@@ -7,6 +7,7 @@ import 'core/theme/app_theme.dart';
 import 'core/router/app_router.dart';
 import 'core/constants/app_strings.dart';
 import 'presentation/providers/theme_provider.dart';
+import 'data/local/local_data_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -17,6 +18,7 @@ void main() async {
   ]);
 
   await Hive.initFlutter();
+  await LocalDataService.seedIfNeeded();
 
   runApp(const ProviderScope(child: PlasticFactoryApp()));
 }

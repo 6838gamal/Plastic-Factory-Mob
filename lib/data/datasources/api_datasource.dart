@@ -161,95 +161,30 @@ class ApiDataSource {
     return (res as List).map((e) => InventoryTransactionModel.fromJson(e)).toList();
   }
 
-  // ==================== WORKERS (local-first, API fallback) ====================
-  Future<List<WorkerModel>> getWorkers() async {
-    final local = await LocalDataService.getWorkers();
-    if (local.isNotEmpty) return local;
-    try {
-      final res = await _get('/api/workers');
-      for (final item in (res as List)) {
-        await LocalDataService.upsertWorker(Map<String, dynamic>.from(item as Map));
-      }
-      return LocalDataService.getWorkers();
-    } catch (_) {
-      return local;
-    }
-  }
-
+  // ==================== WORKERS (local only — seeded on first run) ====================
+  Future<List<WorkerModel>> getWorkers() => LocalDataService.getWorkers();
   Future<void> upsertWorker(Map<String, dynamic> data) =>
       LocalDataService.upsertWorker(data);
-
   Future<void> deleteWorker(String id) => LocalDataService.deleteWorker(id);
 
-  // ==================== PRODUCTS (local-first, API fallback) ====================
-  Future<List<ProductModel>> getProducts() async {
-    final local = await LocalDataService.getProducts();
-    if (local.isNotEmpty) return local;
-    try {
-      final res = await _get('/api/products');
-      for (final item in (res as List)) {
-        await LocalDataService.upsertProduct(Map<String, dynamic>.from(item as Map));
-      }
-      return LocalDataService.getProducts();
-    } catch (_) {
-      return local;
-    }
-  }
-
+  // ==================== PRODUCTS (local only) ====================
+  Future<List<ProductModel>> getProducts() => LocalDataService.getProducts();
   Future<void> upsertProduct(Map<String, dynamic> data) =>
       LocalDataService.upsertProduct(data);
 
-  // ==================== MACHINES (local-first, API fallback) ====================
-  Future<List<MachineModel>> getMachines() async {
-    final local = await LocalDataService.getMachines();
-    if (local.isNotEmpty) return local;
-    try {
-      final res = await _get('/api/machines');
-      for (final item in (res as List)) {
-        await LocalDataService.upsertMachine(Map<String, dynamic>.from(item as Map));
-      }
-      return LocalDataService.getMachines();
-    } catch (_) {
-      return local;
-    }
-  }
-
+  // ==================== MACHINES (local only) ====================
+  Future<List<MachineModel>> getMachines() => LocalDataService.getMachines();
   Future<void> upsertMachine(Map<String, dynamic> data) =>
       LocalDataService.upsertMachine(data);
 
-  // ==================== MIXERS (local-first, API fallback) ====================
-  Future<List<MixerModel>> getMixers() async {
-    final local = await LocalDataService.getMixers();
-    if (local.isNotEmpty) return local;
-    try {
-      final res = await _get('/api/mixers');
-      for (final item in (res as List)) {
-        await LocalDataService.upsertMixer(Map<String, dynamic>.from(item as Map));
-      }
-      return LocalDataService.getMixers();
-    } catch (_) {
-      return local;
-    }
-  }
-
+  // ==================== MIXERS (local only) ====================
+  Future<List<MixerModel>> getMixers() => LocalDataService.getMixers();
   Future<void> upsertMixer(Map<String, dynamic> data) =>
       LocalDataService.upsertMixer(data);
 
-  // ==================== MIXTURE TYPES (local-first, API fallback) ====================
-  Future<List<MixtureTypeModel>> getMixtureTypes() async {
-    final local = await LocalDataService.getMixtureTypes();
-    if (local.isNotEmpty) return local;
-    try {
-      final res = await _get('/api/mixture-types');
-      for (final item in (res as List)) {
-        await LocalDataService.upsertMixtureType(Map<String, dynamic>.from(item as Map));
-      }
-      return LocalDataService.getMixtureTypes();
-    } catch (_) {
-      return local;
-    }
-  }
-
+  // ==================== MIXTURE TYPES (local only) ====================
+  Future<List<MixtureTypeModel>> getMixtureTypes() =>
+      LocalDataService.getMixtureTypes();
   Future<void> upsertMixtureType(Map<String, dynamic> data) =>
       LocalDataService.upsertMixtureType(data);
 

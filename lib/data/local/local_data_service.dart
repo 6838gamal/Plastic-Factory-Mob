@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/reference_models.dart';
+import 'seed_data.dart';
 
 class LocalDataService {
   static const _wKey = 'lref_workers';
@@ -8,6 +9,31 @@ class LocalDataService {
   static const _xKey = 'lref_mixers';
   static const _pKey = 'lref_products';
   static const _tKey = 'lref_mixture_types';
+  static const _seededKey = 'lref_seeded_v1';
+
+  /// Seeds default data on first app run. Safe to call every startup.
+  static Future<void> seedIfNeeded() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getBool(_seededKey) == true) return;
+
+    for (final w in SeedData.workers) {
+      await _upsert(_wKey, Map<String, dynamic>.from(w));
+    }
+    for (final m in SeedData.machines) {
+      await _upsert(_mKey, Map<String, dynamic>.from(m));
+    }
+    for (final x in SeedData.mixers) {
+      await _upsert(_xKey, Map<String, dynamic>.from(x));
+    }
+    for (final p in SeedData.products) {
+      await _upsert(_pKey, Map<String, dynamic>.from(p));
+    }
+    for (final t in SeedData.mixtureTypes) {
+      await _upsert(_tKey, Map<String, dynamic>.from(t));
+    }
+
+    await prefs.setBool(_seededKey, true);
+  }
 
   static String _newId() =>
       DateTime.now().microsecondsSinceEpoch.toString();
