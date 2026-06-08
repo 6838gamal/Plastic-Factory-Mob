@@ -11,7 +11,8 @@ import '../models/reference_models.dart';
 import '../local/local_data_service.dart';
 
 class ApiDataSource {
-  static const String _fallbackUrl = 'https://plastic-factory-api.onrender.com';
+  // Empty string = use relative URLs (same origin). Correct for Replit hosting.
+  static const String _fallbackUrl = '';
 
   static String? _resolvedBaseUrl;
 
@@ -23,9 +24,13 @@ class ApiDataSource {
       );
       if (res.statusCode == 200) {
         final body = jsonDecode(res.body) as Map<String, dynamic>;
-        _resolvedBaseUrl = (body['base_url'] as String?)?.isNotEmpty == true
-            ? body['base_url'] as String
-            : _fallbackUrl;
+        final configUrl = (body['base_url'] as String?) ?? '';
+        // Use the configured URL only if it's non-empty AND not the old external
+        // fallback address. Otherwise fall back to relative paths (same origin).
+        _resolvedBaseUrl = (configUrl.isNotEmpty &&
+                !configUrl.contains('onrender.com'))
+            ? configUrl
+            : '';
         return _resolvedBaseUrl!;
       }
     } catch (_) {}
