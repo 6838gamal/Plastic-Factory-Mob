@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../widgets/admin/admin_login_dialog.dart';
 import '../../providers/auth_provider.dart';
@@ -42,7 +41,7 @@ class _WorkerHomePageState extends ConsumerState<WorkerHomePage> {
         ],
       ),
       drawer: _WorkerDrawer(
-        onAdminAccess: () => _showAdminLogin(context),
+        onAdminAccess: () => _showAdminLogin(),
       ),
       body: _pages[_selectedIndex],
       bottomNavigationBar: NavigationBar(
@@ -69,14 +68,15 @@ class _WorkerHomePageState extends ConsumerState<WorkerHomePage> {
     );
   }
 
-  void _showAdminLogin(BuildContext context) {
+  void _showAdminLogin() {
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AdminLoginDialog(
         onSuccess: () {
+          // Close the dialog — the router's refreshListenable
+          // detects isAdmin=true and redirects to /admin automatically.
           Navigator.of(ctx, rootNavigator: true).pop();
-          if (mounted) context.go('/admin');
         },
       ),
     );

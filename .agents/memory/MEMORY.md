@@ -1,1 +1,2 @@
 - [Plastic Factory ERP setup](plastic-factory-erp.md) — Flutter web + FastAPI + Replit PostgreSQL; SSL must be disabled for Replit's helium DB host; rebuild Flutter after any Dart changes.
+- [GoRouter + Riverpod auth redirect](go-router-riverpod-auth.md) — Never recreate GoRouter on auth change; use refreshListenable + ChangeNotifier instead.

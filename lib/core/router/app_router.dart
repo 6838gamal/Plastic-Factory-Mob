@@ -16,16 +16,29 @@ import '../../presentation/pages/admin/settings/settings_page.dart';
 import '../../presentation/pages/admin/production/production_page.dart';
 import '../../presentation/providers/auth_provider.dart';
 
+/// A ChangeNotifier that fires whenever auth state changes,
+/// so GoRouter re-evaluates its redirect without recreating the router.
+class _AuthRefreshNotifier extends ChangeNotifier {
+  _AuthRefreshNotifier(Ref ref) {
+    ref.listen<AuthState>(authProvider, (_, __) => notifyListeners());
+  }
+}
+
+final _authRefreshProvider = ChangeNotifierProvider<_AuthRefreshNotifier>(
+  (ref) => _AuthRefreshNotifier(ref),
+);
+
 final routerProvider = Provider<GoRouter>((ref) {
-  final authState = ref.watch(authProvider);
-  return GoRouter(
+  // Keep the notifier alive for the lifetime of this provider.
+  final notifier = ref.watch(_authRefreshProvider);
+
+  final router = GoRouter(
     initialLocation: '/worker',
+    refreshListenable: notifier,
     redirect: (context, state) {
-      final isAdmin = authState.isAdmin;
+      final isAdmin = ref.read(authProvider).isAdmin;
       final onAdmin = state.uri.toString().startsWith('/admin');
-      // Not admin trying to reach admin pages → send to worker
       if (onAdmin && !isAdmin) return '/worker';
-      // Admin sitting on worker pages → send to admin dashboard
       if (isAdmin && !onAdmin) return '/admin';
       return null;
     },
@@ -55,4 +68,6 @@ final routerProvider = Provider<GoRouter>((ref) {
       body: Center(child: Text('الصفحة غير موجودة: ${state.error}')),
     ),
   );
+
+  return router;
 });
