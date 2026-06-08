@@ -7,7 +7,7 @@ import '../../providers/batch_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../data/models/reference_models.dart';
-import '../../../data/datasources/supabase_datasource.dart';
+import '../../../data/datasources/api_datasource.dart';
 
 class MachineEntryPage extends ConsumerStatefulWidget {
   const MachineEntryPage({super.key});

@@ -1,10 +1,14 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-import '../../data/datasources/supabase_datasource.dart';
-import '../../data/supabase/supabase_config.dart';
+import '../../data/datasources/api_datasource.dart';
+
+class AppUser {
+  final String id;
+  final String email;
+  const AppUser({required this.id, required this.email});
+}
 
 class AuthState {
-  final User? user;
+  final AppUser? user;
   final bool isAdmin;
   final bool isLoading;
   final String? error;
@@ -17,7 +21,7 @@ class AuthState {
   });
 
   AuthState copyWith({
-    User? user,
+    AppUser? user,
     bool? isAdmin,
     bool? isLoading,
     String? error,
@@ -30,41 +34,24 @@ class AuthState {
       );
 }
 
-final dataSourceProvider = Provider<SupabaseDataSource>((ref) => SupabaseDataSource());
+final dataSourceProvider = Provider<ApiDataSource>((ref) => ApiDataSource());
 
 class AuthNotifier extends Notifier<AuthState> {
   @override
-  AuthState build() {
-    if (!SupabaseConfig.isConfigured) {
-      return const AuthState();
-    }
-    try {
-      final ds = ref.read(dataSourceProvider);
-      final currentUser = ds.currentUser;
-      return AuthState(
-        user: currentUser,
-        isAdmin: currentUser != null,
-      );
-    } catch (_) {
-      return const AuthState();
-    }
-  }
+  AuthState build() => const AuthState();
 
   Future<bool> signIn(String email, String password) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
       final ds = ref.read(dataSourceProvider);
       final response = await ds.signIn(email, password);
-      if (response.user != null) {
-        state = state.copyWith(
-          user: response.user,
-          isAdmin: true,
-          isLoading: false,
-        );
-        return true;
-      }
-      state = state.copyWith(isLoading: false, error: 'بيانات خاطئة');
-      return false;
+      final userMap = response['user'] as Map<String, dynamic>;
+      final user = AppUser(
+        id: userMap['id'] as String,
+        email: userMap['email'] as String,
+      );
+      state = state.copyWith(user: user, isAdmin: true, isLoading: false);
+      return true;
     } catch (e) {
       state = state.copyWith(isLoading: false, error: 'خطأ في تسجيل الدخول: $e');
       return false;

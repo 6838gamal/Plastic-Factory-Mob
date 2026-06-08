@@ -4,7 +4,7 @@ import '../../../providers/batch_provider.dart';
 import '../../../widgets/common/loading_widget.dart';
 import '../../../widgets/common/severity_chip.dart';
 import '../../../../data/models/alert_model.dart';
-import '../../../../data/datasources/supabase_datasource.dart';
+import '../../../../data/datasources/api_datasource.dart';
 import '../../../../core/utils/helpers.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../../core/constants/app_strings.dart';

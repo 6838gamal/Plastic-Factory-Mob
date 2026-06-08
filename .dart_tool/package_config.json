@@ -20,30 +20,6 @@
       "languageVersion": "3.5"
     },
     {
-      "name": "app_links",
-      "rootUri": "file:///home/runner/.pub-cache/hosted/pub.dev/app_links-6.4.1",
-      "packageUri": "lib/",
-      "languageVersion": "3.5"
-    },
-    {
-      "name": "app_links_linux",
-      "rootUri": "file:///home/runner/.pub-cache/hosted/pub.dev/app_links_linux-1.0.3",
-      "packageUri": "lib/",
-      "languageVersion": "3.2"
-    },
-    {
-      "name": "app_links_platform_interface",
-      "rootUri": "file:///home/runner/.pub-cache/hosted/pub.dev/app_links_platform_interface-2.0.2",
-      "packageUri": "lib/",
-      "languageVersion": "3.2"
-    },
-    {
-      "name": "app_links_web",
-      "rootUri": "file:///home/runner/.pub-cache/hosted/pub.dev/app_links_web-1.0.4",
-      "packageUri": "lib/",
-      "languageVersion": "3.2"
-    },
-    {
       "name": "archive",
       "rootUri": "file:///home/runner/.pub-cache/hosted/pub.dev/archive-3.6.1",
       "packageUri": "lib/",
@@ -214,12 +190,6 @@
     {
       "name": "custom_lint_visitor",
       "rootUri": "file:///home/runner/.pub-cache/hosted/pub.dev/custom_lint_visitor-1.0.0+7.7.0",
-      "packageUri": "lib/",
-      "languageVersion": "3.0"
-    },
-    {
-      "name": "dart_jsonwebtoken",
-      "rootUri": "file:///home/runner/.pub-cache/hosted/pub.dev/dart_jsonwebtoken-3.4.1",
       "packageUri": "lib/",
       "languageVersion": "3.0"
     },
@@ -398,12 +368,6 @@
       "languageVersion": "3.0"
     },
     {
-      "name": "functions_client",
-      "rootUri": "file:///home/runner/.pub-cache/hosted/pub.dev/functions_client-2.6.0",
-      "packageUri": "lib/",
-      "languageVersion": "3.3"
-    },
-    {
       "name": "get_it",
       "rootUri": "file:///home/runner/.pub-cache/hosted/pub.dev/get_it-7.7.0",
       "packageUri": "lib/",
@@ -428,22 +392,10 @@
       "languageVersion": "3.7"
     },
     {
-      "name": "gotrue",
-      "rootUri": "file:///home/runner/.pub-cache/hosted/pub.dev/gotrue-2.21.0",
-      "packageUri": "lib/",
-      "languageVersion": "3.3"
-    },
-    {
       "name": "graphs",
       "rootUri": "file:///home/runner/.pub-cache/hosted/pub.dev/graphs-2.3.2",
       "packageUri": "lib/",
       "languageVersion": "3.4"
-    },
-    {
-      "name": "gtk",
-      "rootUri": "file:///home/runner/.pub-cache/hosted/pub.dev/gtk-2.2.0",
-      "packageUri": "lib/",
-      "languageVersion": "3.0"
     },
     {
       "name": "hive",
@@ -558,12 +510,6 @@
       "rootUri": "file:///home/runner/.pub-cache/hosted/pub.dev/json_serializable-6.9.5",
       "packageUri": "lib/",
       "languageVersion": "3.6"
-    },
-    {
-      "name": "jwt_decode",
-      "rootUri": "file:///home/runner/.pub-cache/hosted/pub.dev/jwt_decode-0.3.1",
-      "packageUri": "lib/",
-      "languageVersion": "2.12"
     },
     {
       "name": "leak_tracker",
@@ -848,22 +794,10 @@
       "languageVersion": "3.0"
     },
     {
-      "name": "pointycastle",
-      "rootUri": "file:///home/runner/.pub-cache/hosted/pub.dev/pointycastle-4.0.0",
-      "packageUri": "lib/",
-      "languageVersion": "3.2"
-    },
-    {
       "name": "pool",
       "rootUri": "file:///home/runner/.pub-cache/hosted/pub.dev/pool-1.5.2",
       "packageUri": "lib/",
       "languageVersion": "3.4"
-    },
-    {
-      "name": "postgrest",
-      "rootUri": "file:///home/runner/.pub-cache/hosted/pub.dev/postgrest-2.7.0",
-      "packageUri": "lib/",
-      "languageVersion": "3.3"
     },
     {
       "name": "printing",
@@ -888,18 +822,6 @@
       "rootUri": "file:///home/runner/.pub-cache/hosted/pub.dev/qr-3.0.2",
       "packageUri": "lib/",
       "languageVersion": "3.4"
-    },
-    {
-      "name": "realtime_client",
-      "rootUri": "file:///home/runner/.pub-cache/hosted/pub.dev/realtime_client-2.7.3",
-      "packageUri": "lib/",
-      "languageVersion": "3.3"
-    },
-    {
-      "name": "retry",
-      "rootUri": "file:///home/runner/.pub-cache/hosted/pub.dev/retry-3.1.2",
-      "packageUri": "lib/",
-      "languageVersion": "3.0"
     },
     {
       "name": "riverpod",
@@ -1070,12 +992,6 @@
       "languageVersion": "2.12"
     },
     {
-      "name": "storage_client",
-      "rootUri": "file:///home/runner/.pub-cache/hosted/pub.dev/storage_client-2.5.5",
-      "packageUri": "lib/",
-      "languageVersion": "3.3"
-    },
-    {
       "name": "stream_channel",
       "rootUri": "file:///home/runner/.pub-cache/hosted/pub.dev/stream_channel-2.1.4",
       "packageUri": "lib/",
@@ -1092,18 +1008,6 @@
       "rootUri": "file:///home/runner/.pub-cache/hosted/pub.dev/string_scanner-1.4.1",
       "packageUri": "lib/",
       "languageVersion": "3.1"
-    },
-    {
-      "name": "supabase",
-      "rootUri": "file:///home/runner/.pub-cache/hosted/pub.dev/supabase-2.12.1",
-      "packageUri": "lib/",
-      "languageVersion": "3.3"
-    },
-    {
-      "name": "supabase_flutter",
-      "rootUri": "file:///home/runner/.pub-cache/hosted/pub.dev/supabase_flutter-2.14.1",
-      "packageUri": "lib/",
-      "languageVersion": "3.3"
     },
     {
       "name": "synchronized",
@@ -1136,34 +1040,10 @@
       "languageVersion": "3.5"
     },
     {
-      "name": "url_launcher",
-      "rootUri": "file:///home/runner/.pub-cache/hosted/pub.dev/url_launcher-6.3.2",
-      "packageUri": "lib/",
-      "languageVersion": "3.6"
-    },
-    {
-      "name": "url_launcher_android",
-      "rootUri": "file:///home/runner/.pub-cache/hosted/pub.dev/url_launcher_android-6.3.20",
-      "packageUri": "lib/",
-      "languageVersion": "3.7"
-    },
-    {
-      "name": "url_launcher_ios",
-      "rootUri": "file:///home/runner/.pub-cache/hosted/pub.dev/url_launcher_ios-6.3.4",
-      "packageUri": "lib/",
-      "languageVersion": "3.7"
-    },
-    {
       "name": "url_launcher_linux",
       "rootUri": "file:///home/runner/.pub-cache/hosted/pub.dev/url_launcher_linux-3.2.2",
       "packageUri": "lib/",
       "languageVersion": "3.8"
-    },
-    {
-      "name": "url_launcher_macos",
-      "rootUri": "file:///home/runner/.pub-cache/hosted/pub.dev/url_launcher_macos-3.2.3",
-      "packageUri": "lib/",
-      "languageVersion": "3.7"
     },
     {
       "name": "url_launcher_platform_interface",
@@ -1254,12 +1134,6 @@
       "rootUri": "file:///home/runner/.pub-cache/hosted/pub.dev/yaml-3.1.3",
       "packageUri": "lib/",
       "languageVersion": "3.4"
-    },
-    {
-      "name": "yet_another_json_isolate",
-      "rootUri": "file:///home/runner/.pub-cache/hosted/pub.dev/yet_another_json_isolate-2.1.0",
-      "packageUri": "lib/",
-      "languageVersion": "3.0"
     },
     {
       "name": "plastic_factory",

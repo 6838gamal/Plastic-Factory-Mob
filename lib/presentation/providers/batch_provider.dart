@@ -1,5 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../data/datasources/supabase_datasource.dart';
+import '../../data/datasources/api_datasource.dart';
 import '../../data/models/batch_model.dart';
 import '../../data/models/machine_production_model.dart';
 import '../../data/models/alert_model.dart';
@@ -85,7 +85,6 @@ class BatchOperationsNotifier extends Notifier<AsyncValue<void>> {
         final required = (mat['quantity'] as num).toDouble();
         final inventory = await ds.getMaterialInventory(materialId, AppConstants.warehouseMixer);
         if (inventory != null && inventory.balance < required) {
-          // Create insufficient stock alert
           await ds.createAlert({
             'alert_type': 'insufficient_stock',
             'severity': AppConstants.severityCritical,
@@ -120,7 +119,6 @@ class BatchOperationsNotifier extends Notifier<AsyncValue<void>> {
           final newBalance = inv.balance - quantity;
           await ds.updateInventoryBalance(materialId, AppConstants.warehouseMixer, newBalance);
 
-          // Create transaction record
           await ds.addInventoryTransaction(InventoryTransactionModel(
             id: '',
             materialId: materialId,
@@ -134,7 +132,6 @@ class BatchOperationsNotifier extends Notifier<AsyncValue<void>> {
             createdAt: DateTime.now(),
           ));
 
-          // Check for low stock alert
           if (newBalance <= inv.minStock) {
             await ds.createAlert({
               'alert_type': 'low_stock',
@@ -168,7 +165,6 @@ class BatchOperationsNotifier extends Notifier<AsyncValue<void>> {
       state = const AsyncValue.data(null);
       return BatchSaveResult(success: true, batch: batch);
     } catch (e) {
-      // Log failure
       await ds.addAuditLog({
         'action': AppConstants.auditFailed,
         'table_name': AppConstants.tbBatches,
@@ -197,7 +193,6 @@ class BatchOperationsNotifier extends Notifier<AsyncValue<void>> {
       };
       final production = await ds.saveMachineProduction(data);
 
-      // Check for high waste
       final wasteQty = (productionData['waste_quantity'] as num?)?.toDouble() ?? 0;
       final producedQty = (productionData['produced_quantity'] as num?)?.toDouble() ?? 0;
       if (producedQty > 0) {
@@ -214,7 +209,6 @@ class BatchOperationsNotifier extends Notifier<AsyncValue<void>> {
         }
       }
 
-      // Check machine stop time
       final stopTime = (productionData['stop_time_minutes'] as num?)?.toDouble() ?? 0;
       if (stopTime > 0) {
         await ds.createAlert({
@@ -227,7 +221,6 @@ class BatchOperationsNotifier extends Notifier<AsyncValue<void>> {
         });
       }
 
-      // Audit log
       await ds.addAuditLog({
         'action': AppConstants.auditCreate,
         'table_name': AppConstants.tbMachineProduction,

@@ -1,5 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../data/datasources/supabase_datasource.dart';
+import '../../data/datasources/api_datasource.dart';
 import '../../data/models/raw_material_model.dart';
 import '../../data/models/reference_models.dart';
 import 'auth_provider.dart';
@@ -34,7 +34,6 @@ final mixtureTypesProvider = FutureProvider<List<MixtureTypeModel>>((ref) async 
   return ds.getMixtureTypes();
 });
 
-// Dashboard stats
 final dashboardStatsProvider = FutureProvider<Map<String, dynamic>>((ref) async {
   final ds = ref.read(dataSourceProvider);
   return ds.getDashboardStats();

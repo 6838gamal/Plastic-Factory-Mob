@@ -1,10 +1,13 @@
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
 const pool = require('./db');
 
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
+
+app.use(express.static(path.join(__dirname, '..', 'build', 'web')));
 
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/materials', require('./routes/materials'));
@@ -29,7 +32,11 @@ app.get('/api/health', async (req, res) => {
   }
 });
 
-const PORT = process.env.API_PORT || 3000;
+app.get('/{*path}', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'build', 'web', 'index.html'));
+});
+
+const PORT = process.env.API_PORT || 5000;
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Plastic Factory API running on port ${PORT}`);
 });

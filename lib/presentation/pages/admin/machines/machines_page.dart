@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../providers/reference_data_provider.dart';
 import '../../../widgets/common/loading_widget.dart';
 import '../../../../data/models/reference_models.dart';
-import '../../../../data/datasources/supabase_datasource.dart';
+import '../../../../data/datasources/api_datasource.dart';
 import '../../../providers/auth_provider.dart';
 
 class MachinesPage extends ConsumerWidget {
