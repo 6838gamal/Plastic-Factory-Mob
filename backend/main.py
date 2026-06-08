@@ -1,9 +1,10 @@
 import os
 import sys
+import asyncio
 from contextlib import asynccontextmanager
+from datetime import datetime, timedelta
 from pathlib import Path
 
-# Ensure backend directory is always on the Python path regardless of CWD
 sys.path.insert(0, os.path.dirname(__file__))
 
 from fastapi import FastAPI, Request
@@ -22,11 +23,48 @@ from routers import (
 WEB_DIR = Path(__file__).parent.parent / "build" / "web"
 
 
+async def _run_daily_report():
+    """Generate and lock the daily report for today."""
+    try:
+        pool = await get_pool()
+        today = str(datetime.now().date())
+
+        existing = await pool.fetchrow(
+            "SELECT is_locked FROM daily_reports WHERE report_date=$1::date", today
+        )
+        if existing and existing["is_locked"]:
+            print(f"[scheduler] Daily report {today} already locked — skipping.")
+            return
+
+        # Import inline to avoid circular imports
+        from routers.reports import generate_daily_report
+        await generate_daily_report(report_date=today, lock=True)
+        print(f"✅ [scheduler] Daily report generated and locked for {today}")
+    except Exception as exc:
+        print(f"❌ [scheduler] Daily report error: {exc}")
+
+
+async def _daily_report_scheduler():
+    """Loop: sleep until 23:59, generate report, sleep 61 s, repeat."""
+    while True:
+        now = datetime.now()
+        target = now.replace(hour=23, minute=59, second=0, microsecond=0)
+        if now >= target:
+            target += timedelta(days=1)
+        sleep_secs = (target - now).total_seconds()
+        print(f"[scheduler] Next daily report in {sleep_secs/3600:.1f} h")
+        await asyncio.sleep(sleep_secs)
+        await _run_daily_report()
+        await asyncio.sleep(61)   # avoid double-fire within the same minute
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await get_pool()
     print("✅ Database pool ready")
+    scheduler_task = asyncio.create_task(_daily_report_scheduler())
     yield
+    scheduler_task.cancel()
     await close_pool()
     print("Database pool closed")
 
@@ -73,7 +111,6 @@ async def health():
 _NO_CACHE = {"Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache"}
 
 if WEB_DIR.exists():
-    # Serve service worker and index.html with no-cache so browsers always pick up fresh builds
     @app.get("/flutter_service_worker.js")
     async def service_worker():
         return FileResponse(str(WEB_DIR / "flutter_service_worker.js"), headers=_NO_CACHE)

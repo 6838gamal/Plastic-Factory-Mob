@@ -1,11 +1,24 @@
+"""
+Batches router — full deduction engine.
+
+Rules:
+ - Transaction ID prevents duplicate deductions.
+ - Negative stock is blocked when settings.prevent_negative_stock = 'true'.
+ - Edit reverses old deductions then applies new ones atomically.
+ - Delete reverses any applied deductions.
+ - Every deduction / reversal is written to audit_log and inventory_transactions.
+ - Alerts are raised for insufficient stock and post-deduction low/zero stock.
+"""
 import json
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 from typing import Optional, List, Any
 from database import get_pool
 
 router = APIRouter(prefix="/api/batches", tags=["batches"])
 
+
+# ─────────────────────────── Models ────────────────────────────
 
 class BatchCreate(BaseModel):
     batch_number: str
@@ -33,19 +46,285 @@ class BatchCreate(BaseModel):
     scale_image_url: Optional[str] = None
     transaction_id: Optional[str] = None
     status: Optional[str] = "saved"
+    created_by: Optional[str] = None
 
 
 class BatchUpdate(BatchCreate):
     pass
 
 
+# ─────────────────────────── Helpers ───────────────────────────
+
+def _parse_json(val) -> list:
+    if isinstance(val, str):
+        try:
+            return json.loads(val) or []
+        except Exception:
+            return []
+    return val or []
+
+
 def serialize_row(row) -> dict:
     d = dict(row)
     for k in ("pigments", "additives", "materials"):
         if k in d and isinstance(d[k], str):
-            d[k] = json.loads(d[k])
+            try:
+                d[k] = json.loads(d[k])
+            except Exception:
+                pass
     return d
 
+
+def _extract_materials(batch: BatchCreate) -> list:
+    """Return a flat list of {material_id, name, quantity, unit} for ALL
+    materials in the batch that have a valid material_id and qty > 0."""
+    items = []
+    seen = {}
+    for field in ("materials", "pigments", "additives"):
+        raw = _parse_json(getattr(batch, field, None))
+        for item in raw:
+            if not isinstance(item, dict):
+                continue
+            mid = item.get("material_id") or item.get("id")
+            qty = float(item.get("quantity", 0) or 0)
+            if not mid or qty <= 0:
+                continue
+            # Aggregate duplicates
+            if mid in seen:
+                seen[mid]["quantity"] += qty
+            else:
+                entry = {
+                    "material_id": str(mid),
+                    "name": item.get("name", ""),
+                    "quantity": qty,
+                    "unit": item.get("unit", "كجم"),
+                }
+                seen[mid] = entry
+                items.append(entry)
+    return items
+
+
+async def _apply_deductions(pool, batch_id: str, batch_number: str,
+                            transaction_id: str, materials: list,
+                            created_by: str = None) -> dict:
+    """Deduct materials from mixer inventory.
+
+    Returns {"deducted": True/False, "items_count": N, "already_deducted": bool}
+    Raises HTTPException 400 when stock is insufficient and prevent_negative=true.
+    """
+    if not transaction_id:
+        return {"deducted": False, "items_count": 0, "already_deducted": False}
+
+    # ── 1. Idempotency check ──────────────────────────────────
+    existing = await pool.fetchrow(
+        "SELECT id FROM deduction_log WHERE transaction_id=$1 AND reversed_at IS NULL",
+        transaction_id,
+    )
+    if existing:
+        return {"deducted": False, "items_count": 0, "already_deducted": True}
+
+    if not materials:
+        return {"deducted": False, "items_count": 0, "already_deducted": False}
+
+    # ── 2. Prevent-negative setting ───────────────────────────
+    setting = await pool.fetchrow(
+        "SELECT value FROM settings WHERE key='prevent_negative_stock'"
+    )
+    prevent_neg = (setting["value"] if setting else "true").lower() == "true"
+
+    # ── 3. Stock-sufficiency check ────────────────────────────
+    if prevent_neg:
+        insufficient = []
+        for item in materials:
+            inv = await pool.fetchrow(
+                """SELECT i.balance, rm.min_stock
+                   FROM inventory i
+                   JOIN raw_materials rm ON rm.id = i.material_id
+                   WHERE i.material_id=$1 AND i.warehouse_type='mixer'""",
+                item["material_id"],
+            )
+            available = float(inv["balance"]) if inv else 0.0
+            if available < item["quantity"]:
+                insufficient.append({**item, "available": available})
+
+        if insufficient:
+            for it in insufficient:
+                await pool.execute(
+                    """INSERT INTO alerts
+                       (id, alert_type, severity, material_id, material_name,
+                        batch_number, description, status, transaction_id)
+                       VALUES (gen_random_uuid(),'insufficient_stock','critical',
+                               $1,$2,$3,$4,'pending',$5)""",
+                    it["material_id"], it["name"], batch_number,
+                    f"مخزون غير كافٍ: {it['name']} — مطلوب {it['quantity']:.3f}، متاح {it['available']:.3f} كجم",
+                    transaction_id,
+                )
+            await pool.execute(
+                """INSERT INTO audit_log
+                   (id, action, table_name, record_id, transaction_id, user_id, description)
+                   VALUES (gen_random_uuid(),'failed','batches',$1,$2,$3,$4)""",
+                batch_id, transaction_id, created_by,
+                f"رُفض حفظ طبخة {batch_number}: مخزون غير كافٍ",
+            )
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": "insufficient_stock",
+                    "message": "المخزون غير كافٍ لإتمام الطبخة",
+                    "items": insufficient,
+                },
+            )
+
+    # ── 4. Deduct each material ───────────────────────────────
+    for item in materials:
+        inv = await pool.fetchrow(
+            """SELECT i.balance, rm.min_stock
+               FROM inventory i
+               JOIN raw_materials rm ON rm.id = i.material_id
+               WHERE i.material_id=$1 AND i.warehouse_type='mixer'""",
+            item["material_id"],
+        )
+        balance_before = float(inv["balance"]) if inv else 0.0
+        min_stock = float(inv["min_stock"]) if inv else 0.0
+        balance_after = balance_before - item["quantity"]
+
+        # Upsert inventory row, subtracting qty
+        await pool.execute(
+            """INSERT INTO inventory (id, material_id, warehouse_type, balance, updated_at)
+               VALUES (gen_random_uuid(), $1, 'mixer', -$2::decimal, NOW())
+               ON CONFLICT (material_id, warehouse_type)
+               DO UPDATE SET balance = inventory.balance - $2::decimal, updated_at = NOW()""",
+            item["material_id"], item["quantity"],
+        )
+
+        # Transaction record
+        await pool.execute(
+            """INSERT INTO inventory_transactions
+               (id, material_id, warehouse_type, transaction_type, quantity,
+                batch_id, transaction_ref, created_by, balance_before, balance_after)
+               VALUES (gen_random_uuid(),$1,'mixer','out',$2,$3,$4,$5,$6,$7)""",
+            item["material_id"], item["quantity"],
+            batch_id, transaction_id, created_by,
+            balance_before, balance_after,
+        )
+
+        # Low / zero stock alerts
+        if balance_after <= 0:
+            sev = "critical"
+            msg = f"نفاد المخزون: {item['name']} — الرصيد {balance_after:.3f} كجم"
+        elif min_stock > 0 and balance_after <= min_stock:
+            sev = "high"
+            msg = f"مخزون منخفض: {item['name']} — الرصيد {balance_after:.3f} كجم (الحد الأدنى {min_stock:.0f})"
+        else:
+            sev = None
+
+        if sev:
+            alert_type = "out_of_stock" if balance_after <= 0 else "low_stock"
+            await pool.execute(
+                """INSERT INTO alerts
+                   (id, alert_type, severity, material_id, material_name,
+                    batch_number, description, status, transaction_id)
+                   VALUES (gen_random_uuid(),$1,$2,$3,$4,$5,$6,'pending',$7)""",
+                alert_type, sev, item["material_id"], item["name"],
+                batch_number, msg, f"stock_{transaction_id}_{item['material_id']}",
+            )
+
+    # ── 5. Log deduction ──────────────────────────────────────
+    await pool.execute(
+        """INSERT INTO deduction_log (id, transaction_id, batch_id, applied_at)
+           VALUES (gen_random_uuid(), $1, $2, NOW())""",
+        transaction_id, batch_id,
+    )
+
+    await pool.execute(
+        """INSERT INTO audit_log
+           (id, action, table_name, record_id, transaction_id, user_id, description)
+           VALUES (gen_random_uuid(),'deduct','batches',$1,$2,$3,$4)""",
+        batch_id, transaction_id, created_by,
+        f"خصم مواد طبخة {batch_number}: {len(materials)} مادة",
+    )
+
+    return {"deducted": True, "items_count": len(materials), "already_deducted": False}
+
+
+async def _reverse_deductions(pool, transaction_id: str,
+                              reason: str = "تعديل طبخة",
+                              reversed_by: str = None) -> dict:
+    """Reverse all 'out' inventory transactions linked to transaction_id.
+
+    Returns {"reversed": bool, "items_count": int}
+    """
+    log = await pool.fetchrow(
+        "SELECT id FROM deduction_log WHERE transaction_id=$1 AND reversed_at IS NULL",
+        transaction_id,
+    )
+    if not log:
+        return {"reversed": False, "items_count": 0}
+
+    txns = await pool.fetch(
+        """SELECT * FROM inventory_transactions
+           WHERE transaction_ref=$1 AND transaction_type='out'""",
+        transaction_id,
+    )
+
+    for txn in txns:
+        # Add quantity back
+        await pool.execute(
+            """UPDATE inventory
+               SET balance = balance + $1, updated_at = NOW()
+               WHERE material_id = $2 AND warehouse_type = $3""",
+            txn["quantity"], txn["material_id"], txn["warehouse_type"],
+        )
+        # Return transaction record
+        await pool.execute(
+            """INSERT INTO inventory_transactions
+               (id, material_id, warehouse_type, transaction_type, quantity,
+                transaction_ref, created_by, notes)
+               VALUES (gen_random_uuid(),$1,$2,'return',$3,$4,$5,$6)""",
+            txn["material_id"], txn["warehouse_type"], txn["quantity"],
+            f"reverse_{transaction_id}", reversed_by, reason,
+        )
+
+    # Mark log entry reversed
+    await pool.execute(
+        "UPDATE deduction_log SET reversed_at = NOW(), reversed_reason = $1 WHERE transaction_id = $2",
+        reason, transaction_id,
+    )
+
+    await pool.execute(
+        """INSERT INTO audit_log
+           (id, action, table_name, transaction_id, user_id, description)
+           VALUES (gen_random_uuid(),'reverse','batches',$1,$2,$3)""",
+        transaction_id, reversed_by, reason,
+    )
+
+    return {"reversed": True, "items_count": len(txns)}
+
+
+def _calc_batch_stats(batch_row: dict) -> dict:
+    """Compute production efficiency/deviation/waste KPIs from raw batch data."""
+    pvc = float(batch_row.get("pvc_qty") or 0)
+    dop = float(batch_row.get("dop_qty") or 0)
+    scrap = float(batch_row.get("scrap_qty") or 0)
+    calcium = float(batch_row.get("calcium_qty") or 0)
+    wax = float(batch_row.get("wax_qty") or 0)
+    stabilizer = float(batch_row.get("stabilizer_qty") or 0)
+    titanium = float(batch_row.get("titanium_qty") or 0)
+
+    dynamic_total = 0.0
+    for field in ("materials", "pigments", "additives"):
+        for item in _parse_json(batch_row.get(field)):
+            if isinstance(item, dict):
+                dynamic_total += float(item.get("quantity", 0) or 0)
+
+    total_inputs = pvc + dop + scrap + calcium + wax + stabilizer + titanium + dynamic_total
+    return {
+        "total_inputs_kg": round(total_inputs, 3),
+        "dynamic_materials_kg": round(dynamic_total, 3),
+    }
+
+
+# ─────────────────────────── Routes ────────────────────────────
 
 @router.get("")
 async def get_batches(
@@ -65,19 +344,76 @@ async def get_batches(
         conditions.append(f"worker_id=${i}"); params.append(worker_id); i += 1
     query = f"SELECT * FROM batches WHERE {' AND '.join(conditions)} ORDER BY created_at DESC"
     rows = await pool.fetch(query, *params)
-    return [serialize_row(r) for r in rows]
+    result = []
+    for r in rows:
+        d = serialize_row(r)
+        d.update(_calc_batch_stats(d))
+        result.append(d)
+    return result
 
 
 @router.get("/check-transaction/{transaction_id}")
 async def check_transaction(transaction_id: str):
     pool = await get_pool()
-    row = await pool.fetchrow("SELECT id FROM batches WHERE transaction_id=$1", transaction_id)
+    row = await pool.fetchrow(
+        "SELECT id FROM batches WHERE transaction_id=$1", transaction_id
+    )
     return {"exists": row is not None}
+
+
+@router.get("/{batch_id}/stats")
+async def get_batch_stats(batch_id: str):
+    """Return KPI stats for a single batch including production figures if available."""
+    pool = await get_pool()
+    batch = await pool.fetchrow("SELECT * FROM batches WHERE id=$1", batch_id)
+    if not batch:
+        raise HTTPException(status_code=404, detail="Batch not found")
+
+    d = serialize_row(batch)
+    stats = _calc_batch_stats(d)
+
+    # Join machine_production to get output quantities
+    prod = await pool.fetchrow(
+        """SELECT
+             COALESCE(SUM(produced_quantity),0) AS total_produced,
+             COALESCE(SUM(scrap_quantity),0)    AS total_scrap,
+             COALESCE(SUM(waste_quantity),0)    AS total_waste,
+             COALESCE(SUM(stop_time_minutes),0) AS total_stop_time
+           FROM machine_production
+           WHERE batch_number=$1""",
+        d.get("batch_number", ""),
+    )
+
+    total_inputs = stats["total_inputs_kg"]
+    total_produced = float(prod["total_produced"]) if prod else 0
+    total_waste = float(prod["total_waste"]) if prod else 0
+    total_scrap = float(prod["total_scrap"]) if prod else 0
+
+    production_diff = total_produced - total_inputs
+    efficiency = (total_produced / total_inputs * 100) if total_inputs > 0 else 0
+    deviation = (production_diff / total_inputs * 100) if total_inputs > 0 else 0
+    waste_pct = (total_waste / total_inputs * 100) if total_inputs > 0 else 0
+    scrap_pct = (total_scrap / total_inputs * 100) if total_inputs > 0 else 0
+
+    return {
+        **stats,
+        "total_produced_kg": round(total_produced, 3),
+        "total_waste_kg": round(total_waste, 3),
+        "total_scrap_kg": round(total_scrap, 3),
+        "total_stop_time_min": float(prod["total_stop_time"]) if prod else 0,
+        "production_diff_kg": round(production_diff, 3),
+        "efficiency_pct": round(efficiency, 2),
+        "deviation_pct": round(deviation, 2),
+        "waste_pct": round(waste_pct, 2),
+        "scrap_pct": round(scrap_pct, 2),
+    }
 
 
 @router.post("")
 async def create_batch(body: BatchCreate):
     pool = await get_pool()
+
+    # ── Insert batch record ────────────────────────────────────
     row = await pool.fetchrow(
         """INSERT INTO batches (
             id, batch_number, date, shift, worker_id, worker_name, mixer_id, mixer_name,
@@ -85,8 +421,8 @@ async def create_batch(body: BatchCreate):
             pvc_qty, dop_qty, scrap_qty, calcium_qty, wax_qty, stabilizer_qty, titanium_qty,
             pigments, additives, materials, notes, scale_image_url, transaction_id, status
         ) VALUES (
-            gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11,
-            $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25
+            gen_random_uuid(),$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,
+            $12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25
         ) RETURNING *""",
         body.batch_number, body.date, body.shift,
         body.worker_id, body.worker_name, body.mixer_id, body.mixer_name,
@@ -98,19 +434,52 @@ async def create_batch(body: BatchCreate):
         json.dumps(body.materials or []),
         body.notes, body.scale_image_url, body.transaction_id, body.status,
     )
-    return serialize_row(row)
 
+    batch_id = str(row["id"])
+    result = serialize_row(row)
 
-@router.delete("/{batch_id}")
-async def delete_batch(batch_id: str):
-    pool = await get_pool()
-    await pool.execute("DELETE FROM batches WHERE id=$1", batch_id)
-    return {"success": True}
+    # ── Audit: create ─────────────────────────────────────────
+    await pool.execute(
+        """INSERT INTO audit_log
+           (id, action, table_name, record_id, transaction_id, user_id, description)
+           VALUES (gen_random_uuid(),'create','batches',$1,$2,$3,$4)""",
+        batch_id, body.transaction_id, body.created_by,
+        f"إنشاء طبخة {body.batch_number}",
+    )
+
+    # ── Deduct inventory ──────────────────────────────────────
+    materials = _extract_materials(body)
+    if materials and body.transaction_id:
+        deduct_result = await _apply_deductions(
+            pool, batch_id, body.batch_number,
+            body.transaction_id, materials, body.created_by,
+        )
+        result["deduction"] = deduct_result
+
+    result.update(_calc_batch_stats(result))
+    return result
 
 
 @router.put("/{batch_id}")
 async def update_batch(batch_id: str, body: BatchUpdate):
     pool = await get_pool()
+
+    # ── Load old batch to get its transaction_id ───────────────
+    old_row = await pool.fetchrow(
+        "SELECT transaction_id, batch_number FROM batches WHERE id=$1", batch_id
+    )
+    old_tx_id = str(old_row["transaction_id"]) if old_row and old_row["transaction_id"] else None
+    old_batch_number = old_row["batch_number"] if old_row else ""
+
+    # ── Reverse old deductions ────────────────────────────────
+    if old_tx_id:
+        await _reverse_deductions(
+            pool, old_tx_id,
+            reason=f"تعديل طبخة {old_batch_number}",
+            reversed_by=body.created_by,
+        )
+
+    # ── Update batch record ───────────────────────────────────
     row = await pool.fetchrow(
         """UPDATE batches SET
             batch_number=$1, date=$2, shift=$3, worker_id=$4, worker_name=$5,
@@ -131,4 +500,53 @@ async def update_batch(batch_id: str, body: BatchUpdate):
         json.dumps(body.materials or []),
         body.notes, body.scale_image_url, body.status, batch_id,
     )
-    return serialize_row(row)
+    if not row:
+        raise HTTPException(status_code=404, detail="Batch not found")
+
+    result = serialize_row(row)
+
+    # ── Audit: update ─────────────────────────────────────────
+    await pool.execute(
+        """INSERT INTO audit_log
+           (id, action, table_name, record_id, transaction_id, user_id, description)
+           VALUES (gen_random_uuid(),'update','batches',$1,$2,$3,$4)""",
+        batch_id, body.transaction_id, body.created_by,
+        f"تعديل طبخة {body.batch_number}",
+    )
+
+    # ── Apply new deductions ──────────────────────────────────
+    materials = _extract_materials(body)
+    if materials and body.transaction_id:
+        deduct_result = await _apply_deductions(
+            pool, batch_id, body.batch_number,
+            body.transaction_id, materials, body.created_by,
+        )
+        result["deduction"] = deduct_result
+
+    result.update(_calc_batch_stats(result))
+    return result
+
+
+@router.delete("/{batch_id}")
+async def delete_batch(batch_id: str):
+    pool = await get_pool()
+
+    row = await pool.fetchrow(
+        "SELECT transaction_id, batch_number FROM batches WHERE id=$1", batch_id
+    )
+    if row and row["transaction_id"]:
+        await _reverse_deductions(
+            pool, str(row["transaction_id"]),
+            reason=f"حذف طبخة {row['batch_number']}",
+        )
+
+    await pool.execute(
+        """INSERT INTO audit_log
+           (id, action, table_name, record_id, description)
+           VALUES (gen_random_uuid(),'delete','batches',$1,$2)""",
+        batch_id,
+        f"حذف طبخة {row['batch_number'] if row else batch_id}",
+    )
+
+    await pool.execute("DELETE FROM batches WHERE id=$1", batch_id)
+    return {"success": True}
