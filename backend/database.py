@@ -1,12 +1,10 @@
 import os
 import asyncpg
 
-DEFAULT_DB_URL = (
-    "postgresql://gamalalmaqtary:tqL6D95VvkoCR9f1gE1fZykYakFU9sXb"
-    "@dpg-d8j5350jo6nc73duopqg-a.virginia-postgres.render.com/plastic_factory_db"
-)
+DATABASE_URL = os.getenv("DATABASE_URL") or os.getenv("PG_DATABASE_URL")
 
-DATABASE_URL = os.getenv("PG_DATABASE_URL", DEFAULT_DB_URL)
+if not DATABASE_URL:
+    raise RuntimeError("DATABASE_URL environment variable is not set")
 
 _pool: asyncpg.Pool | None = None
 
