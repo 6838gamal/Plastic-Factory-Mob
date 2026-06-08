@@ -72,10 +72,11 @@ class _WorkerHomePageState extends ConsumerState<WorkerHomePage> {
   void _showAdminLogin(BuildContext context) {
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (ctx) => AdminLoginDialog(
         onSuccess: () {
-          Navigator.of(ctx).pop();
-          context.go('/admin');
+          Navigator.of(ctx, rootNavigator: true).pop();
+          if (mounted) context.go('/admin');
         },
       ),
     );
