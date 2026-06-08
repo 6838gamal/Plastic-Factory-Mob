@@ -6,9 +6,10 @@ from pathlib import Path
 # Ensure backend directory is always on the Python path regardless of CWD
 sys.path.insert(0, os.path.dirname(__file__))
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 
 from database import get_pool, close_pool
 from routers import (
@@ -69,5 +70,20 @@ async def health():
         return {"status": "error", "db": str(e)}
 
 
+_NO_CACHE = {"Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache"}
+
 if WEB_DIR.exists():
+    # Serve service worker and index.html with no-cache so browsers always pick up fresh builds
+    @app.get("/flutter_service_worker.js")
+    async def service_worker():
+        return FileResponse(str(WEB_DIR / "flutter_service_worker.js"), headers=_NO_CACHE)
+
+    @app.get("/index.html")
+    async def index_html():
+        return FileResponse(str(WEB_DIR / "index.html"), headers=_NO_CACHE)
+
+    @app.get("/flutter_bootstrap.js")
+    async def flutter_bootstrap():
+        return FileResponse(str(WEB_DIR / "flutter_bootstrap.js"), headers=_NO_CACHE)
+
     app.mount("/", StaticFiles(directory=str(WEB_DIR), html=True), name="flutter")

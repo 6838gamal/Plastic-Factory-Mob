@@ -91,39 +91,36 @@ class _WorkerDrawer extends ConsumerWidget {
     return Drawer(
       child: Column(
         children: [
-          GestureDetector(
-            onDoubleTap: onAdminAccess,
-            child: DrawerHeader(
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Color(0xFF1565C0), Color(0xFF0D47A1)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+          DrawerHeader(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Color(0xFF1565C0), Color(0xFF0D47A1)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.factory, size: 48, color: Colors.white),
                 ),
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    width: 80,
-                    height: 80,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.factory, size: 48, color: Colors.white),
+                const SizedBox(height: 12),
+                const Text(
+                  AppStrings.appName,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
                   ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    AppStrings.appName,
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
           ListTile(
@@ -142,8 +139,31 @@ class _WorkerDrawer extends ConsumerWidget {
             onTap: () => Navigator.pop(context),
           ),
           const Spacer(),
+          const Divider(),
+          ListTile(
+            leading: Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1565C0).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.admin_panel_settings,
+                  color: Color(0xFF1565C0), size: 22),
+            ),
+            title: const Text(
+              'لوحة الإدارة',
+              style: TextStyle(
+                  fontWeight: FontWeight.w600, color: Color(0xFF1565C0)),
+            ),
+            subtitle: const Text('تسجيل الدخول كمسؤول',
+                style: TextStyle(fontSize: 11)),
+            onTap: () {
+              Navigator.pop(context);
+              onAdminAccess();
+            },
+          ),
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Text(
               AppStrings.appVersion,
               style: TextStyle(color: Colors.grey[500], fontSize: 12),
