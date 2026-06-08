@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../providers/batch_provider.dart';
 import '../../../widgets/common/loading_widget.dart';
-import '../../../widgets/common/severity_chip.dart';
 import '../../../../data/models/batch_model.dart';
+import '../../../../data/datasources/api_datasource.dart';
+import '../../../providers/auth_provider.dart';
 import '../../../../core/utils/helpers.dart';
 
 class BatchesAdminPage extends ConsumerStatefulWidget {
@@ -72,11 +73,15 @@ class _BatchesAdminPageState extends ConsumerState<BatchesAdminPage> {
               }
 
               return RefreshIndicator(
-                onRefresh: () async => ref.invalidate(batchesProvider({'from': _from, 'to': _to})),
+                onRefresh: () async =>
+                    ref.invalidate(batchesProvider({'from': _from, 'to': _to})),
                 child: ListView.builder(
                   padding: const EdgeInsets.symmetric(horizontal: 12),
                   itemCount: filtered.length,
-                  itemBuilder: (_, i) => _BatchCard(batch: filtered[i]),
+                  itemBuilder: (_, i) => _BatchCard(
+                    batch: filtered[i],
+                    onDelete: () => _deleteBatch(filtered[i]),
+                  ),
                 ),
               );
             },
@@ -86,6 +91,75 @@ class _BatchesAdminPageState extends ConsumerState<BatchesAdminPage> {
         ),
       ],
     );
+  }
+
+  Future<void> _deleteBatch(BatchModel batch) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('تأكيد حذف الطبخة'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('طبخة #${batch.batchNumber}'),
+            const SizedBox(height: 4),
+            Text('${batch.workerName} • ${Helpers.formatDate(batch.date)}'),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.orange.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.orange.shade200),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.warning_amber, color: Colors.orange, size: 18),
+                  SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'تنبيه: لن تُعاد كميات المواد الخام المستهلكة إلى المخزون تلقائياً.',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('إلغاء')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('حذف', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true && mounted) {
+      try {
+        final ds = ref.read(dataSourceProvider);
+        await ds.deleteBatch(batch.id);
+        ref.invalidate(batchesProvider({'from': _from, 'to': _to}));
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('تم حذف طبخة #${batch.batchNumber}')),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+                content: Text('خطأ في الحذف: $e'), backgroundColor: Colors.red),
+          );
+        }
+      }
+    }
   }
 
   Future<void> _pickDateRange() async {
@@ -108,7 +182,8 @@ class _BatchesAdminPageState extends ConsumerState<BatchesAdminPage> {
 
 class _BatchCard extends StatelessWidget {
   final BatchModel batch;
-  const _BatchCard({required this.batch});
+  final VoidCallback onDelete;
+  const _BatchCard({required this.batch, required this.onDelete});
 
   @override
   Widget build(BuildContext context) {
@@ -127,9 +202,20 @@ class _BatchCard extends StatelessWidget {
           '${batch.workerName} • ${batch.shift} • ${Helpers.formatDate(batch.date)}',
           style: TextStyle(fontSize: 12, color: Colors.grey[600]),
         ),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
+              onPressed: onDelete,
+              tooltip: 'حذف الطبخة',
+            ),
+            const Icon(Icons.expand_more),
+          ],
+        ),
         children: [
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -137,7 +223,8 @@ class _BatchCard extends StatelessWidget {
                 _DetailRow('المنتج', batch.productName),
                 _DetailRow('نوع الخلطة', batch.mixtureTypeName),
                 const Divider(),
-                Text('المواد الخام:', style: TextStyle(fontWeight: FontWeight.w600, color: Colors.grey[700])),
+                Text('المواد الخام:',
+                    style: TextStyle(fontWeight: FontWeight.w600, color: Colors.grey[700])),
                 const SizedBox(height: 4),
                 if (batch.pvcQty > 0) _MaterialRow('PVC', batch.pvcQty),
                 if (batch.dopQty > 0) _MaterialRow('DOP', batch.dopQty),
@@ -185,7 +272,8 @@ class _DetailRow extends StatelessWidget {
         children: [
           Text('$label: ', style: TextStyle(color: Colors.grey[600], fontSize: 13)),
           Expanded(
-            child: Text(value, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+            child: Text(value,
+                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
           ),
         ],
       ),

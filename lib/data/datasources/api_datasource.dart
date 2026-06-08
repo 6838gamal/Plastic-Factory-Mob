@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import '../models/raw_material_model.dart';
 import '../models/inventory_model.dart';
+import '../models/inventory_summary_model.dart';
 import '../models/batch_model.dart';
 import '../models/machine_production_model.dart';
 import '../models/alert_model.dart';
@@ -126,6 +127,15 @@ class ApiDataSource {
     return (res as List).map((e) => InventoryModel.fromJson(e)).toList();
   }
 
+  Future<List<InventorySummaryModel>> getInventorySummary() async {
+    final res = await _get('/api/inventory/summary');
+    return (res as List).map((e) => InventorySummaryModel.fromJson(e)).toList();
+  }
+
+  Future<void> addOpeningBalance(Map<String, dynamic> data) async {
+    await _post('/api/opening-balances', data);
+  }
+
   Future<InventoryModel?> getMaterialInventory(String materialId, String warehouseType) async {
     final res = await _get(
       '/api/inventory/material/$materialId',
@@ -213,6 +223,10 @@ class ApiDataSource {
     return BatchModel.fromJson(res as Map<String, dynamic>);
   }
 
+  Future<void> deleteBatch(String id) async {
+    await _delete('/api/batches/$id');
+  }
+
   Future<bool> checkTransactionExists(String transactionId) async {
     final res = await _get('/api/batches/check-transaction/$transactionId');
     return (res as Map<String, dynamic>)['exists'] as bool;
@@ -235,6 +249,16 @@ class ApiDataSource {
   Future<MachineProductionModel> saveMachineProduction(Map<String, dynamic> data) async {
     final res = await _post('/api/machine-production', data);
     return MachineProductionModel.fromJson(res as Map<String, dynamic>);
+  }
+
+  Future<MachineProductionModel> updateMachineProduction(
+      String id, Map<String, dynamic> data) async {
+    final res = await _put('/api/machine-production/$id', data);
+    return MachineProductionModel.fromJson(res as Map<String, dynamic>);
+  }
+
+  Future<void> deleteMachineProduction(String id) async {
+    await _delete('/api/machine-production/$id');
   }
 
   // ==================== ALERTS ====================

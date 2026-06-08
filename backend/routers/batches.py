@@ -101,6 +101,13 @@ async def create_batch(body: BatchCreate):
     return serialize_row(row)
 
 
+@router.delete("/{batch_id}")
+async def delete_batch(batch_id: str):
+    pool = await get_pool()
+    await pool.execute("DELETE FROM batches WHERE id=$1", batch_id)
+    return {"success": True}
+
+
 @router.put("/{batch_id}")
 async def update_batch(batch_id: str, body: BatchUpdate):
     pool = await get_pool()

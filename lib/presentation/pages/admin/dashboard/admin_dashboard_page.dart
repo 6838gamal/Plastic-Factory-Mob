@@ -139,14 +139,14 @@ class AdminDashboardPage extends ConsumerWidget {
           value: '${(data['production_today'] as num).toStringAsFixed(0)} كجم',
           icon: Icons.precision_manufacturing,
           color: Colors.blue,
-          onTap: () => {},
+          onTap: () => context.go('/admin/production'),
         ),
         StatCard(
           title: AppStrings.alertsCount,
           value: '${data['pending_alerts']}',
           icon: Icons.warning_amber,
           color: (data['pending_alerts'] as int) > 0 ? Colors.red : Colors.green,
-          onTap: () => {},
+          onTap: () => context.go('/admin/alerts'),
         ),
         StatCard(
           title: AppStrings.wastePercentage,

@@ -1480,6 +1480,7 @@ file:///home/runner/workspace/lib/data/models/alert_model.dart
 file:///home/runner/workspace/lib/data/models/audit_log_model.dart
 file:///home/runner/workspace/lib/data/models/batch_model.dart
 file:///home/runner/workspace/lib/data/models/inventory_model.dart
+file:///home/runner/workspace/lib/data/models/inventory_summary_model.dart
 file:///home/runner/workspace/lib/data/models/machine_production_model.dart
 file:///home/runner/workspace/lib/data/models/raw_material_model.dart
 file:///home/runner/workspace/lib/data/models/reference_models.dart

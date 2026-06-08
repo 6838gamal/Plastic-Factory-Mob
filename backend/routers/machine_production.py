@@ -47,6 +47,27 @@ async def get_productions(
     return [dict(r) for r in rows]
 
 
+@router.put("/{production_id}")
+async def update_production(production_id: str, body: ProductionCreate):
+    pool = await get_pool()
+    row = await pool.fetchrow(
+        """UPDATE machine_production SET
+            produced_quantity=$1, scrap_quantity=$2, waste_quantity=$3,
+            stop_time_minutes=$4, notes=$5, status=$6, updated_at=NOW()
+           WHERE id=$7 RETURNING *""",
+        body.produced_quantity, body.scrap_quantity, body.waste_quantity,
+        body.stop_time_minutes, body.notes, body.status or 'saved', production_id,
+    )
+    return dict(row)
+
+
+@router.delete("/{production_id}")
+async def delete_production(production_id: str):
+    pool = await get_pool()
+    await pool.execute("DELETE FROM machine_production WHERE id=$1", production_id)
+    return {"success": True}
+
+
 @router.post("")
 async def create_production(body: ProductionCreate):
     pool = await get_pool()
