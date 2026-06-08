@@ -5,6 +5,32 @@ import '../../providers/auth_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../../core/constants/app_strings.dart';
 
+Future<void> _confirmAndSignOut(BuildContext context, WidgetRef ref) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('تسجيل الخروج'),
+      content: const Text('هل تريد تسجيل الخروج من لوحة الإدارة؟\nستحتاج إلى كلمة المرور للدخول مجدداً.'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx, false),
+          child: const Text('إلغاء'),
+        ),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+          onPressed: () => Navigator.pop(ctx, true),
+          child: const Text('تسجيل الخروج', style: TextStyle(color: Colors.white)),
+        ),
+      ],
+    ),
+  );
+  if (confirmed == true) {
+    await ref.read(authProvider.notifier).signOut();
+    // The router's refreshListenable detects isAdmin=false
+    // and redirects to /worker automatically — no need for context.go.
+  }
+}
+
 class AdminShellPage extends ConsumerWidget {
   final Widget child;
   const AdminShellPage({super.key, required this.child});
@@ -13,28 +39,28 @@ class AdminShellPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final themeMode = ref.watch(themeProvider);
     final isDark = themeMode == ThemeMode.dark;
-    final auth = ref.watch(authProvider);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('لوحة الإدارة'),
-        actions: [
-          IconButton(
-            icon: Icon(isDark ? Icons.light_mode : Icons.dark_mode),
-            onPressed: () => ref.read(themeProvider.notifier).toggleTheme(),
-          ),
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () async {
-              await ref.read(authProvider.notifier).signOut();
-              if (context.mounted) context.go('/worker');
-            },
-            tooltip: AppStrings.logout,
-          ),
-        ],
+    return PopScope(
+      // Prevent Android/browser back button from returning to admin pages.
+      canPop: false,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('لوحة الإدارة'),
+          actions: [
+            IconButton(
+              icon: Icon(isDark ? Icons.light_mode : Icons.dark_mode),
+              onPressed: () => ref.read(themeProvider.notifier).toggleTheme(),
+            ),
+            IconButton(
+              icon: const Icon(Icons.logout),
+              tooltip: AppStrings.logout,
+              onPressed: () => _confirmAndSignOut(context, ref),
+            ),
+          ],
+        ),
+        drawer: _AdminDrawer(),
+        body: child,
       ),
-      drawer: _AdminDrawer(),
-      body: child,
     );
   }
 }
@@ -164,12 +190,13 @@ class _AdminDrawer extends ConsumerWidget {
           Padding(
             padding: const EdgeInsets.all(16),
             child: ListTile(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              tileColor: Colors.red.withOpacity(0.08),
               leading: const Icon(Icons.exit_to_app, color: Colors.red),
-              title: const Text(AppStrings.logout, style: TextStyle(color: Colors.red)),
+              title: const Text(AppStrings.logout, style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
               onTap: () async {
-                Navigator.pop(context);
-                await ref.read(authProvider.notifier).signOut();
-                if (context.mounted) context.go('/worker');
+                Navigator.pop(context); // close drawer first
+                await _confirmAndSignOut(context, ref);
               },
             ),
           ),
