@@ -23,7 +23,10 @@ final routerProvider = Provider<GoRouter>((ref) {
     redirect: (context, state) {
       final isAdmin = authState.isAdmin;
       final onAdmin = state.uri.toString().startsWith('/admin');
+      // Not admin trying to reach admin pages → send to worker
       if (onAdmin && !isAdmin) return '/worker';
+      // Admin sitting on worker pages → send to admin dashboard
+      if (isAdmin && !onAdmin) return '/admin';
       return null;
     },
     routes: [

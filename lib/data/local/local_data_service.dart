@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/reference_models.dart';
 import 'seed_data.dart';
@@ -33,6 +34,40 @@ class LocalDataService {
     }
 
     await prefs.setBool(_seededKey, true);
+  }
+
+  /// Syncs dropdown lists from the backend API.
+  /// Replaces local data with whatever the server has.
+  /// Silently skips each endpoint on network failure so offline works.
+  static Future<void> syncFromApi() async {
+    await Future.wait([
+      _syncEndpoint(_wKey,  '/api/workers'),
+      _syncEndpoint(_mKey,  '/api/machines'),
+      _syncEndpoint(_xKey,  '/api/mixers'),
+      _syncEndpoint(_pKey,  '/api/products'),
+      _syncEndpoint(_tKey,  '/api/mixture-types'),
+    ]);
+  }
+
+  static Future<void> _syncEndpoint(String key, String path) async {
+    try {
+      final res = await http
+          .get(Uri.parse(path))
+          .timeout(const Duration(seconds: 6));
+      if (res.statusCode == 200) {
+        final List<dynamic> raw = jsonDecode(res.body) as List<dynamic>;
+        final items = raw
+            .whereType<Map>()
+            .where((e) => e['is_active'] != false)
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList();
+        if (items.isNotEmpty) {
+          await _save(key, items);
+        }
+      }
+    } catch (_) {
+      // Offline or server error — keep existing local data
+    }
   }
 
   static String _newId() =>

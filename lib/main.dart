@@ -19,6 +19,9 @@ void main() async {
 
   await Hive.initFlutter();
   await LocalDataService.seedIfNeeded();
+  // Sync dropdown lists from the backend in the background —
+  // does not block startup; falls back to local data if offline.
+  LocalDataService.syncFromApi();
 
   runApp(const ProviderScope(child: PlasticFactoryApp()));
 }
