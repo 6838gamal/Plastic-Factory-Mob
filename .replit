@@ -47,4 +47,3 @@ publicDir = "build/web"
 [userenv]
 
 [userenv.shared]
-JWT_SECRET = "c1597af2bec4bc9227ffb6f2b43583ff180ad127599cc1aebf4e083fb008af09"
