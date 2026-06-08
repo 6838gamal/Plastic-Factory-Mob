@@ -121,11 +121,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 trailing: Text('1.0.0'),
               ),
               const Divider(),
-              ListTile(
-                leading: const Icon(Icons.storage),
-                title: const Text('قاعدة البيانات'),
-                trailing: const Text('Supabase'),
-                onTap: () {},
+              const ListTile(
+                leading: Icon(Icons.storage),
+                title: Text('قاعدة البيانات'),
+                trailing: Text('PostgreSQL'),
               ),
             ],
           ),

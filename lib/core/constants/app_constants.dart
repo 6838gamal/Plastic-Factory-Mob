@@ -11,7 +11,7 @@ class AppConstants {
   // Low stock percentage (below this = low stock warning)
   static const double lowStockThreshold = 20.0;
 
-  // Supabase table names
+  // Table names
   static const String tbRawMaterials = 'raw_materials';
   static const String tbInventory = 'inventory';
   static const String tbInventoryTransactions = 'inventory_transactions';
