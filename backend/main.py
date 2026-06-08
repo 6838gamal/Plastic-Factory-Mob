@@ -1,6 +1,10 @@
 import os
+import sys
 from contextlib import asynccontextmanager
 from pathlib import Path
+
+# Ensure backend directory is always on the Python path regardless of CWD
+sys.path.insert(0, os.path.dirname(__file__))
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
