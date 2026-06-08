@@ -15,6 +15,7 @@ from routers import (
     auth, materials, inventory, workers, products,
     machines, mixers, mixture_types, batches,
     machine_production, alerts, audit, dashboard, config,
+    shifts, opening_balances, reports,
 )
 
 WEB_DIR = Path(__file__).parent.parent / "build" / "web"
@@ -53,6 +54,9 @@ app.include_router(alerts.router)
 app.include_router(audit.router)
 app.include_router(dashboard.router)
 app.include_router(config.router)
+app.include_router(shifts.router)
+app.include_router(opening_balances.router)
+app.include_router(reports.router)
 
 
 @app.get("/api/health")
