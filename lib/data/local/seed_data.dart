@@ -4,15 +4,15 @@
 
 class SeedData {
   static const List<Map<String, dynamic>> workers = [
-    {'id': 'seed-w-1', 'name': 'عامل 1', 'is_active': true},
-    {'id': 'seed-w-2', 'name': 'عامل 2', 'is_active': true},
-    {'id': 'seed-w-3', 'name': 'عامل 3', 'is_active': true},
+    {'id': 'seed-w-1', 'name': 'رضوان', 'is_active': true},
+    {'id': 'seed-w-2', 'name': 'صقر', 'is_active': true},
   ];
 
   static const List<Map<String, dynamic>> machines = [
     {'id': 'seed-m-1', 'name': 'ماكينة 1', 'is_active': true},
     {'id': 'seed-m-2', 'name': 'ماكينة 2', 'is_active': true},
     {'id': 'seed-m-3', 'name': 'ماكينة 3', 'is_active': true},
+    {'id': 'seed-m-4', 'name': 'ماكينة 4', 'is_active': true},
   ];
 
   static const List<Map<String, dynamic>> mixers = [
@@ -21,14 +21,11 @@ class SeedData {
   ];
 
   static const List<Map<String, dynamic>> products = [
-    {'id': 'seed-p-1', 'name': 'منتج 1', 'is_active': true},
-    {'id': 'seed-p-2', 'name': 'منتج 2', 'is_active': true},
-    {'id': 'seed-p-3', 'name': 'منتج 3', 'is_active': true},
+    {'id': 'seed-p-1', 'name': 'صندل رجالي', 'is_active': true},
+    {'id': 'seed-p-2', 'name': 'صندل ولادي', 'is_active': true},
   ];
 
   static const List<Map<String, dynamic>> mixtureTypes = [
-    {'id': 'seed-t-1', 'name': 'خلطة عادي', 'is_active': true},
-    {'id': 'seed-t-2', 'name': 'خلطة طلاء', 'is_active': true},
-    {'id': 'seed-t-3', 'name': 'خلطة مشتركة', 'is_active': true},
+    {'id': 'seed-t-1', 'name': 'خلطة أزرق', 'is_active': true},
   ];
 }
