@@ -1,0 +1,1 @@
+- [Plastic Factory ERP setup](plastic-factory-erp.md) — Flutter web + FastAPI + Replit PostgreSQL; SSL must be disabled for Replit's helium DB host; rebuild Flutter after any Dart changes.

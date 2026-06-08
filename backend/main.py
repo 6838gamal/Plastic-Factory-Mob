@@ -10,7 +10,7 @@ from database import get_pool, close_pool
 from routers import (
     auth, materials, inventory, workers, products,
     machines, mixers, mixture_types, batches,
-    machine_production, alerts, audit, dashboard,
+    machine_production, alerts, audit, dashboard, config,
 )
 
 WEB_DIR = Path(__file__).parent.parent / "build" / "web"
@@ -48,6 +48,7 @@ app.include_router(machine_production.router)
 app.include_router(alerts.router)
 app.include_router(audit.router)
 app.include_router(dashboard.router)
+app.include_router(config.router)
 
 
 @app.get("/api/health")
