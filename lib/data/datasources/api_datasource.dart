@@ -8,11 +8,12 @@ import '../models/machine_production_model.dart';
 import '../models/alert_model.dart';
 import '../models/audit_log_model.dart';
 import '../models/reference_models.dart';
+import '../local/local_data_service.dart';
 
 class ApiDataSource {
   static const String baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: '',
+    defaultValue: 'https://plastic-factory-api.onrender.com',
   );
 
   String? _token;
@@ -139,59 +140,38 @@ class ApiDataSource {
     return (res as List).map((e) => InventoryTransactionModel.fromJson(e)).toList();
   }
 
-  // ==================== WORKERS ====================
-  Future<List<WorkerModel>> getWorkers() async {
-    final res = await _get('/api/workers');
-    return (res as List).map((e) => WorkerModel.fromJson(e)).toList();
-  }
+  // ==================== WORKERS (local) ====================
+  Future<List<WorkerModel>> getWorkers() => LocalDataService.getWorkers();
 
-  Future<void> upsertWorker(Map<String, dynamic> data) async {
-    await _post('/api/workers/upsert', data);
-  }
+  Future<void> upsertWorker(Map<String, dynamic> data) =>
+      LocalDataService.upsertWorker(data);
 
-  Future<void> deleteWorker(String id) async {
-    await _delete('/api/workers/$id');
-  }
+  Future<void> deleteWorker(String id) => LocalDataService.deleteWorker(id);
 
-  // ==================== PRODUCTS ====================
-  Future<List<ProductModel>> getProducts() async {
-    final res = await _get('/api/products');
-    return (res as List).map((e) => ProductModel.fromJson(e)).toList();
-  }
+  // ==================== PRODUCTS (local) ====================
+  Future<List<ProductModel>> getProducts() => LocalDataService.getProducts();
 
-  Future<void> upsertProduct(Map<String, dynamic> data) async {
-    await _post('/api/products/upsert', data);
-  }
+  Future<void> upsertProduct(Map<String, dynamic> data) =>
+      LocalDataService.upsertProduct(data);
 
-  // ==================== MACHINES ====================
-  Future<List<MachineModel>> getMachines() async {
-    final res = await _get('/api/machines');
-    return (res as List).map((e) => MachineModel.fromJson(e)).toList();
-  }
+  // ==================== MACHINES (local) ====================
+  Future<List<MachineModel>> getMachines() => LocalDataService.getMachines();
 
-  Future<void> upsertMachine(Map<String, dynamic> data) async {
-    await _post('/api/machines/upsert', data);
-  }
+  Future<void> upsertMachine(Map<String, dynamic> data) =>
+      LocalDataService.upsertMachine(data);
 
-  // ==================== MIXERS ====================
-  Future<List<MixerModel>> getMixers() async {
-    final res = await _get('/api/mixers');
-    return (res as List).map((e) => MixerModel.fromJson(e)).toList();
-  }
+  // ==================== MIXERS (local) ====================
+  Future<List<MixerModel>> getMixers() => LocalDataService.getMixers();
 
-  Future<void> upsertMixer(Map<String, dynamic> data) async {
-    await _post('/api/mixers/upsert', data);
-  }
+  Future<void> upsertMixer(Map<String, dynamic> data) =>
+      LocalDataService.upsertMixer(data);
 
-  // ==================== MIXTURE TYPES ====================
-  Future<List<MixtureTypeModel>> getMixtureTypes() async {
-    final res = await _get('/api/mixture-types');
-    return (res as List).map((e) => MixtureTypeModel.fromJson(e)).toList();
-  }
+  // ==================== MIXTURE TYPES (local) ====================
+  Future<List<MixtureTypeModel>> getMixtureTypes() =>
+      LocalDataService.getMixtureTypes();
 
-  Future<void> upsertMixtureType(Map<String, dynamic> data) async {
-    await _post('/api/mixture-types/upsert', data);
-  }
+  Future<void> upsertMixtureType(Map<String, dynamic> data) =>
+      LocalDataService.upsertMixtureType(data);
 
   // ==================== BATCHES ====================
   Future<List<BatchModel>> getBatches({DateTime? from, DateTime? to, String? workerId}) async {

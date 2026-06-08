@@ -122,15 +122,6 @@ class _WorkerDrawer extends ConsumerWidget {
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    AppStrings.doubleTapHint,
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.7),
-                      fontSize: 10,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
                 ],
               ),
             ),

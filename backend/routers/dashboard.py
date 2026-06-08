@@ -9,7 +9,7 @@ router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
 async def get_stats():
     pool = await get_pool()
     today = date.today()
-    start_of_day = datetime(today.year, today.month, today.day).isoformat()
+    start_of_day = datetime(today.year, today.month, today.day)
 
     batches_count = await pool.fetchval(
         "SELECT COUNT(*) FROM batches WHERE created_at >= $1", start_of_day
@@ -29,11 +29,11 @@ async def get_stats():
     total_waste = float(prod_row["total_waste"])
 
     return {
-        "batches_today": batches_count,
+        "batches_today": int(batches_count),
         "production_today": total_produced,
         "scrap_today": float(prod_row["total_scrap"]),
         "waste_today": total_waste,
         "stop_time_today": float(prod_row["total_stop_time"]),
-        "pending_alerts": alerts_count,
-        "waste_percentage": (total_waste / total_produced * 100) if total_produced > 0 else 0,
+        "pending_alerts": int(alerts_count),
+        "waste_percentage": round((total_waste / total_produced * 100), 1) if total_produced > 0 else 0,
     }

@@ -35,9 +35,11 @@ async def get_productions(
     params = []
     i = 1
     if from_:
-        conditions.append(f"created_at>=${i}"); params.append(from_); i += 1
+        from datetime import datetime as dt
+        conditions.append(f"created_at>=${i}"); params.append(dt.fromisoformat(from_.replace('Z',''))); i += 1
     if to:
-        conditions.append(f"created_at<=${i}"); params.append(to); i += 1
+        from datetime import datetime as dt
+        conditions.append(f"created_at<=${i}"); params.append(dt.fromisoformat(to.replace('Z',''))); i += 1
     if machine_id:
         conditions.append(f"machine_id=${i}"); params.append(machine_id); i += 1
     query = f"SELECT * FROM machine_production WHERE {' AND '.join(conditions)} ORDER BY created_at DESC"

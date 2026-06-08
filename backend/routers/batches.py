@@ -58,9 +58,9 @@ async def get_batches(
     params = []
     i = 1
     if from_:
-        conditions.append(f"date>=${i}"); params.append(from_); i += 1
+        conditions.append(f"date::text>=${i}"); params.append(from_[:10]); i += 1
     if to:
-        conditions.append(f"date<=${i}"); params.append(to); i += 1
+        conditions.append(f"date::text<=${i}"); params.append(to[:10]); i += 1
     if worker_id:
         conditions.append(f"worker_id=${i}"); params.append(worker_id); i += 1
     query = f"SELECT * FROM batches WHERE {' AND '.join(conditions)} ORDER BY created_at DESC"
