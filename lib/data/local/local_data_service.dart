@@ -10,7 +10,7 @@ class LocalDataService {
   static const _xKey = 'lref_mixers';
   static const _pKey = 'lref_products';
   static const _tKey = 'lref_mixture_types';
-  static const _seededKey = 'lref_seeded_v2';
+  static const _seededKey = 'lref_seeded_v3';
 
   /// Seeds default data on first app run. Safe to call every startup.
   static Future<void> seedIfNeeded() async {

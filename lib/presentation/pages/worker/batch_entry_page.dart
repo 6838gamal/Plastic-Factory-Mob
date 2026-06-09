@@ -5,12 +5,10 @@ import 'dart:io';
 import '../../providers/reference_data_provider.dart';
 import '../../providers/batch_provider.dart';
 import '../../widgets/common/loading_widget.dart';
-import '../../widgets/common/custom_text_field.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../data/models/reference_models.dart';
 import '../../../data/datasources/api_datasource.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/auth_provider.dart';
 
 class BatchEntryPage extends ConsumerStatefulWidget {
@@ -24,14 +22,41 @@ class _BatchEntryPageState extends ConsumerState<BatchEntryPage> {
   final _formKey = GlobalKey<FormState>();
 
   final _batchNumberCtrl = TextEditingController();
-  final _pvcCtrl = TextEditingController();
-  final _dopCtrl = TextEditingController();
-  final _scrapCtrl = TextEditingController();
-  final _calciumCtrl = TextEditingController();
-  final _waxCtrl = TextEditingController();
-  final _stabilizerCtrl = TextEditingController();
-  final _titaniumCtrl = TextEditingController();
   final _notesCtrl = TextEditingController();
+
+  // ── المواد الرئيسية ─────────────────────────────────────────
+  final _pvcCtrl             = TextEditingController();
+  final _dopCtrl             = TextEditingController();
+  final _scrapBlackCtrl      = TextEditingController(); // سكراب اسود ناعم
+  final _scrapBlueCtrl       = TextEditingController(); // سكراب ازرق ناعم
+  final _scrapBlueSugarCtrl  = TextEditingController(); // سكراب ازرق سكري
+  final _calciumCtrl         = TextEditingController();
+  final _waxCtrl             = TextEditingController();
+  final _stabilizerCtrl      = TextEditingController();
+  final _titaniumCtrl        = TextEditingController();
+  final _citricAcidCtrl      = TextEditingController(); // سيتريك اسيد
+  final _bicarYellowCtrl     = TextEditingController(); // بيكربونات اصفر
+  final _bicarWhiteCtrl      = TextEditingController(); // بيكربونات ابيض
+
+  // ── الأصباغ (ثابتة) ─────────────────────────────────────────
+  final _pig1Ctrl  = TextEditingController(); // صبغة سوداء باودر
+  final _pig2Ctrl  = TextEditingController(); // صبغة زرقاء باودر رقم-١٠٢٧
+  final _pig3Ctrl  = TextEditingController(); // صبغة زرقاء فاتح رقم-١٢٥٦
+  final _pig4Ctrl  = TextEditingController(); // صبغة ارجواني رقم-F٤٠٩
+  final _pig5Ctrl  = TextEditingController(); // صبغة احمر زهري رقم-F٣٥٨
+  final _pig6Ctrl  = TextEditingController(); // صبغة كاكي بيج رقم-١٠٣٥
+  final _pig7Ctrl  = TextEditingController(); // صبغه خضراء طاووس محلي
+  final _pig8Ctrl  = TextEditingController(); // صبغه برتقالي محلي
+  final _pig9Ctrl  = TextEditingController(); // صبغه زرقاء طاووس محلي
+  final _pig10Ctrl = TextEditingController(); // صبغه سوداء طاووس محلي
+
+  // ── إضافات أخرى (ثابتة) ─────────────────────────────────────
+  final _add1Ctrl = TextEditingController(); // لواصق موديل ۷۰۳
+  final _add2Ctrl = TextEditingController(); // لواصق موديل ۸۰۳۱-٦٠٣١
+  final _add3Ctrl = TextEditingController(); // لواصق موديل ٦٠٢٦-٨٠٢٦
+  final _add4Ctrl = TextEditingController(); // لواصق موديل ٦٠٢٢-٨٠٢٢
+  final _add5Ctrl = TextEditingController(); // خلطه ازرق
+  final _add6Ctrl = TextEditingController(); // راجع مكينه ازرق
 
   DateTime _selectedDate = DateTime.now();
   String? _selectedShift;
@@ -40,16 +65,37 @@ class _BatchEntryPageState extends ConsumerState<BatchEntryPage> {
   ProductModel? _selectedProduct;
   MixtureTypeModel? _selectedMixtureType;
   File? _scaleImage;
-
-  // Dynamic pigment/additive rows
-  final List<Map<String, dynamic>> _pigmentRows = [];
-  final List<Map<String, dynamic>> _additiveRows = [];
   bool _loadingBatchNum = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadNextBatchNumber());
+  }
+
+  @override
+  void dispose() {
+    _batchNumberCtrl.dispose();
+    _notesCtrl.dispose();
+    _pvcCtrl.dispose();
+    _dopCtrl.dispose();
+    _scrapBlackCtrl.dispose();
+    _scrapBlueCtrl.dispose();
+    _scrapBlueSugarCtrl.dispose();
+    _calciumCtrl.dispose();
+    _waxCtrl.dispose();
+    _stabilizerCtrl.dispose();
+    _titaniumCtrl.dispose();
+    _citricAcidCtrl.dispose();
+    _bicarYellowCtrl.dispose();
+    _bicarWhiteCtrl.dispose();
+    _pig1Ctrl.dispose();  _pig2Ctrl.dispose();  _pig3Ctrl.dispose();
+    _pig4Ctrl.dispose();  _pig5Ctrl.dispose();  _pig6Ctrl.dispose();
+    _pig7Ctrl.dispose();  _pig8Ctrl.dispose();  _pig9Ctrl.dispose();
+    _pig10Ctrl.dispose();
+    _add1Ctrl.dispose();  _add2Ctrl.dispose();  _add3Ctrl.dispose();
+    _add4Ctrl.dispose();  _add5Ctrl.dispose();  _add6Ctrl.dispose();
+    super.dispose();
   }
 
   Future<void> _loadNextBatchNumber() async {
@@ -62,20 +108,6 @@ class _BatchEntryPageState extends ConsumerState<BatchEntryPage> {
     } catch (_) {} finally {
       if (mounted) setState(() => _loadingBatchNum = false);
     }
-  }
-
-  @override
-  void dispose() {
-    _batchNumberCtrl.dispose();
-    _pvcCtrl.dispose();
-    _dopCtrl.dispose();
-    _scrapCtrl.dispose();
-    _calciumCtrl.dispose();
-    _waxCtrl.dispose();
-    _stabilizerCtrl.dispose();
-    _titaniumCtrl.dispose();
-    _notesCtrl.dispose();
-    super.dispose();
   }
 
   Future<void> _pickDate() async {
@@ -94,17 +126,14 @@ class _BatchEntryPageState extends ConsumerState<BatchEntryPage> {
     if (picked != null) setState(() => _scaleImage = File(picked.path));
   }
 
+  double _kg(TextEditingController c) => double.tryParse(c.text.trim()) ?? 0;
+  double _gToKg(TextEditingController c) {
+    final g = double.tryParse(c.text.trim()) ?? 0;
+    return g / 1000.0;
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    if (_scaleImage == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(AppStrings.scaleImageRequired),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
     if (_selectedShift == null ||
         _selectedWorker == null ||
         _selectedMixer == null ||
@@ -119,76 +148,115 @@ class _BatchEntryPageState extends ConsumerState<BatchEntryPage> {
       return;
     }
 
-    // Upload image
+    // Upload image (optional on web)
     String? imageUrl;
-    try {
-      final bytes = await _scaleImage!.readAsBytes();
-      final ds = ref.read(dataSourceProvider);
-      imageUrl = await ds.uploadImage(
-        'batch-images',
-        'scale/${_batchNumberCtrl.text}_${DateTime.now().millisecondsSinceEpoch}.jpg',
-        bytes,
-      );
-    } catch (_) {}
+    if (_scaleImage != null) {
+      try {
+        final bytes = await _scaleImage!.readAsBytes();
+        final ds = ref.read(dataSourceProvider);
+        imageUrl = await ds.uploadImage(
+          'batch-images',
+          'scale/${_batchNumberCtrl.text}_${DateTime.now().millisecondsSinceEpoch}.jpg',
+          bytes,
+        );
+      } catch (_) {}
+    }
 
-    // Build materials list
+    // ── مجموع السكراب للحقل المخصص ─────────────────────────
+    final totalScrap = _kg(_scrapBlackCtrl) + _kg(_scrapBlueCtrl) + _kg(_scrapBlueSugarCtrl);
+
+    // ── قائمة الأصباغ ─────────────────────────────────────────
+    final pigmentDefs = [
+      ('صبغة سوداء باودر عبوة 10 كيلو',           _pig1Ctrl,  'جرام'),
+      ('صبغة زرقاء باودر عبوة 20 كيلو رقم-١٠٢٧',  _pig2Ctrl,  'جرام'),
+      ('صبغة زرقاء فاتح عبوة 20 كيلو رقم-١٢٥٦',   _pig3Ctrl,  'جرام'),
+      ('صبغة ارجواني عبوة 25 كيلو رقم-F٤٠٩',       _pig4Ctrl,  'جرام'),
+      ('صبغة احمر زهري عبوة 25 كيلو رقم-F٣٥٨',     _pig5Ctrl,  'جرام'),
+      ('صبغة كاكي بيج عبوة 25 كيلو رقم-١٠٣٥',      _pig6Ctrl,  'جرام'),
+      ('صبغه خضراء طاووس محلي',                     _pig7Ctrl,  'جرام'),
+      ('صبغه برتقالي محلي',                         _pig8Ctrl,  'جرام'),
+      ('صبغه زرقاء طاووس محلي',                     _pig9Ctrl,  'جرام'),
+      ('صبغه سوداء طاووس محلي',                     _pig10Ctrl, 'جرام'),
+    ];
+
+    // ── قائمة الإضافات ─────────────────────────────────────────
+    final additiveDefs = [
+      ('لواصق موديل ۷۰۳ بالحبه',        _add1Ctrl, 'قطعة'),
+      ('لواصق موديل ۸۰۳۱-٦٠٣١ بالحبه', _add2Ctrl, 'قطعة'),
+      ('لواصق موديل ٦٠٢٦-٨٠٢٦ بالحبه', _add3Ctrl, 'قطعة'),
+      ('لواصق موديل ٦٠٢٢-٨٠٢٢ بالحبه', _add4Ctrl, 'قطعة'),
+      ('خلطه ازرق',                      _add5Ctrl, 'كجم'),
+      ('راجع مكينه ازرق',                _add6Ctrl, 'كجم'),
+    ];
+
+    // ── بناء قائمة المواد للخصم من المخزن ──────────────────────
     final materials = <Map<String, dynamic>>[];
-    void addMat(String ctrl, String name) {
-      final qty = double.tryParse(ctrl) ?? 0;
-      if (qty > 0) {
-        materials.add({'material_name': name, 'quantity': qty, 'unit': 'كجم'});
+
+    void addKg(String name, TextEditingController c) {
+      final qty = _kg(c);
+      if (qty > 0) materials.add({'material_name': name, 'quantity': qty, 'unit': 'كجم'});
+    }
+
+    addKg('مواد خام pvc صيني', _pvcCtrl);
+    addKg('DOP زيت', _dopCtrl);
+    if (_kg(_scrapBlackCtrl) > 0)
+      materials.add({'material_name': 'سكراب اسود ناعم', 'quantity': _kg(_scrapBlackCtrl), 'unit': 'كجم'});
+    if (_kg(_scrapBlueCtrl) > 0)
+      materials.add({'material_name': 'سكراب ازرق ناعم', 'quantity': _kg(_scrapBlueCtrl), 'unit': 'كجم'});
+    if (_kg(_scrapBlueSugarCtrl) > 0)
+      materials.add({'material_name': 'سكراب ازرق سكري', 'quantity': _kg(_scrapBlueSugarCtrl), 'unit': 'كجم'});
+    addKg('كالسيوم باودر عبوة 25 كيلو', _calciumCtrl);
+    addKg('شمع باودر عبوة 25 كيلو', _waxCtrl);
+    addKg('مثبت استبليزر باودر عبوة 25 كيلو', _stabilizerCtrl);
+    addKg('تيتانيوم', _titaniumCtrl);
+    addKg('سيتريك اسيد - ملح الليمون - 490 عبوة 25 كجم', _citricAcidCtrl);
+    addKg('بيكربونات اصفر محلي', _bicarYellowCtrl);
+    addKg('بيكربونات ابيض محلي', _bicarWhiteCtrl);
+
+    // الأصباغ — القيم بالجرام تُحوّل لكجم عند الخصم
+    final pigmentsList = <Map<String, dynamic>>[];
+    for (final (name, ctrl, unit) in pigmentDefs) {
+      final val = double.tryParse(ctrl.text.trim()) ?? 0;
+      if (val > 0) {
+        pigmentsList.add({'name': name, 'quantity': val, 'unit': unit});
+        materials.add({'material_name': name, 'quantity': val, 'unit': unit});
       }
     }
 
-    addMat(_pvcCtrl.text, 'PVC');
-    addMat(_dopCtrl.text, 'DOP زيت');
-    addMat(_scrapCtrl.text, 'سكراب');
-    addMat(_calciumCtrl.text, 'كالسيوم');
-    addMat(_waxCtrl.text, 'شمع');
-    addMat(_stabilizerCtrl.text, 'مثبت');
-    addMat(_titaniumCtrl.text, 'تيتانيوم');
-
-    for (final p in _pigmentRows) {
-      final qty = double.tryParse((p['qty'] as TextEditingController).text) ?? 0;
-      if (qty > 0 && p['name'] != null) {
-        materials.add({'material_name': p['name'], 'quantity': qty, 'unit': 'كجم'});
+    // الإضافات الأخرى
+    final additivesList = <Map<String, dynamic>>[];
+    for (final (name, ctrl, unit) in additiveDefs) {
+      final val = double.tryParse(ctrl.text.trim()) ?? 0;
+      if (val > 0) {
+        additivesList.add({'name': name, 'quantity': val, 'unit': unit});
+        materials.add({'material_name': name, 'quantity': val, 'unit': unit});
       }
     }
 
     final batchData = {
-      'batch_number': _batchNumberCtrl.text.trim(),
-      'date': _selectedDate.toIso8601String().split('T').first,
-      'shift': _selectedShift,
-      'worker_id': _selectedWorker!.id,
-      'worker_name': _selectedWorker!.name,
-      'mixer_id': _selectedMixer!.id,
-      'mixer_name': _selectedMixer!.name,
-      'product_id': _selectedProduct!.id,
-      'product_name': _selectedProduct!.name,
-      'mixture_type_id': _selectedMixtureType!.id,
+      'batch_number':      _batchNumberCtrl.text.trim(),
+      'date':              _selectedDate.toIso8601String().split('T').first,
+      'shift':             _selectedShift,
+      'worker_id':         _selectedWorker!.id,
+      'worker_name':       _selectedWorker!.name,
+      'mixer_id':          _selectedMixer!.id,
+      'mixer_name':        _selectedMixer!.name,
+      'product_id':        _selectedProduct!.id,
+      'product_name':      _selectedProduct!.name,
+      'mixture_type_id':   _selectedMixtureType!.id,
       'mixture_type_name': _selectedMixtureType!.name,
-      'pvc_qty': double.tryParse(_pvcCtrl.text) ?? 0,
-      'dop_qty': double.tryParse(_dopCtrl.text) ?? 0,
-      'scrap_qty': double.tryParse(_scrapCtrl.text) ?? 0,
-      'calcium_qty': double.tryParse(_calciumCtrl.text) ?? 0,
-      'wax_qty': double.tryParse(_waxCtrl.text) ?? 0,
-      'stabilizer_qty': double.tryParse(_stabilizerCtrl.text) ?? 0,
-      'titanium_qty': double.tryParse(_titaniumCtrl.text) ?? 0,
-      'pigments': _pigmentRows
-          .map((p) => {
-                'name': p['name'],
-                'quantity': double.tryParse((p['qty'] as TextEditingController).text) ?? 0,
-              })
-          .toList(),
-      'additives': _additiveRows
-          .map((a) => {
-                'name': a['name'],
-                'quantity': double.tryParse((a['qty'] as TextEditingController).text) ?? 0,
-              })
-          .toList(),
-      'notes': _notesCtrl.text.trim(),
-      'scale_image_url': imageUrl,
-      'materials': materials,
+      'pvc_qty':           _kg(_pvcCtrl),
+      'dop_qty':           _kg(_dopCtrl),
+      'scrap_qty':         totalScrap,
+      'calcium_qty':       _kg(_calciumCtrl),
+      'wax_qty':           _kg(_waxCtrl),
+      'stabilizer_qty':    _kg(_stabilizerCtrl),
+      'titanium_qty':      _kg(_titaniumCtrl),
+      'pigments':          pigmentsList,
+      'additives':         additivesList,
+      'notes':             _notesCtrl.text.trim(),
+      'scale_image_url':   imageUrl,
+      'materials':         materials,
     };
 
     final result = await ref.read(batchOperationsProvider.notifier).saveBatch(batchData);
@@ -196,10 +264,7 @@ class _BatchEntryPageState extends ConsumerState<BatchEntryPage> {
     if (!mounted) return;
     if (result.success) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(AppStrings.saveSuccess),
-          backgroundColor: Colors.green,
-        ),
+        const SnackBar(content: Text(AppStrings.saveSuccess), backgroundColor: Colors.green),
       );
       _resetForm();
     } else {
@@ -215,15 +280,17 @@ class _BatchEntryPageState extends ConsumerState<BatchEntryPage> {
 
   void _resetForm() {
     _formKey.currentState?.reset();
-    _loadNextBatchNumber(); // auto-generate next batch number
-    _pvcCtrl.clear();
-    _dopCtrl.clear();
-    _scrapCtrl.clear();
-    _calciumCtrl.clear();
-    _waxCtrl.clear();
-    _stabilizerCtrl.clear();
-    _titaniumCtrl.clear();
-    _notesCtrl.clear();
+    _loadNextBatchNumber();
+    for (final c in [
+      _notesCtrl, _pvcCtrl, _dopCtrl, _scrapBlackCtrl, _scrapBlueCtrl,
+      _scrapBlueSugarCtrl, _calciumCtrl, _waxCtrl, _stabilizerCtrl, _titaniumCtrl,
+      _citricAcidCtrl, _bicarYellowCtrl, _bicarWhiteCtrl,
+      _pig1Ctrl, _pig2Ctrl, _pig3Ctrl, _pig4Ctrl, _pig5Ctrl,
+      _pig6Ctrl, _pig7Ctrl, _pig8Ctrl, _pig9Ctrl, _pig10Ctrl,
+      _add1Ctrl, _add2Ctrl, _add3Ctrl, _add4Ctrl, _add5Ctrl, _add6Ctrl,
+    ]) {
+      c.clear();
+    }
     setState(() {
       _selectedDate = DateTime.now();
       _selectedShift = null;
@@ -232,8 +299,6 @@ class _BatchEntryPageState extends ConsumerState<BatchEntryPage> {
       _selectedProduct = null;
       _selectedMixtureType = null;
       _scaleImage = null;
-      _pigmentRows.clear();
-      _additiveRows.clear();
     });
   }
 
@@ -243,7 +308,6 @@ class _BatchEntryPageState extends ConsumerState<BatchEntryPage> {
     final mixers = ref.watch(mixersProvider);
     final products = ref.watch(productsProvider);
     final mixtureTypes = ref.watch(mixtureTypesProvider);
-    final rawMaterials = ref.watch(rawMaterialsProvider);
     final opsState = ref.watch(batchOperationsProvider);
 
     return SingleChildScrollView(
@@ -253,10 +317,10 @@ class _BatchEntryPageState extends ConsumerState<BatchEntryPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // ── معلومات الطبخة ──────────────────────────────────
             _SectionHeader(title: 'معلومات الطبخة', icon: Icons.info_outline),
             const SizedBox(height: 12),
 
-            // Batch Number — auto-generated (read-only)
             Row(
               children: [
                 Expanded(
@@ -269,9 +333,8 @@ class _BatchEntryPageState extends ConsumerState<BatchEntryPage> {
                       suffixText: 'تلقائي',
                       suffixStyle: TextStyle(color: Colors.grey.shade500, fontSize: 12),
                     ),
-                    validator: (v) => (v == null || v.trim().isEmpty)
-                        ? 'رقم الطبخة مطلوب'
-                        : null,
+                    validator: (v) =>
+                        (v == null || v.trim().isEmpty) ? 'رقم الطبخة مطلوب' : null,
                   ),
                 ),
                 if (_loadingBatchNum)
@@ -292,7 +355,6 @@ class _BatchEntryPageState extends ConsumerState<BatchEntryPage> {
             ),
             const SizedBox(height: 12),
 
-            // Date
             InkWell(
               onTap: _pickDate,
               child: InputDecorator(
@@ -301,13 +363,14 @@ class _BatchEntryPageState extends ConsumerState<BatchEntryPage> {
                   suffixIcon: Icon(Icons.calendar_today),
                 ),
                 child: Text(
-                  '${_selectedDate.year}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.day.toString().padLeft(2, '0')}',
+                  '${_selectedDate.year}-'
+                  '${_selectedDate.month.toString().padLeft(2, '0')}-'
+                  '${_selectedDate.day.toString().padLeft(2, '0')}',
                 ),
               ),
             ),
             const SizedBox(height: 12),
 
-            // Shift
             DropdownButtonFormField<String>(
               value: _selectedShift,
               decoration: const InputDecoration(labelText: '${AppStrings.shift} *'),
@@ -319,13 +382,14 @@ class _BatchEntryPageState extends ConsumerState<BatchEntryPage> {
             ),
             const SizedBox(height: 12),
 
-            // Worker
             workers.when(
               data: (list) => DropdownButtonFormField<WorkerModel>(
                 value: _selectedWorker,
                 decoration: const InputDecoration(labelText: '${AppStrings.worker} *'),
                 isExpanded: true,
-                items: list.map((w) => DropdownMenuItem(value: w, child: Text(w.name))).toList(),
+                items: list
+                    .map((w) => DropdownMenuItem(value: w, child: Text(w.name)))
+                    .toList(),
                 onChanged: (v) => setState(() => _selectedWorker = v),
                 validator: (v) => v == null ? 'العامل مطلوب' : null,
               ),
@@ -334,13 +398,14 @@ class _BatchEntryPageState extends ConsumerState<BatchEntryPage> {
             ),
             const SizedBox(height: 12),
 
-            // Mixer
             mixers.when(
               data: (list) => DropdownButtonFormField<MixerModel>(
                 value: _selectedMixer,
                 decoration: const InputDecoration(labelText: '${AppStrings.mixer} *'),
                 isExpanded: true,
-                items: list.map((m) => DropdownMenuItem(value: m, child: Text(m.name))).toList(),
+                items: list
+                    .map((m) => DropdownMenuItem(value: m, child: Text(m.name)))
+                    .toList(),
                 onChanged: (v) => setState(() => _selectedMixer = v),
                 validator: (v) => v == null ? 'الخلاط مطلوب' : null,
               ),
@@ -349,13 +414,14 @@ class _BatchEntryPageState extends ConsumerState<BatchEntryPage> {
             ),
             const SizedBox(height: 12),
 
-            // Product
             products.when(
               data: (list) => DropdownButtonFormField<ProductModel>(
                 value: _selectedProduct,
                 decoration: const InputDecoration(labelText: '${AppStrings.product} *'),
                 isExpanded: true,
-                items: list.map((p) => DropdownMenuItem(value: p, child: Text(p.name))).toList(),
+                items: list
+                    .map((p) => DropdownMenuItem(value: p, child: Text(p.name)))
+                    .toList(),
                 onChanged: (v) => setState(() => _selectedProduct = v),
                 validator: (v) => v == null ? 'المنتج مطلوب' : null,
               ),
@@ -364,13 +430,14 @@ class _BatchEntryPageState extends ConsumerState<BatchEntryPage> {
             ),
             const SizedBox(height: 12),
 
-            // Mixture Type
             mixtureTypes.when(
               data: (list) => DropdownButtonFormField<MixtureTypeModel>(
                 value: _selectedMixtureType,
                 decoration: const InputDecoration(labelText: '${AppStrings.mixtureType} *'),
                 isExpanded: true,
-                items: list.map((m) => DropdownMenuItem(value: m, child: Text(m.name))).toList(),
+                items: list
+                    .map((m) => DropdownMenuItem(value: m, child: Text(m.name)))
+                    .toList(),
                 onChanged: (v) => setState(() => _selectedMixtureType = v),
                 validator: (v) => v == null ? 'نوع الخلطة مطلوب' : null,
               ),
@@ -379,82 +446,56 @@ class _BatchEntryPageState extends ConsumerState<BatchEntryPage> {
             ),
             const SizedBox(height: 20),
 
-            _SectionHeader(title: 'المواد الخام (كجم)', icon: Icons.inventory_2_outlined),
+            // ── المواد الخام ─────────────────────────────────────
+            _SectionHeader(title: 'المواد الخام', icon: Icons.inventory_2_outlined),
             const SizedBox(height: 12),
 
-            _MaterialRow(label: AppStrings.pvc, controller: _pvcCtrl),
-            _MaterialRow(label: AppStrings.dop, controller: _dopCtrl),
-            _MaterialRow(label: AppStrings.scrap, controller: _scrapCtrl),
-            _MaterialRow(label: AppStrings.calcium, controller: _calciumCtrl),
-            _MaterialRow(label: AppStrings.wax, controller: _waxCtrl),
-            _MaterialRow(label: AppStrings.stabilizer, controller: _stabilizerCtrl),
-            _MaterialRow(label: AppStrings.titanium, controller: _titaniumCtrl),
-
-            const SizedBox(height: 16),
-            _SectionHeader(title: 'الأصباغ', icon: Icons.color_lens_outlined),
-            const SizedBox(height: 8),
-
-            ..._pigmentRows.asMap().entries.map((entry) {
-              final i = entry.key;
-              final row = entry.value;
-              return rawMaterials.when(
-                data: (mats) {
-                  final pigments = mats.where((m) => m.category == 'أصباغ').toList();
-                  return _DynamicMaterialRow(
-                    index: i,
-                    options: pigments.map((p) => p.name).toList(),
-                    selectedName: row['name'] as String?,
-                    qtyController: row['qty'] as TextEditingController,
-                    onNameChanged: (v) => setState(() => _pigmentRows[i]['name'] = v),
-                    onRemove: () => setState(() {
-                      (row['qty'] as TextEditingController).dispose();
-                      _pigmentRows.removeAt(i);
-                    }),
-                  );
-                },
-                loading: () => const LinearProgressIndicator(),
-                error: (e, _) => const SizedBox.shrink(),
-              );
-            }),
-
-            TextButton.icon(
-              onPressed: () => setState(() {
-                _pigmentRows.add({'name': null, 'qty': TextEditingController()});
-              }),
-              icon: const Icon(Icons.add),
-              label: const Text('إضافة صبغة'),
-            ),
-
-            const SizedBox(height: 16),
-            _SectionHeader(title: 'إضافات أخرى', icon: Icons.add_circle_outline),
-            const SizedBox(height: 8),
-
-            ..._additiveRows.asMap().entries.map((entry) {
-              final i = entry.key;
-              final row = entry.value;
-              return _DynamicMaterialRow(
-                index: i,
-                options: const [],
-                selectedName: row['name'] as String?,
-                qtyController: row['qty'] as TextEditingController,
-                onNameChanged: (v) => setState(() => _additiveRows[i]['name'] = v),
-                onRemove: () => setState(() {
-                  (row['qty'] as TextEditingController).dispose();
-                  _additiveRows.removeAt(i);
-                }),
-                freeText: true,
-              );
-            }),
-
-            TextButton.icon(
-              onPressed: () => setState(() {
-                _additiveRows.add({'name': null, 'qty': TextEditingController()});
-              }),
-              icon: const Icon(Icons.add),
-              label: const Text('إضافة مادة'),
-            ),
+            _MatRow(label: 'مواد خام PVC صيني',                    ctrl: _pvcCtrl),
+            _MatRow(label: 'DOP زيت',                               ctrl: _dopCtrl),
+            _MatRow(label: 'سكراب اسود ناعم',                       ctrl: _scrapBlackCtrl),
+            _MatRow(label: 'سكراب ازرق ناعم',                       ctrl: _scrapBlueCtrl),
+            _MatRow(label: 'سكراب ازرق سكري',                       ctrl: _scrapBlueSugarCtrl),
+            _MatRow(label: 'كالسيوم باودر عبوة 25 كيلو',            ctrl: _calciumCtrl),
+            _MatRow(label: 'شمع باودر عبوة 25 كيلو',                ctrl: _waxCtrl),
+            _MatRow(label: 'مثبت استبليزر باودر عبوة 25 كيلو',      ctrl: _stabilizerCtrl),
+            _MatRow(label: 'تيتانيوم',                              ctrl: _titaniumCtrl),
+            _MatRow(label: 'سيتريك اسيد (ملح الليمون) 490 عبوة 25 كجم', ctrl: _citricAcidCtrl),
+            _MatRow(label: 'بيكربونات اصفر محلي',                   ctrl: _bicarYellowCtrl),
+            _MatRow(label: 'بيكربونات ابيض محلي',                   ctrl: _bicarWhiteCtrl),
 
             const SizedBox(height: 20),
+
+            // ── الأصباغ ──────────────────────────────────────────
+            _SectionHeader(title: 'الأصباغ', icon: Icons.color_lens_outlined),
+            const SizedBox(height: 12),
+
+            _MatRow(label: 'صبغة سوداء باودر عبوة 10 كيلو',          ctrl: _pig1Ctrl,  unit: 'جرام'),
+            _MatRow(label: 'صبغة زرقاء باودر عبوة 20 كيلو رقم-١٠٢٧', ctrl: _pig2Ctrl,  unit: 'جرام'),
+            _MatRow(label: 'صبغة زرقاء فاتح عبوة 20 كيلو رقم-١٢٥٦',  ctrl: _pig3Ctrl,  unit: 'جرام'),
+            _MatRow(label: 'صبغة ارجواني عبوة 25 كيلو رقم-F٤٠٩',      ctrl: _pig4Ctrl,  unit: 'جرام'),
+            _MatRow(label: 'صبغة احمر زهري عبوة 25 كيلو رقم-F٣٥٨',    ctrl: _pig5Ctrl,  unit: 'جرام'),
+            _MatRow(label: 'صبغة كاكي بيج عبوة 25 كيلو رقم-١٠٣٥',     ctrl: _pig6Ctrl,  unit: 'جرام'),
+            _MatRow(label: 'صبغه خضراء طاووس محلي',                   ctrl: _pig7Ctrl,  unit: 'جرام'),
+            _MatRow(label: 'صبغه برتقالي محلي',                       ctrl: _pig8Ctrl,  unit: 'جرام'),
+            _MatRow(label: 'صبغه زرقاء طاووس محلي',                   ctrl: _pig9Ctrl,  unit: 'جرام'),
+            _MatRow(label: 'صبغه سوداء طاووس محلي',                   ctrl: _pig10Ctrl, unit: 'جرام'),
+
+            const SizedBox(height: 20),
+
+            // ── إضافات أخرى ─────────────────────────────────────
+            _SectionHeader(title: 'إضافات أخرى', icon: Icons.add_circle_outline),
+            const SizedBox(height: 12),
+
+            _MatRow(label: 'لواصق موديل ۷۰۳ بالحبه',        ctrl: _add1Ctrl, unit: 'قطعة'),
+            _MatRow(label: 'لواصق موديل ۸۰۳۱-٦٠٣١ بالحبه', ctrl: _add2Ctrl, unit: 'قطعة'),
+            _MatRow(label: 'لواصق موديل ٦٠٢٦-٨٠٢٦ بالحبه', ctrl: _add3Ctrl, unit: 'قطعة'),
+            _MatRow(label: 'لواصق موديل ٦٠٢٢-٨٠٢٢ بالحبه', ctrl: _add4Ctrl, unit: 'قطعة'),
+            _MatRow(label: 'خلطه ازرق',                      ctrl: _add5Ctrl),
+            _MatRow(label: 'راجع مكينه ازرق',                ctrl: _add6Ctrl),
+
+            const SizedBox(height: 20),
+
+            // ── ملاحظات وصورة الميزان ─────────────────────────
             _SectionHeader(title: 'ملاحظات وصورة الميزان', icon: Icons.notes),
             const SizedBox(height: 12),
 
@@ -468,19 +509,18 @@ class _BatchEntryPageState extends ConsumerState<BatchEntryPage> {
             ),
             const SizedBox(height: 16),
 
-            // Scale image
             Container(
               decoration: BoxDecoration(
                 border: Border.all(
-                  color: _scaleImage == null ? Colors.red : Colors.green,
+                  color: _scaleImage == null ? Colors.grey : Colors.green,
                   width: 2,
                 ),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: _scaleImage == null
                   ? ListTile(
-                      leading: const Icon(Icons.camera_alt, color: Colors.red),
-                      title: const Text('${AppStrings.scaleImage} *'),
+                      leading: const Icon(Icons.camera_alt, color: Colors.grey),
+                      title: const Text('صورة الميزان (اختياري)'),
                       subtitle: const Text('اضغط لالتقاط صورة الميزان'),
                       onTap: _pickImage,
                     )
@@ -506,7 +546,8 @@ class _BatchEntryPageState extends ConsumerState<BatchEntryPage> {
                                 color: Colors.black54,
                                 shape: BoxShape.circle,
                               ),
-                              child: const Icon(Icons.camera_alt, color: Colors.white, size: 20),
+                              child: const Icon(Icons.camera_alt,
+                                  color: Colors.white, size: 20),
                             ),
                           ),
                         ),
@@ -521,7 +562,8 @@ class _BatchEntryPageState extends ConsumerState<BatchEntryPage> {
                                 color: Colors.red,
                                 shape: BoxShape.circle,
                               ),
-                              child: const Icon(Icons.delete, color: Colors.white, size: 20),
+                              child: const Icon(Icons.delete,
+                                  color: Colors.white, size: 20),
                             ),
                           ),
                         ),
@@ -540,10 +582,12 @@ class _BatchEntryPageState extends ConsumerState<BatchEntryPage> {
                     ? const SizedBox(
                         height: 20,
                         width: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white),
                       )
                     : const Icon(Icons.save_outlined),
-                label: const Text(AppStrings.saveAndSend, style: TextStyle(fontSize: 18)),
+                label: const Text(AppStrings.saveAndSend,
+                    style: TextStyle(fontSize: 18)),
               ),
             ),
             const SizedBox(height: 32),
@@ -554,6 +598,7 @@ class _BatchEntryPageState extends ConsumerState<BatchEntryPage> {
   }
 }
 
+// ── Section Header ─────────────────────────────────────────────
 class _SectionHeader extends StatelessWidget {
   final String title;
   final IconData icon;
@@ -574,16 +619,26 @@ class _SectionHeader extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 8),
-        Expanded(child: Divider(color: Theme.of(context).primaryColor.withOpacity(0.3))),
+        Expanded(
+          child: Divider(
+              color: Theme.of(context).primaryColor.withOpacity(0.3)),
+        ),
       ],
     );
   }
 }
 
-class _MaterialRow extends StatelessWidget {
+// ── Material Row (fixed label + qty input) ─────────────────────
+class _MatRow extends StatelessWidget {
   final String label;
-  final TextEditingController controller;
-  const _MaterialRow({required this.label, required this.controller});
+  final TextEditingController ctrl;
+  final String unit;
+
+  const _MatRow({
+    required this.label,
+    required this.ctrl,
+    this.unit = 'كجم',
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -592,94 +647,25 @@ class _MaterialRow extends StatelessWidget {
       child: Row(
         children: [
           Expanded(
-            flex: 2,
-            child: Text(label, style: const TextStyle(fontWeight: FontWeight.w500)),
-          ),
-          Expanded(
             flex: 3,
-            child: TextFormField(
-              controller: controller,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(
-                suffixText: 'كجم',
-                isDense: true,
-                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _DynamicMaterialRow extends StatelessWidget {
-  final int index;
-  final List<String> options;
-  final String? selectedName;
-  final TextEditingController qtyController;
-  final void Function(String?) onNameChanged;
-  final VoidCallback onRemove;
-  final bool freeText;
-
-  const _DynamicMaterialRow({
-    required this.index,
-    required this.options,
-    required this.selectedName,
-    required this.qtyController,
-    required this.onNameChanged,
-    required this.onRemove,
-    this.freeText = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        children: [
-          Expanded(
-            flex: 3,
-            child: freeText
-                ? TextFormField(
-                    initialValue: selectedName,
-                    decoration: const InputDecoration(
-                      labelText: 'اسم المادة',
-                      isDense: true,
-                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                    ),
-                    onChanged: onNameChanged,
-                  )
-                : DropdownButtonFormField<String>(
-                    value: selectedName,
-                    isExpanded: true,
-                    decoration: const InputDecoration(
-                      labelText: 'الصبغة',
-                      isDense: true,
-                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                    ),
-                    items: options
-                        .map((o) => DropdownMenuItem(value: o, child: Text(o, overflow: TextOverflow.ellipsis)))
-                        .toList(),
-                    onChanged: onNameChanged,
-                  ),
+            child: Text(label,
+                style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13)),
           ),
           const SizedBox(width: 8),
           Expanded(
             flex: 2,
             child: TextFormField(
-              controller: qtyController,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(
-                suffixText: 'كجم',
+              controller: ctrl,
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+              textAlign: TextAlign.center,
+              decoration: InputDecoration(
+                suffixText: unit,
                 isDense: true,
-                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               ),
             ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.remove_circle, color: Colors.red),
-            onPressed: onRemove,
           ),
         ],
       ),
