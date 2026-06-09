@@ -47,3 +47,5 @@ publicDir = "build/web"
 [userenv]
 
 [userenv.shared]
+JWT_SECRET = "dd6a79f49f294714a3f81ec51c31bbb67f7d2953d4114060b72642301b361e73"
+API_BASE_URL = ""
