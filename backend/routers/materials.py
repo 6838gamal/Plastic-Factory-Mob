@@ -13,6 +13,7 @@ class MaterialUpsert(BaseModel):
     category: Optional[str] = "عام"
     unit: Optional[str] = "كجم"
     min_stock: Optional[float] = 0
+    cost_per_unit: Optional[float] = 0
     is_active: Optional[bool] = True
     notes: Optional[str] = None
 
@@ -39,17 +40,17 @@ async def upsert_material(body: MaterialUpsert):
     if body.id:
         row = await pool.fetchrow(
             """UPDATE raw_materials SET name=$1, code=$2, category=$3, unit=$4,
-               min_stock=$5, is_active=$6, notes=$7, updated_at=NOW()
-               WHERE id=$8 RETURNING *""",
+               min_stock=$5, cost_per_unit=$6, is_active=$7, notes=$8, updated_at=NOW()
+               WHERE id=$9 RETURNING *""",
             body.name, body.code, body.category, body.unit, body.min_stock,
-            body.is_active, body.notes, body.id,
+            body.cost_per_unit, body.is_active, body.notes, body.id,
         )
     else:
         row = await pool.fetchrow(
-            """INSERT INTO raw_materials (id, name, code, category, unit, min_stock, is_active, notes)
-               VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7) RETURNING *""",
+            """INSERT INTO raw_materials (id, name, code, category, unit, min_stock, cost_per_unit, is_active, notes)
+               VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8) RETURNING *""",
             body.name, body.code, body.category, body.unit, body.min_stock,
-            body.is_active, body.notes,
+            body.cost_per_unit, body.is_active, body.notes,
         )
     return dict(row)
 

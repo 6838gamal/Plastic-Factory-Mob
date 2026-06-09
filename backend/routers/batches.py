@@ -478,6 +478,17 @@ async def get_next_batch_number():
 async def create_batch(body: BatchCreate):
     pool = await get_pool()
 
+    # ── Idempotency: if transaction_id already exists, return existing batch ──
+    if body.transaction_id:
+        existing = await pool.fetchrow(
+            "SELECT * FROM batches WHERE transaction_id=$1", body.transaction_id
+        )
+        if existing:
+            result = serialize_row(existing)
+            result.update(_calc_batch_stats(result))
+            result["deduction"] = {"deducted": False, "items_count": 0, "already_deducted": True}
+            return result
+
     # ── Insert batch record ────────────────────────────────────
     row = await pool.fetchrow(
         """INSERT INTO batches (
@@ -489,7 +500,7 @@ async def create_batch(body: BatchCreate):
             gen_random_uuid(),$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,
             $12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25
         ) RETURNING *""",
-        body.batch_number, body.date, body.shift,
+        body.batch_number, body.date or DateType.today(), body.shift,
         body.worker_id, body.worker_name, body.mixer_id, body.mixer_name,
         body.product_id, body.product_name, body.mixture_type_id, body.mixture_type_name,
         body.pvc_qty, body.dop_qty, body.scrap_qty, body.calcium_qty,
@@ -555,7 +566,7 @@ async def update_batch(batch_id: str, body: BatchUpdate):
             pigments=$19, additives=$20, materials=$21, notes=$22,
             scale_image_url=$23, status=$24, updated_at=NOW()
            WHERE id=$25 RETURNING *""",
-        body.batch_number, body.date, body.shift,
+        body.batch_number, body.date or DateType.today(), body.shift,
         body.worker_id, body.worker_name, body.mixer_id, body.mixer_name,
         body.product_id, body.product_name, body.mixture_type_id, body.mixture_type_name,
         body.pvc_qty, body.dop_qty, body.scrap_qty, body.calcium_qty,

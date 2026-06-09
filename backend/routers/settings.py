@@ -62,9 +62,8 @@ async def update_setting(key: str, body: SettingUpdate):
         key, body.value, body.description,
     )
     await pool.execute(
-        """INSERT INTO audit_log (id, action, table_name, record_id, description)
-           VALUES (gen_random_uuid(), 'update', 'settings', $1, $2)""",
-        key,
+        """INSERT INTO audit_log (id, action, table_name, description)
+           VALUES (gen_random_uuid(), 'update', 'settings', $1)""",
         f"تحديث إعداد {key} إلى {body.value}",
     )
     return dict(row)

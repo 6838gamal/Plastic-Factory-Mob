@@ -18,7 +18,7 @@ from routers import (
     auth, materials, inventory, workers, products,
     machines, mixers, mixture_types, batches,
     machine_production, alerts, audit, dashboard, config,
-    shifts, opening_balances, reports, settings,
+    shifts, opening_balances, reports, settings, day,
 )
 from routers import stock_take
 
@@ -162,6 +162,7 @@ app.include_router(opening_balances.router)
 app.include_router(reports.router)
 app.include_router(stock_take.router)
 app.include_router(settings.router)
+app.include_router(day.router)
 
 
 @app.get("/api/health")
