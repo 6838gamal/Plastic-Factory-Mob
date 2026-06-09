@@ -1,6 +1,7 @@
 import os
 import sys
 import asyncio
+import bcrypt
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -59,10 +60,28 @@ async def _daily_report_scheduler():
         await asyncio.sleep(61)   # avoid double-fire within the same minute
 
 
+async def _seed_default_admin():
+    """Ensure a default admin user always exists on startup."""
+    pool = await get_pool()
+    existing = await pool.fetchval("SELECT COUNT(*) FROM admin_users")
+    if existing == 0:
+        default_email = os.getenv("ADMIN_EMAIL", "admin@factory.com")
+        default_password = os.getenv("ADMIN_PASSWORD", "admin123")
+        hashed = bcrypt.hashpw(default_password.encode(), bcrypt.gensalt()).decode()
+        await pool.execute(
+            "INSERT INTO admin_users (id, email, password_hash) VALUES (gen_random_uuid(), $1, $2) ON CONFLICT (email) DO NOTHING",
+            default_email, hashed,
+        )
+        print(f"✅ Default admin created: {default_email}")
+    else:
+        print(f"✅ Admin users found: {existing}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await get_pool()
     print("✅ Database pool ready")
+    await _seed_default_admin()
     scheduler_task = asyncio.create_task(_daily_report_scheduler())
     yield
     scheduler_task.cancel()
