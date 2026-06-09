@@ -650,6 +650,8 @@ async def delete_batch(batch_id: str):
         f"حذف طبخة {row['batch_number'] if row else batch_id}",
     )
 
+    # ── Remove deduction_log FK references before delete ─────
+    await pool.execute("DELETE FROM deduction_log WHERE batch_id=$1", batch_id)
     await pool.execute("DELETE FROM batches WHERE id=$1", batch_id)
 
     # ── Auto 5: Refresh daily report in background ────────────
