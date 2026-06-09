@@ -12,9 +12,11 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE TABLE IF NOT EXISTS raw_materials (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   name VARCHAR(200) NOT NULL,
+  code VARCHAR(50),
   category VARCHAR(100) NOT NULL DEFAULT 'عام',
   unit VARCHAR(20) NOT NULL DEFAULT 'كجم',
   min_stock DECIMAL(12,3) NOT NULL DEFAULT 0,
+  cost_per_unit DECIMAL(12,3) NOT NULL DEFAULT 0,
   is_active BOOLEAN NOT NULL DEFAULT true,
   notes TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
