@@ -1,2 +1,4 @@
 - [Plastic Factory ERP setup](plastic-factory-erp.md) — Flutter web + FastAPI + Replit PostgreSQL; SSL must be disabled for Replit's helium DB host; rebuild Flutter after any Dart changes.
 - [GoRouter + Riverpod auth redirect](go-router-riverpod-auth.md) — Never recreate GoRouter on auth change; use refreshListenable + ChangeNotifier instead.
+- [asyncpg date type requirement](asyncpg-date-types.md) — asyncpg rejects Python str for DATE columns; must use datetime.date objects. Fix: type Pydantic model fields as Optional[date], not str.
+- [daily_reports schema mismatch](daily-reports-schema.md) — DB columns are total_waste_kg/total_scrap_kg but code used total_waste/total_scrap; also missing total_inputs/total_alerts/KPI columns were added via ALTER TABLE.

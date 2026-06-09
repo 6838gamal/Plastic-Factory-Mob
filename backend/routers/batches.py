@@ -10,6 +10,7 @@ Rules:
  - Alerts are raised for insufficient stock and post-deduction low/zero stock.
 """
 import json
+from datetime import date as DateType
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 from typing import Optional, List, Any
@@ -22,7 +23,7 @@ router = APIRouter(prefix="/api/batches", tags=["batches"])
 
 class BatchCreate(BaseModel):
     batch_number: str
-    date: str
+    date: Optional[DateType] = None
     shift: Optional[str] = None
     worker_id: Optional[str] = None
     worker_name: Optional[str] = None

@@ -16,7 +16,17 @@ from database import get_pool
 
 router = APIRouter(prefix="/api/machine-production", tags=["machine_production"])
 
-DEVIATION_ALERT_THRESHOLD = 2.0  # % — alert when industrial deviation exceeds ±2%
+DEVIATION_ALERT_THRESHOLD = 2.0   # % — alert when industrial deviation exceeds ±2%
+DEVIATION_NOTES_THRESHOLD = 5.0  # % — require notes when deviation exceeds ±5%
+
+_GRAM_UNITS = {"جرام", "gram", "g", "غرام", "gm"}
+
+
+def _to_kg(qty: float, unit: str) -> float:
+    """Convert quantity to kg. Gram units ÷ 1000."""
+    if unit and unit.strip().lower() in _GRAM_UNITS:
+        return qty / 1000.0
+    return qty
 
 
 class ProductionCreate(BaseModel):
@@ -131,7 +141,9 @@ async def _check_industrial_deviation(pool, batch_number: str, production_id: st
         if raw:
             for item in raw:
                 if isinstance(item, dict):
-                    dynamic += float(item.get("quantity", 0) or 0)
+                    qty_raw = float(item.get("quantity", 0) or 0)
+                    unit = item.get("unit", "كجم")
+                    dynamic += _to_kg(qty_raw, unit)  # ✓ unit conversion fixed
 
     total_inputs = pvc + dop + scrap_b + calcium + wax + stabilizer + titanium + dynamic
 
@@ -156,25 +168,42 @@ async def _check_industrial_deviation(pool, batch_number: str, production_id: st
     deviation = total_outputs - total_inputs
     deviation_pct = abs(deviation / total_inputs * 100)
 
-    if deviation_pct > DEVIATION_ALERT_THRESHOLD:
+    # ── Fetch configurable thresholds from settings ───────────
+    dev_setting = await pool.fetchrow(
+        "SELECT value FROM settings WHERE key='deviation_alert_threshold'"
+    )
+    alert_threshold = float(dev_setting["value"]) if dev_setting and dev_setting["value"] else DEVIATION_ALERT_THRESHOLD
+
+    notes_setting = await pool.fetchrow(
+        "SELECT value FROM settings WHERE key='deviation_notes_threshold'"
+    )
+    notes_threshold = float(notes_setting["value"]) if notes_setting and notes_setting["value"] else DEVIATION_NOTES_THRESHOLD
+
+    if deviation_pct > alert_threshold:
         direction = "زيادة" if deviation > 0 else "نقص"
+        severity = "critical" if deviation_pct > notes_threshold else "high"
+        description = (
+            f"انحراف صناعي {direction} في طبخة {batch_number}: "
+            f"المدخلات {total_inputs:.1f} كجم — المخرجات {total_outputs:.1f} كجم "
+            f"(انحراف {deviation_pct:.1f}%)"
+        )
+        if deviation_pct > notes_threshold:
+            description += " ⚠ يلزم إضافة ملاحظة تفسيرية"
+
         await pool.execute(
             """INSERT INTO alerts
                (id, alert_type, severity, batch_number, description, status, transaction_id)
-               VALUES (gen_random_uuid(), 'industrial_deviation', 'high', $1, $2, 'pending', $3)
-               ON CONFLICT DO NOTHING""",
-            batch_number,
-            f"انحراف صناعي {direction} في طبخة {batch_number}: "
-            f"المدخلات {total_inputs:.1f} كجم — المخرجات {total_outputs:.1f} كجم "
-            f"(انحراف {deviation_pct:.1f}%)",
-            f"deviat_{production_id}",
+               VALUES (gen_random_uuid(), 'industrial_deviation', $1, $2, $3, 'pending', $4)
+               ON CONFLICT (transaction_id) DO NOTHING""",
+            severity, batch_number, description, f"deviat_{production_id}",
         )
         await pool.execute(
             """INSERT INTO audit_log
                (id, action, table_name, record_id, description)
                VALUES (gen_random_uuid(), 'alert', 'machine_production', $1, $2)""",
             production_id,
-            f"انحراف صناعي {deviation_pct:.1f}% في طبخة {batch_number}",
+            f"انحراف صناعي {deviation_pct:.1f}% في طبخة {batch_number}" +
+            (" — يلزم ملاحظة" if deviation_pct > notes_threshold else ""),
         )
 
 

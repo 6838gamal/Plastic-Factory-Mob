@@ -18,36 +18,80 @@ from routers import (
     auth, materials, inventory, workers, products,
     machines, mixers, mixture_types, batches,
     machine_production, alerts, audit, dashboard, config,
-    shifts, opening_balances, reports,
+    shifts, opening_balances, reports, settings,
 )
 from routers import stock_take
 
 WEB_DIR = Path(__file__).parent.parent / "build" / "web"
 
 
+async def _archive_previous_day(pool, yesterday: str):
+    """Automation 17: Archive yesterday's data as a snapshot."""
+    try:
+        existing = await pool.fetchrow(
+            "SELECT id FROM daily_archive WHERE archive_date=$1::date", yesterday
+        )
+        if existing:
+            return
+
+        # Snapshot daily report
+        report = await pool.fetchrow(
+            "SELECT * FROM daily_reports WHERE report_date=$1::date", yesterday
+        )
+        # Snapshot inventory state
+        inv_rows = await pool.fetch(
+            """SELECT i.material_id, rm.name, i.warehouse_type, i.balance, rm.unit
+               FROM inventory i JOIN raw_materials rm ON rm.id=i.material_id
+               ORDER BY rm.name"""
+        )
+        batch_count = await pool.fetchval(
+            "SELECT COUNT(*) FROM batches WHERE date=$1::date", yesterday
+        )
+
+        import json as _json
+        inv_snapshot = [dict(r) for r in inv_rows]
+
+        await pool.execute(
+            """INSERT INTO daily_archive
+               (id, archive_date, report_data, inventory_snapshot, batch_count, archived_at)
+               VALUES (gen_random_uuid(), $1::date, $2, $3, $4, NOW())
+               ON CONFLICT (archive_date) DO NOTHING""",
+            yesterday,
+            _json.dumps(dict(report) if report else {}, default=str),
+            _json.dumps(inv_snapshot, default=str),
+            int(batch_count),
+        )
+        print(f"✅ [scheduler] Archive created for {yesterday}")
+    except Exception as exc:
+        print(f"❌ [scheduler] Archive error: {exc}")
+
+
 async def _run_daily_report():
-    """Generate and lock the daily report for today."""
+    """Automation 15 & 16: Generate daily report snapshot and lock it."""
     try:
         pool = await get_pool()
         today = str(datetime.now().date())
+        yesterday = str((datetime.now() - timedelta(days=1)).date())
 
         existing = await pool.fetchrow(
             "SELECT is_locked FROM daily_reports WHERE report_date=$1::date", today
         )
         if existing and existing["is_locked"]:
             print(f"[scheduler] Daily report {today} already locked — skipping.")
-            return
+        else:
+            from routers.reports import generate_daily_report
+            await generate_daily_report(report_date=today, lock=True)
+            print(f"✅ [scheduler] Daily report generated and locked for {today}")
 
-        # Import inline to avoid circular imports
-        from routers.reports import generate_daily_report
-        await generate_daily_report(report_date=today, lock=True)
-        print(f"✅ [scheduler] Daily report generated and locked for {today}")
+        # Automation 17: archive yesterday after locking today
+        await _archive_previous_day(pool, yesterday)
+
     except Exception as exc:
         print(f"❌ [scheduler] Daily report error: {exc}")
 
 
 async def _daily_report_scheduler():
-    """Loop: sleep until 23:59, generate report, sleep 61 s, repeat."""
+    """Loop: sleep until 23:59, generate report + archive, repeat."""
     while True:
         now = datetime.now()
         target = now.replace(hour=23, minute=59, second=0, microsecond=0)
@@ -117,6 +161,7 @@ app.include_router(shifts.router)
 app.include_router(opening_balances.router)
 app.include_router(reports.router)
 app.include_router(stock_take.router)
+app.include_router(settings.router)
 
 
 @app.get("/api/health")
