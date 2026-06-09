@@ -1,56 +1,69 @@
 name: plastic Build Lightweight Flutter APK
 
 on:
-  workflow_dispatch:
+ workflow_dispatch:
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
+ build:
+  runs-on: ubuntu-latest
+  
+  steps:
+  # تحميل المشروع
+  - name: Checkout repository
+    uses: actions/checkout@v4
 
-    steps:
-      # تحميل المشروع
-      - name: Checkout repository
-        uses: actions/checkout@v4
+  # إعداد Java
+  - name: Setup Java
+    uses: actions/setup-java@v4
+    with:
+      distribution: temurin
+      java-version: 17
 
-      # إعداد Java
-      - name: Setup Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 17
+  # إعداد Android SDK
+  - name: Setup Android SDK
+    uses: android-actions/setup-android@v3
 
-      # إعداد Flutter
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-          cache: true
+  - name: Install Android SDK 34
+    run: |
+      sdkmanager "platforms;android-34"
+      sdkmanager "build-tools;34.0.0"
 
-      # تثبيت الحزم
-      - name: Install dependencies
-        run: flutter pub get
+  # إعداد Flutter
+  - name: Setup Flutter
+    uses: subosito/flutter-action@v2
+    with:
+      channel: stable
+      cache: true
 
-      # بناء APK خفيف ومحسن ARM64 فقط
-      - name: Build Lightweight APK
-        run: |
-          flutter build apk --release \
-          --target-platform=android-arm64 \
-          --tree-shake-icons \
-          --obfuscate \
-          --split-debug-info=build/debug-info #\
-        #  --dart-define=API_BASE_URL=https://android-al-ahmadi-store-api.onrender.com/
+  # تنظيف المشروع
+  - name: Flutter Clean
+    run: flutter clean
 
-      # رفع APK
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: lightweight-release-apk
-          path: build/app/outputs/flutter-apk/*.apk
+  # تثبيت الحزم
+  - name: Install Dependencies
+    run: flutter pub get
 
-      # رفع ملفات debug symbols
-      - name: Upload Debug Symbols
-        uses: actions/upload-artifact@v4
-        with:
-          name: debug-symbols
-          path: build/debug-info
+  # بناء APK خفيف ARM64 فقط
+  - name: Build Lightweight APK
+    run: |
+      flutter build apk \
+        --release \
+        --target-platform=android-arm64 \
+        --tree-shake-icons \
+        --obfuscate \
+        --split-debug-info=build/debug-info
+
+  # رفع APK
+  - name: Upload APK
+    uses: actions/upload-artifact@v4
+    with:
+      name: lightweight-release-apk
+      path: build/app/outputs/flutter-apk/*.apk
+
+  # رفع ملفات الرموز
+  - name: Upload Debug Symbols
+    uses: actions/upload-artifact@v4
+    with:
+      name: debug-symbols
+      path: build/debug-info
 
