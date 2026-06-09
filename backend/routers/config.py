@@ -3,6 +3,8 @@ from fastapi import APIRouter, Request
 
 router = APIRouter(prefix="/api", tags=["config"])
 
+DEFAULT_API_URL = "https://plastic-factory-api.onrender.com"
+
 
 @router.get("/config")
 async def get_config(request: Request):
@@ -10,32 +12,9 @@ async def get_config(request: Request):
 
     Priority:
       1. API_BASE_URL env var (explicit override)
-      2. Derived from the incoming request (works on Replit dev & production)
-
-    When behind a reverse proxy (x-forwarded-host is set), the external URL
-    has no port — never append the internal uvicorn port in that case.
+      2. Default: https://plastic-factory-api.onrender.com
     """
-    explicit = os.getenv("API_BASE_URL")
-    if explicit and "onrender.com" not in explicit:
-        base_url = explicit.rstrip("/")
-    else:
-        forwarded_host  = request.headers.get("x-forwarded-host")
-        forwarded_proto = request.headers.get("x-forwarded-proto")
-
-        if forwarded_host:
-            # Behind a proxy: use the external host/scheme with no port
-            scheme = forwarded_proto or "https"
-            base_url = f"{scheme}://{forwarded_host}"
-        else:
-            # Direct connection (local dev): include port if non-standard
-            scheme = request.url.scheme
-            host   = request.url.hostname
-            port   = request.url.port
-            if port and port not in (80, 443):
-                base_url = f"{scheme}://{host}:{port}"
-            else:
-                base_url = f"{scheme}://{host}"
-
+    base_url = os.getenv("API_BASE_URL", DEFAULT_API_URL).rstrip("/")
     return {"base_url": base_url}
 
 

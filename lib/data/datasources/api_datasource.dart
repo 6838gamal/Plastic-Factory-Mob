@@ -21,17 +21,12 @@ class ApiDataSource {
     if (_resolvedBaseUrl != null) return _resolvedBaseUrl!;
     try {
       final res = await http.get(Uri.parse('/api/config')).timeout(
-        const Duration(seconds: 3),
+        const Duration(seconds: 5),
       );
       if (res.statusCode == 200) {
         final body = jsonDecode(res.body) as Map<String, dynamic>;
         final configUrl = (body['base_url'] as String?) ?? '';
-        // Use the configured URL only if it's non-empty AND not the old external
-        // fallback address. Otherwise fall back to relative paths (same origin).
-        _resolvedBaseUrl = (configUrl.isNotEmpty &&
-                !configUrl.contains('onrender.com'))
-            ? configUrl
-            : '';
+        _resolvedBaseUrl = configUrl.isNotEmpty ? configUrl : _fallbackUrl;
         return _resolvedBaseUrl!;
       }
     } catch (_) {}
