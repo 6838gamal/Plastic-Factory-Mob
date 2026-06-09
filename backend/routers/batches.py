@@ -9,6 +9,7 @@ Rules:
  - Every deduction / reversal is written to audit_log and inventory_transactions.
  - Alerts are raised for insufficient stock and post-deduction low/zero stock.
 """
+import asyncio
 import json
 from datetime import date as DateType
 from fastapi import APIRouter, HTTPException, Query
@@ -451,6 +452,23 @@ async def get_batch_stats(batch_id: str):
     }
 
 
+async def _refresh_daily_report(date_str: str):
+    """Auto 5 — Regenerate today's daily report snapshot in the background (non-locking)."""
+    try:
+        from datetime import date as _date
+        pool = await get_pool()
+        target = _date.fromisoformat(date_str)
+        existing = await pool.fetchrow(
+            "SELECT is_locked FROM daily_reports WHERE report_date=$1", target
+        )
+        if existing and existing["is_locked"]:
+            return
+        from routers.reports import generate_daily_report
+        await generate_daily_report(report_date=date_str, lock=False)
+    except Exception as exc:
+        print(f"[auto5] Daily report refresh failed for {date_str}: {exc}")
+
+
 @router.get("/next-number")
 async def get_next_batch_number():
     """
@@ -533,6 +551,10 @@ async def create_batch(body: BatchCreate):
         result["deduction"] = deduct_result
 
     result.update(_calc_batch_stats(result))
+
+    # ── Auto 5: Refresh daily report in background ────────────
+    asyncio.create_task(_refresh_daily_report(str(body.date or DateType.today())))
+
     return result
 
 
@@ -600,6 +622,10 @@ async def update_batch(batch_id: str, body: BatchUpdate):
         result["deduction"] = deduct_result
 
     result.update(_calc_batch_stats(result))
+
+    # ── Auto 5: Refresh daily report in background ────────────
+    asyncio.create_task(_refresh_daily_report(str(body.date or DateType.today())))
+
     return result
 
 
@@ -625,4 +651,152 @@ async def delete_batch(batch_id: str):
     )
 
     await pool.execute("DELETE FROM batches WHERE id=$1", batch_id)
+
+    # ── Auto 5: Refresh daily report in background ────────────
+    asyncio.create_task(_refresh_daily_report(str(DateType.today())))
+
     return {"success": True}
+
+
+# ───────────────────── Recipe Deviation ──────────────────────────
+
+@router.get("/{batch_id}/recipe-deviation")
+async def get_recipe_deviation(batch_id: str):
+    """
+    معادلة الاستهلاك المعياري وانحراف الوصفة.
+
+    لكل مادة في الوصفة المرتبطة بنوع المزيج للطبخة:
+      الكمية المعيارية (كجم) = (كمية PVC الفعلية ÷ 100) × كمية المادة في الوصفة
+      الانحراف              = الفعلي − المعياري
+      نسبة الانحراف (%)   = (الانحراف ÷ المعياري) × 100
+
+    ملاحظة: إذا لم تكن الوصفة موجودة، يُرجع قائمة فارغة.
+    """
+    pool = await get_pool()
+
+    # ── Load batch ────────────────────────────────────────────
+    batch = await pool.fetchrow("SELECT * FROM batches WHERE id=$1", batch_id)
+    if not batch:
+        raise HTTPException(status_code=404, detail="Batch not found")
+
+    def to_f(v): return float(v or 0)
+
+    actual_pvc = to_f(batch["pvc_qty"])
+
+    # ── Load recipe for this mixture_type ─────────────────────
+    recipe = await pool.fetchrow(
+        "SELECT id FROM recipes WHERE mixture_type_id=$1",
+        batch["mixture_type_id"],
+    )
+    if not recipe:
+        return {
+            "batch_id": batch_id,
+            "batch_number": batch["batch_number"],
+            "mixture_type_id": str(batch["mixture_type_id"] or ""),
+            "mixture_type_name": batch["mixture_type_name"],
+            "actual_pvc_kg": actual_pvc,
+            "recipe_found": False,
+            "items": [],
+            "summary": {
+                "total_standard_kg": 0,
+                "total_actual_kg": 0,
+                "total_deviation_kg": 0,
+                "total_deviation_pct": 0,
+            },
+        }
+
+    recipe_items = await pool.fetch(
+        """SELECT ri.material_id, ri.quantity, ri.unit, rm.name, rm.unit AS mat_unit
+           FROM recipe_items ri
+           JOIN raw_materials rm ON rm.id = ri.material_id
+           WHERE ri.recipe_id = $1
+           ORDER BY rm.name""",
+        recipe["id"],
+    )
+
+    # ── Build actual-quantities map from batch ────────────────
+    actual_map: dict = {}
+
+    # Fixed fields
+    field_to_name = {
+        "pvc_qty": "PVC",
+        "dop_qty": "DOP",
+        "scrap_qty": "scrap",
+        "calcium_qty": "calcium",
+        "wax_qty": "wax",
+        "stabilizer_qty": "stabilizer",
+        "titanium_qty": "titanium",
+    }
+    for field in ("materials", "pigments", "additives"):
+        raw = batch[field]
+        if isinstance(raw, str):
+            try:
+                raw = json.loads(raw)
+            except Exception:
+                raw = []
+        if raw:
+            for item in raw:
+                if isinstance(item, dict):
+                    mid = str(item.get("material_id") or item.get("id") or "")
+                    if mid:
+                        qty_raw = to_f(item.get("quantity", 0))
+                        unit = item.get("unit", "كجم")
+                        actual_map[mid] = actual_map.get(mid, 0.0) + _to_kg(qty_raw, unit)
+
+    # ── Compute deviations ────────────────────────────────────
+    items = []
+    total_standard = 0.0
+    total_actual   = 0.0
+
+    for ri in recipe_items:
+        material_id = str(ri["material_id"])
+        recipe_qty  = to_f(ri["quantity"])
+        recipe_unit = ri["unit"] or "كجم"
+        recipe_qty_kg = _to_kg(recipe_qty, recipe_unit)
+
+        # Standard = scale recipe qty proportionally to actual PVC
+        standard_kg = (actual_pvc / 100.0) * recipe_qty_kg if actual_pvc > 0 else recipe_qty_kg
+
+        actual_kg = actual_map.get(material_id, 0.0)
+
+        deviation_kg = actual_kg - standard_kg
+        if standard_kg > 0:
+            deviation_pct = round(deviation_kg / standard_kg * 100, 2)
+        else:
+            deviation_pct = 0.0
+
+        items.append({
+            "material_id": material_id,
+            "material_name": ri["name"],
+            "recipe_qty_per_100kg_pvc": round(recipe_qty_kg, 4),
+            "standard_qty_kg": round(standard_kg, 4),
+            "actual_qty_kg":   round(actual_kg, 4),
+            "deviation_kg":    round(deviation_kg, 4),
+            "deviation_pct":   deviation_pct,
+            "status": (
+                "ok" if abs(deviation_pct) <= 2
+                else ("warning" if abs(deviation_pct) <= 5 else "critical")
+            ),
+        })
+
+        total_standard += standard_kg
+        total_actual   += actual_kg
+
+    total_deviation    = total_actual - total_standard
+    total_deviation_pct = round(total_deviation / total_standard * 100, 2) if total_standard > 0 else 0.0
+
+    return {
+        "batch_id": batch_id,
+        "batch_number": batch["batch_number"],
+        "mixture_type_id": str(batch["mixture_type_id"] or ""),
+        "mixture_type_name": batch["mixture_type_name"],
+        "actual_pvc_kg": actual_pvc,
+        "recipe_found": True,
+        "items": items,
+        "summary": {
+            "total_standard_kg":  round(total_standard, 3),
+            "total_actual_kg":    round(total_actual, 3),
+            "total_deviation_kg": round(total_deviation, 3),
+            "total_deviation_pct": total_deviation_pct,
+        },
+    }

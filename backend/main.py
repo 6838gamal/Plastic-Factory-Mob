@@ -35,6 +35,12 @@ async def _init_db():
     )
     if already_exists:
         print("✅ [init_db] Schema already present — skipping.")
+        # Ensure partial unique index on alerts.transaction_id (idempotent migration)
+        await pool.execute(
+            """CREATE UNIQUE INDEX IF NOT EXISTS alerts_transaction_id_key
+               ON alerts (transaction_id)
+               WHERE transaction_id IS NOT NULL"""
+        )
         return
 
     if not SCHEMA_PATH.exists():

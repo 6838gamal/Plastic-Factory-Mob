@@ -5,10 +5,14 @@ Rules:
  - When production is saved:
      * scrap_quantity → added to scrap material inventory (warehouse_type='mixer')
      * industrial deviation alert raised when |outputs - inputs| / inputs > threshold
+     * Auto 11: if projected deviation > notes_threshold AND notes is empty → HTTP 400
  - Edit reverses scrap additions before applying new ones.
  - Delete reverses scrap additions.
  - Every change is written to audit_log.
+ - After save/edit: daily report is regenerated in the background (Auto 5).
 """
+import asyncio
+import json
 from fastapi import APIRouter, Query, HTTPException
 from pydantic import BaseModel
 from typing import Optional
@@ -109,30 +113,38 @@ async def _remove_scrap_from_inventory(pool, production_id: str, scrap_qty: floa
     )
 
 
-async def _check_industrial_deviation(pool, batch_number: str, production_id: str):
-    """Compare batch total_inputs vs total_outputs and raise alert if threshold exceeded."""
-    if not batch_number:
-        return
+async def _get_notes_threshold(pool) -> float:
+    """Fetch deviation_notes_threshold from settings."""
+    row = await pool.fetchrow("SELECT value FROM settings WHERE key='deviation_notes_threshold'")
+    try:
+        return float(row["value"]) if row and row["value"] else DEVIATION_NOTES_THRESHOLD
+    except (ValueError, TypeError):
+        return DEVIATION_NOTES_THRESHOLD
 
-    # Get batch total inputs
-    batch = await pool.fetchrow("SELECT * FROM batches WHERE batch_number=$1", batch_number)
-    if not batch:
-        return
 
+async def _get_alert_threshold(pool) -> float:
+    """Fetch deviation_alert_threshold from settings."""
+    row = await pool.fetchrow("SELECT value FROM settings WHERE key='deviation_alert_threshold'")
+    try:
+        return float(row["value"]) if row and row["value"] else DEVIATION_ALERT_THRESHOLD
+    except (ValueError, TypeError):
+        return DEVIATION_ALERT_THRESHOLD
+
+
+def _compute_batch_total_inputs(batch_row) -> float:
+    """Compute total_inputs_kg from a batch DB row."""
     def to_f(v): return float(v or 0)
+    pvc       = to_f(batch_row["pvc_qty"])
+    dop       = to_f(batch_row["dop_qty"])
+    scrap_b   = to_f(batch_row["scrap_qty"])
+    calcium   = to_f(batch_row["calcium_qty"])
+    wax       = to_f(batch_row["wax_qty"])
+    stabilizer = to_f(batch_row["stabilizer_qty"])
+    titanium  = to_f(batch_row["titanium_qty"])
 
-    pvc = to_f(batch["pvc_qty"])
-    dop = to_f(batch["dop_qty"])
-    scrap_b = to_f(batch["scrap_qty"])
-    calcium = to_f(batch["calcium_qty"])
-    wax = to_f(batch["wax_qty"])
-    stabilizer = to_f(batch["stabilizer_qty"])
-    titanium = to_f(batch["titanium_qty"])
-
-    import json
     dynamic = 0.0
     for field in ("materials", "pigments", "additives"):
-        raw = batch[field]
+        raw = batch_row[field]
         if isinstance(raw, str):
             try:
                 raw = json.loads(raw)
@@ -143,11 +155,93 @@ async def _check_industrial_deviation(pool, batch_number: str, production_id: st
                 if isinstance(item, dict):
                     qty_raw = float(item.get("quantity", 0) or 0)
                     unit = item.get("unit", "كجم")
-                    dynamic += _to_kg(qty_raw, unit)  # ✓ unit conversion fixed
+                    dynamic += _to_kg(qty_raw, unit)
 
-    total_inputs = pvc + dop + scrap_b + calcium + wax + stabilizer + titanium + dynamic
+    return pvc + dop + scrap_b + calcium + wax + stabilizer + titanium + dynamic
 
-    # Get all machine production for this batch
+
+async def _check_notes_required(pool, batch_number: str, body: ProductionCreate,
+                                 exclude_production_id: str = None):
+    """
+    Auto 11 — Pre-check: if projected deviation > notes_threshold and notes are empty → raise 400.
+
+    Projects what the deviation WILL be after this production record is added,
+    then enforces the notes requirement before any DB write.
+    """
+    if not batch_number:
+        return
+
+    notes_threshold = await _get_notes_threshold(pool)
+    notes = (body.notes or "").strip()
+
+    batch = await pool.fetchrow("SELECT * FROM batches WHERE batch_number=$1", batch_number)
+    if not batch:
+        return
+
+    total_inputs = _compute_batch_total_inputs(batch)
+    if total_inputs <= 0:
+        return
+
+    # Get existing production totals (exclude current record if editing)
+    conditions = ["batch_number=$1"]
+    params = [batch_number]
+    if exclude_production_id:
+        conditions.append("id!=$2")
+        params.append(exclude_production_id)
+
+    prod = await pool.fetchrow(
+        f"""SELECT
+              COALESCE(SUM(produced_quantity),0) AS total_produced,
+              COALESCE(SUM(scrap_quantity),0)    AS total_scrap,
+              COALESCE(SUM(waste_quantity),0)    AS total_waste
+            FROM machine_production
+            WHERE {' AND '.join(conditions)}""",
+        *params,
+    )
+
+    existing_outputs = (
+        float(prod["total_produced"] or 0) +
+        float(prod["total_scrap"] or 0) +
+        float(prod["total_waste"] or 0)
+    )
+
+    new_outputs = (
+        float(body.produced_quantity or 0) +
+        float(body.scrap_quantity or 0) +
+        float(body.waste_quantity or 0)
+    )
+
+    projected_outputs = existing_outputs + new_outputs
+    deviation = projected_outputs - total_inputs
+    deviation_pct = abs(deviation / total_inputs * 100)
+
+    if deviation_pct > notes_threshold and not notes:
+        direction = "زيادة" if deviation > 0 else "نقص"
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "notes_required",
+                "message": (
+                    f"الانحراف الصناعي كبير ({deviation_pct:.1f}% — {direction}). "
+                    f"يجب إدخال ملاحظة تفسيرية قبل الحفظ."
+                ),
+                "deviation_pct": round(deviation_pct, 2),
+                "threshold": notes_threshold,
+            },
+        )
+
+
+async def _check_industrial_deviation(pool, batch_number: str, production_id: str):
+    """Compare batch total_inputs vs total_outputs and raise alert if threshold exceeded."""
+    if not batch_number:
+        return
+
+    batch = await pool.fetchrow("SELECT * FROM batches WHERE batch_number=$1", batch_number)
+    if not batch:
+        return
+
+    total_inputs = _compute_batch_total_inputs(batch)
+
     prod = await pool.fetchrow(
         """SELECT
              COALESCE(SUM(produced_quantity),0) AS total_produced,
@@ -157,9 +251,9 @@ async def _check_industrial_deviation(pool, batch_number: str, production_id: st
         batch_number,
     )
     total_outputs = (
-        to_f(prod["total_produced"]) +
-        to_f(prod["total_scrap"]) +
-        to_f(prod["total_waste"])
+        float(prod["total_produced"]) +
+        float(prod["total_scrap"]) +
+        float(prod["total_waste"])
     )
 
     if total_inputs <= 0:
@@ -168,16 +262,8 @@ async def _check_industrial_deviation(pool, batch_number: str, production_id: st
     deviation = total_outputs - total_inputs
     deviation_pct = abs(deviation / total_inputs * 100)
 
-    # ── Fetch configurable thresholds from settings ───────────
-    dev_setting = await pool.fetchrow(
-        "SELECT value FROM settings WHERE key='deviation_alert_threshold'"
-    )
-    alert_threshold = float(dev_setting["value"]) if dev_setting and dev_setting["value"] else DEVIATION_ALERT_THRESHOLD
-
-    notes_setting = await pool.fetchrow(
-        "SELECT value FROM settings WHERE key='deviation_notes_threshold'"
-    )
-    notes_threshold = float(notes_setting["value"]) if notes_setting and notes_setting["value"] else DEVIATION_NOTES_THRESHOLD
+    alert_threshold = await _get_alert_threshold(pool)
+    notes_threshold = await _get_notes_threshold(pool)
 
     if deviation_pct > alert_threshold:
         direction = "زيادة" if deviation > 0 else "نقص"
@@ -194,7 +280,7 @@ async def _check_industrial_deviation(pool, batch_number: str, production_id: st
             """INSERT INTO alerts
                (id, alert_type, severity, batch_number, description, status, transaction_id)
                VALUES (gen_random_uuid(), 'industrial_deviation', $1, $2, $3, 'pending', $4)
-               ON CONFLICT (transaction_id) DO NOTHING""",
+               ON CONFLICT (transaction_id) WHERE transaction_id IS NOT NULL DO NOTHING""",
             severity, batch_number, description, f"deviat_{production_id}",
         )
         await pool.execute(
@@ -205,6 +291,23 @@ async def _check_industrial_deviation(pool, batch_number: str, production_id: st
             f"انحراف صناعي {deviation_pct:.1f}% في طبخة {batch_number}" +
             (" — يلزم ملاحظة" if deviation_pct > notes_threshold else ""),
         )
+
+
+async def _refresh_daily_report(date_str: str):
+    """Auto 5 — Regenerate today's daily report snapshot in the background (non-locking)."""
+    try:
+        from datetime import date as _date
+        pool = await get_pool()
+        target = _date.fromisoformat(date_str)
+        existing = await pool.fetchrow(
+            "SELECT is_locked FROM daily_reports WHERE report_date=$1", target
+        )
+        if existing and existing["is_locked"]:
+            return  # Never touch a locked report
+        from routers.reports import generate_daily_report
+        await generate_daily_report(report_date=date_str, lock=False)
+    except Exception as exc:
+        print(f"[auto5] Daily report refresh failed for {date_str}: {exc}")
 
 
 # ─────────────────────── routes ─────────────────────────────────
@@ -241,6 +344,9 @@ async def get_productions(
 async def create_production(body: ProductionCreate):
     pool = await get_pool()
 
+    # ── Auto 11: Enforce notes when deviation is large ────────
+    await _check_notes_required(pool, body.batch_number, body)
+
     row = await pool.fetchrow(
         """INSERT INTO machine_production (
             id, batch_number, machine_id, machine_name, product_id, product_name,
@@ -274,8 +380,12 @@ async def create_production(body: ProductionCreate):
         f"إنتاج ماكينة {body.machine_name or ''} — طبخة {body.batch_number or ''}",
     )
 
-    # ── Industrial deviation check ────────────────────────────
+    # ── Industrial deviation check + alert ────────────────────
     await _check_industrial_deviation(pool, body.batch_number, production_id)
+
+    # ── Auto 5: Refresh daily report in background ────────────
+    from datetime import date
+    asyncio.create_task(_refresh_daily_report(str(date.today())))
 
     return dict(row)
 
@@ -283,6 +393,10 @@ async def create_production(body: ProductionCreate):
 @router.put("/{production_id}")
 async def update_production(production_id: str, body: ProductionCreate):
     pool = await get_pool()
+
+    # ── Auto 11: Enforce notes when deviation is large ────────
+    await _check_notes_required(pool, body.batch_number, body,
+                                 exclude_production_id=production_id)
 
     # Reverse old scrap addition
     old = await pool.fetchrow(
@@ -310,7 +424,20 @@ async def update_production(production_id: str, body: ProductionCreate):
             new_scrap, f"update_{production_id}", body.created_by,
         )
 
+    await pool.execute(
+        """INSERT INTO audit_log
+           (id, action, table_name, record_id, transaction_id, user_id, description)
+           VALUES (gen_random_uuid(),'update','machine_production',$1,$2,$3,$4)""",
+        production_id, body.transaction_id, body.created_by,
+        f"تعديل إنتاج ماكينة {body.machine_name or ''} — طبخة {body.batch_number or ''}",
+    )
+
     await _check_industrial_deviation(pool, str(row["batch_number"]), production_id)
+
+    # ── Auto 5: Refresh daily report in background ────────────
+    from datetime import date
+    asyncio.create_task(_refresh_daily_report(str(date.today())))
+
     return dict(row)
 
 
@@ -330,4 +457,9 @@ async def delete_production(production_id: str):
         production_id, "حذف سجل إنتاج",
     )
     await pool.execute("DELETE FROM machine_production WHERE id=$1", production_id)
+
+    # ── Auto 5: Refresh daily report in background ────────────
+    from datetime import date
+    asyncio.create_task(_refresh_daily_report(str(date.today())))
+
     return {"success": True}
