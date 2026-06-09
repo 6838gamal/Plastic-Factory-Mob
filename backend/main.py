@@ -56,6 +56,7 @@ from routers import (
     shifts, opening_balances, reports, settings, day,
 )
 from routers import stock_take
+from routers import recipes
 
 WEB_DIR = Path(__file__).parent.parent / "build" / "web"
 
@@ -218,6 +219,7 @@ app.include_router(reports.router)
 app.include_router(stock_take.router)
 app.include_router(settings.router)
 app.include_router(day.router)
+app.include_router(recipes.router)
 
 
 @app.get("/api/health")

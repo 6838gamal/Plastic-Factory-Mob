@@ -118,6 +118,71 @@ class ProductModel {
       };
 }
 
+class RecipeItemModel {
+  final String id;
+  final String recipeId;
+  final String materialName;
+  final double standardQty;
+  final String unit;
+
+  const RecipeItemModel({
+    required this.id,
+    required this.recipeId,
+    required this.materialName,
+    required this.standardQty,
+    required this.unit,
+  });
+
+  factory RecipeItemModel.fromJson(Map<String, dynamic> json) => RecipeItemModel(
+        id: json['id'] as String,
+        recipeId: json['recipe_id'] as String,
+        materialName: json['material_name'] as String,
+        standardQty: (json['standard_qty'] as num?)?.toDouble() ?? 0,
+        unit: json['unit'] as String? ?? 'كجم',
+      );
+
+  Map<String, dynamic> toJson() => {
+        'material_name': materialName,
+        'standard_qty': standardQty,
+        'unit': unit,
+      };
+}
+
+class RecipeModel {
+  final String id;
+  final String mixtureTypeId;
+  final String? mixtureTypeName;
+  final String name;
+  final String? notes;
+  final bool isActive;
+  final List<RecipeItemModel> items;
+
+  const RecipeModel({
+    required this.id,
+    required this.mixtureTypeId,
+    this.mixtureTypeName,
+    required this.name,
+    this.notes,
+    required this.isActive,
+    required this.items,
+  });
+
+  factory RecipeModel.fromJson(Map<String, dynamic> json) => RecipeModel(
+        id: json['id'] as String,
+        mixtureTypeId: json['mixture_type_id'] as String,
+        mixtureTypeName: json['mixture_type_name'] as String?,
+        name: json['name'] as String,
+        notes: json['notes'] as String?,
+        isActive: json['is_active'] as bool? ?? true,
+        items: ((json['items'] as List?) ?? [])
+            .map((e) => RecipeItemModel.fromJson(e as Map<String, dynamic>))
+            .toList(),
+      );
+
+  Map<String, double> get qtyMap => {for (final i in items) i.materialName: i.standardQty};
+  Map<String, String> get unitMap => {for (final i in items) i.materialName: i.unit};
+}
+
 class MixtureTypeModel {
   final String id;
   final String name;

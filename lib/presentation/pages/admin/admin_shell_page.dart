@@ -163,6 +163,13 @@ class _AdminDrawer extends ConsumerWidget {
                   route: '/admin/stock-take',
                   currentRoute: currentRoute,
                 ),
+                _DrawerItem(
+                  icon: Icons.menu_book_outlined,
+                  selectedIcon: Icons.menu_book,
+                  title: 'وصفات الخلطات',
+                  route: '/admin/recipes',
+                  currentRoute: currentRoute,
+                ),
                 const Divider(),
                 _DrawerItem(
                   icon: Icons.warning_amber_outlined,

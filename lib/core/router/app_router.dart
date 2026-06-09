@@ -15,6 +15,7 @@ import '../../presentation/pages/admin/reports/reports_page.dart';
 import '../../presentation/pages/admin/settings/settings_page.dart';
 import '../../presentation/pages/admin/production/production_page.dart';
 import '../../presentation/pages/admin/inventory/stock_take_page.dart';
+import '../../presentation/pages/admin/recipes/recipe_management_page.dart';
 import '../../presentation/providers/auth_provider.dart';
 
 /// A ChangeNotifier that fires whenever auth state changes,
@@ -63,6 +64,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(path: '/admin/reports', builder: (_, __) => const ReportsPage()),
           GoRoute(path: '/admin/settings', builder: (_, __) => const SettingsPage()),
           GoRoute(path: '/admin/stock-take', builder: (_, __) => const StockTakePage()),
+          GoRoute(path: '/admin/recipes', builder: (_, __) => const RecipeManagementPage()),
         ],
       ),
     ],

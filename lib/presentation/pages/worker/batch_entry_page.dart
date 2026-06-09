@@ -66,6 +66,8 @@ class _BatchEntryPageState extends ConsumerState<BatchEntryPage> {
   MixtureTypeModel? _selectedMixtureType;
   File? _scaleImage;
   bool _loadingBatchNum = false;
+  bool _loadingRecipe = false;
+  bool _recipeApplied = false;
 
   @override
   void initState() {
@@ -96,6 +98,73 @@ class _BatchEntryPageState extends ConsumerState<BatchEntryPage> {
     _add1Ctrl.dispose();  _add2Ctrl.dispose();  _add3Ctrl.dispose();
     _add4Ctrl.dispose();  _add5Ctrl.dispose();  _add6Ctrl.dispose();
     super.dispose();
+  }
+
+  // ── خريطة الحقول الثابتة بالاسم الكامل ────────────────────────
+  Map<String, TextEditingController> get _fieldByName => {
+    'مواد خام PVC صيني':                         _pvcCtrl,
+    'DOP زيت':                                    _dopCtrl,
+    'سكراب اسود ناعم':                            _scrapBlackCtrl,
+    'سكراب ازرق ناعم':                            _scrapBlueCtrl,
+    'سكراب ازرق سكري':                            _scrapBlueSugarCtrl,
+    'كالسيوم باودر عبوة 25 كيلو':                 _calciumCtrl,
+    'شمع باودر عبوة 25 كيلو':                     _waxCtrl,
+    'مثبت استبليزر باودر عبوة 25 كيلو':           _stabilizerCtrl,
+    'تيتانيوم':                                   _titaniumCtrl,
+    'سيتريك اسيد (ملح الليمون) 490 عبوة 25 كجم': _citricAcidCtrl,
+    'بيكربونات اصفر محلي':                        _bicarYellowCtrl,
+    'بيكربونات ابيض محلي':                        _bicarWhiteCtrl,
+    'صبغة سوداء باودر عبوة 10 كيلو':             _pig1Ctrl,
+    'صبغة زرقاء باودر عبوة 20 كيلو رقم-١٠٢٧':    _pig2Ctrl,
+    'صبغة زرقاء فاتح عبوة 20 كيلو رقم-١٢٥٦':     _pig3Ctrl,
+    'صبغة ارجواني عبوة 25 كيلو رقم-F٤٠٩':        _pig4Ctrl,
+    'صبغة احمر زهري عبوة 25 كيلو رقم-F٣٥٨':      _pig5Ctrl,
+    'صبغة كاكي بيج عبوة 25 كيلو رقم-١٠٣٥':       _pig6Ctrl,
+    'صبغه خضراء طاووس محلي':                     _pig7Ctrl,
+    'صبغه برتقالي محلي':                         _pig8Ctrl,
+    'صبغه زرقاء طاووس محلي':                     _pig9Ctrl,
+    'صبغه سوداء طاووس محلي':                     _pig10Ctrl,
+    'لواصق موديل ۷۰۳ بالحبه':                    _add1Ctrl,
+    'لواصق موديل ۸۰۳۱-٦٠٣١ بالحبه':             _add2Ctrl,
+    'لواصق موديل ٦٠٢٦-٨٠٢٦ بالحبه':             _add3Ctrl,
+    'لواصق موديل ٦٠٢٢-٨٠٢٢ بالحبه':             _add4Ctrl,
+    'خلطه ازرق':                                  _add5Ctrl,
+    'راجع مكينه ازرق':                            _add6Ctrl,
+  };
+
+  Future<void> _applyRecipe(MixtureTypeModel mixtureType) async {
+    setState(() { _loadingRecipe = true; _recipeApplied = false; });
+    try {
+      final ds = ref.read(dataSourceProvider);
+      final recipe = await ds.getRecipeByMixtureType(mixtureType.id);
+      if (recipe == null || !mounted) return;
+      final qtyMap = recipe.qtyMap;
+      final fieldMap = _fieldByName;
+      bool anyFilled = false;
+      for (final entry in qtyMap.entries) {
+        final ctrl = fieldMap[entry.key];
+        if (ctrl != null && entry.value > 0) {
+          final qty = entry.value;
+          ctrl.text = qty == qty.truncateToDouble()
+              ? qty.toInt().toString()
+              : qty.toString();
+          anyFilled = true;
+        }
+      }
+      if (anyFilled && mounted) {
+        setState(() => _recipeApplied = true);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('تم تعبئة الوصفة: ${recipe.name}'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (_) {
+    } finally {
+      if (mounted) setState(() => _loadingRecipe = false);
+    }
   }
 
   Future<void> _loadNextBatchNumber() async {
@@ -431,15 +500,48 @@ class _BatchEntryPageState extends ConsumerState<BatchEntryPage> {
             const SizedBox(height: 12),
 
             mixtureTypes.when(
-              data: (list) => DropdownButtonFormField<MixtureTypeModel>(
-                value: _selectedMixtureType,
-                decoration: const InputDecoration(labelText: '${AppStrings.mixtureType} *'),
-                isExpanded: true,
-                items: list
-                    .map((m) => DropdownMenuItem(value: m, child: Text(m.name)))
-                    .toList(),
-                onChanged: (v) => setState(() => _selectedMixtureType = v),
-                validator: (v) => v == null ? 'نوع الخلطة مطلوب' : null,
+              data: (list) => Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  DropdownButtonFormField<MixtureTypeModel>(
+                    value: _selectedMixtureType,
+                    decoration: InputDecoration(
+                      labelText: '${AppStrings.mixtureType} *',
+                      suffixIcon: _loadingRecipe
+                          ? const Padding(
+                              padding: EdgeInsets.all(12),
+                              child: SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(strokeWidth: 2)),
+                            )
+                          : _recipeApplied
+                              ? const Icon(Icons.check_circle, color: Colors.green)
+                              : null,
+                    ),
+                    isExpanded: true,
+                    items: list
+                        .map((m) => DropdownMenuItem(value: m, child: Text(m.name)))
+                        .toList(),
+                    onChanged: (v) {
+                      setState(() {
+                        _selectedMixtureType = v;
+                        _recipeApplied = false;
+                      });
+                      if (v != null) _applyRecipe(v);
+                    },
+                    validator: (v) => v == null ? 'نوع الخلطة مطلوب' : null,
+                  ),
+                  if (_recipeApplied)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4, right: 4),
+                      child: Text(
+                        'تم تطبيق الوصفة القياسية — يمكنك تعديل أي قيمة',
+                        style: TextStyle(
+                            fontSize: 11, color: Colors.green.shade700),
+                      ),
+                    ),
+                ],
               ),
               loading: () => const LinearProgressIndicator(),
               error: (e, _) => Text('خطأ: $e'),

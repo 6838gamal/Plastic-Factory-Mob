@@ -203,6 +203,27 @@ class ApiDataSource {
   Future<void> upsertMixtureType(Map<String, dynamic> data) =>
       LocalDataService.upsertMixtureType(data);
 
+  // ==================== RECIPES ====================
+  Future<List<RecipeModel>> getRecipes() async {
+    final res = await _get('/api/recipes');
+    return (res as List).map((e) => RecipeModel.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
+  Future<RecipeModel?> getRecipeByMixtureType(String mixtureTypeId) async {
+    final res = await _get('/api/recipes/by-mixture/$mixtureTypeId');
+    if (res == null) return null;
+    return RecipeModel.fromJson(res as Map<String, dynamic>);
+  }
+
+  Future<RecipeModel> upsertRecipe(Map<String, dynamic> data) async {
+    final res = await _post('/api/recipes', data);
+    return RecipeModel.fromJson(res as Map<String, dynamic>);
+  }
+
+  Future<void> deleteRecipe(String id) async {
+    await _delete('/api/recipes/$id');
+  }
+
   // ==================== BATCHES ====================
   Future<List<BatchModel>> getBatches({DateTime? from, DateTime? to, String? workerId}) async {
     final res = await _get('/api/batches', query: {

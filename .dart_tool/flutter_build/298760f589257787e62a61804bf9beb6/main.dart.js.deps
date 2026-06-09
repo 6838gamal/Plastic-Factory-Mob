@@ -1495,6 +1495,7 @@ file:///home/runner/workspace/lib/presentation/pages/admin/inventory/stock_take_
 file:///home/runner/workspace/lib/presentation/pages/admin/machines/machines_page.dart
 file:///home/runner/workspace/lib/presentation/pages/admin/materials/materials_page.dart
 file:///home/runner/workspace/lib/presentation/pages/admin/production/production_page.dart
+file:///home/runner/workspace/lib/presentation/pages/admin/recipes/recipe_management_page.dart
 file:///home/runner/workspace/lib/presentation/pages/admin/reports/reports_page.dart
 file:///home/runner/workspace/lib/presentation/pages/admin/settings/settings_page.dart
 file:///home/runner/workspace/lib/presentation/pages/admin/workers/workers_page.dart

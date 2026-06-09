@@ -2,5 +2,6 @@
 - [GoRouter + Riverpod auth redirect](go-router-riverpod-auth.md) — Never recreate GoRouter on auth change; use refreshListenable + ChangeNotifier instead.
 - [asyncpg date type requirement](asyncpg-date-types.md) — asyncpg rejects Python str for DATE columns; must use datetime.date objects. Fix: type Pydantic model fields as Optional[date], not str.
 - [daily_reports schema mismatch](daily-reports-schema.md) — DB columns are total_waste_kg/total_scrap_kg but code used total_waste/total_scrap; also missing total_inputs/total_alerts/KPI columns were added via ALTER TABLE.
+- [Recipes system](recipes-system.md) — recipes/recipe_items tables created on-demand via ensure_tables() in router; UNIQUE(mixture_type_id) on recipes; auto-fill uses material_name as key mapped to fixed TextEditingControllers in batch entry.
 - [Batch idempotency — duplicate TX ID](batch-idempotency.md) — batches table has UNIQUE(transaction_id); asyncpg crashes on dupe INSERT; check-before-insert pattern added at top of create_batch for graceful idempotent response.
 - [Batch date NOT NULL fix](batch-date-fix.md) — batches.date is NOT NULL DEFAULT CURRENT_DATE; asyncpg passes None as NULL and bypasses DB default; fix: use body.date or DateType.today() in both create and update.
