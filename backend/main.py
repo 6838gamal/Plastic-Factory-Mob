@@ -14,6 +14,41 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
 from database import get_pool, close_pool
+
+SCHEMA_PATH = Path(__file__).parent.parent / "schema.sql"
+
+
+async def _init_db():
+    """Initialize DB schema on first deployment only.
+
+    Uses CREATE TABLE IF NOT EXISTS + CREATE INDEX IF NOT EXISTS in schema.sql,
+    so re-running on every restart is safe and fast (no-op if tables exist).
+    Checks for the presence of the primary table first to skip the SQL parse
+    step entirely on normal restarts.
+    """
+    pool = await get_pool()
+    already_exists = await pool.fetchval(
+        "SELECT EXISTS("
+        "  SELECT 1 FROM information_schema.tables"
+        "  WHERE table_schema='public' AND table_name='raw_materials'"
+        ")"
+    )
+    if already_exists:
+        print("✅ [init_db] Schema already present — skipping.")
+        return
+
+    if not SCHEMA_PATH.exists():
+        print(f"⚠️  [init_db] schema.sql not found at {SCHEMA_PATH} — skipping.")
+        return
+
+    sql = SCHEMA_PATH.read_text(encoding="utf-8")
+    try:
+        await pool.execute(sql)
+        print("✅ [init_db] Schema created from schema.sql")
+    except Exception as exc:
+        print(f"❌ [init_db] Schema init error: {exc}")
+
+
 from routers import (
     auth, materials, inventory, workers, products,
     machines, mixers, mixture_types, batches,
@@ -121,11 +156,31 @@ async def _seed_default_admin():
         print(f"✅ Admin users found: {existing}")
 
 
+async def _seed_default_settings():
+    """Seed required settings rows if they don't exist yet."""
+    pool = await get_pool()
+    defaults = [
+        ("prevent_negative_stock",    "true",  "منع الخصم عند نقص المخزون"),
+        ("deviation_alert_threshold", "2.0",   "نسبة الانحراف لإنشاء تنبيه (%)"),
+        ("deviation_notes_threshold", "5.0",   "نسبة الانحراف لإلزام الملاحظة (%)"),
+        ("scrap_material_id",         "",      "معرف مادة الهالك"),
+    ]
+    for key, value, description in defaults:
+        await pool.execute(
+            """INSERT INTO settings (key, value, description)
+               VALUES ($1, $2, $3)
+               ON CONFLICT (key) DO NOTHING""",
+            key, value, description,
+        )
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await get_pool()
     print("✅ Database pool ready")
+    await _init_db()
     await _seed_default_admin()
+    await _seed_default_settings()
     scheduler_task = asyncio.create_task(_daily_report_scheduler())
     yield
     scheduler_task.cancel()

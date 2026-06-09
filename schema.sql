@@ -21,8 +21,8 @@ CREATE TABLE IF NOT EXISTS raw_materials (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_raw_materials_category ON raw_materials(category);
-CREATE INDEX idx_raw_materials_active ON raw_materials(is_active);
+CREATE INDEX IF NOT EXISTS idx_raw_materials_category ON raw_materials(category);
+CREATE INDEX IF NOT EXISTS idx_raw_materials_active ON raw_materials(is_active);
 
 -- =============================================================
 -- جدول المخزون - Inventory
@@ -36,8 +36,8 @@ CREATE TABLE IF NOT EXISTS inventory (
   UNIQUE(material_id, warehouse_type)
 );
 
-CREATE INDEX idx_inventory_material ON inventory(material_id);
-CREATE INDEX idx_inventory_warehouse ON inventory(warehouse_type);
+CREATE INDEX IF NOT EXISTS idx_inventory_material ON inventory(material_id);
+CREATE INDEX IF NOT EXISTS idx_inventory_warehouse ON inventory(warehouse_type);
 
 -- =============================================================
 -- جدول حركات المخزون - Inventory Transactions
@@ -56,9 +56,9 @@ CREATE TABLE IF NOT EXISTS inventory_transactions (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_inv_tx_material ON inventory_transactions(material_id);
-CREATE INDEX idx_inv_tx_created ON inventory_transactions(created_at);
-CREATE INDEX idx_inv_tx_ref ON inventory_transactions(transaction_ref);
+CREATE INDEX IF NOT EXISTS idx_inv_tx_material ON inventory_transactions(material_id);
+CREATE INDEX IF NOT EXISTS idx_inv_tx_created ON inventory_transactions(created_at);
+CREATE INDEX IF NOT EXISTS idx_inv_tx_ref ON inventory_transactions(transaction_ref);
 
 -- =============================================================
 -- جدول العمال - Workers
@@ -159,10 +159,10 @@ CREATE TABLE IF NOT EXISTS batches (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_batches_date ON batches(date);
-CREATE INDEX idx_batches_worker ON batches(worker_id);
-CREATE INDEX idx_batches_number ON batches(batch_number);
-CREATE INDEX idx_batches_tx ON batches(transaction_id);
+CREATE INDEX IF NOT EXISTS idx_batches_date ON batches(date);
+CREATE INDEX IF NOT EXISTS idx_batches_worker ON batches(worker_id);
+CREATE INDEX IF NOT EXISTS idx_batches_number ON batches(batch_number);
+CREATE INDEX IF NOT EXISTS idx_batches_tx ON batches(transaction_id);
 
 -- =============================================================
 -- جدول إنتاج الماكينات - Machine Production
@@ -192,9 +192,9 @@ CREATE TABLE IF NOT EXISTS machine_production (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_machine_prod_machine ON machine_production(machine_id);
-CREATE INDEX idx_machine_prod_created ON machine_production(created_at);
-CREATE INDEX idx_machine_prod_tx ON machine_production(transaction_id);
+CREATE INDEX IF NOT EXISTS idx_machine_prod_machine ON machine_production(machine_id);
+CREATE INDEX IF NOT EXISTS idx_machine_prod_created ON machine_production(created_at);
+CREATE INDEX IF NOT EXISTS idx_machine_prod_tx ON machine_production(transaction_id);
 
 -- =============================================================
 -- جدول التحذيرات - Alerts
@@ -218,10 +218,10 @@ CREATE TABLE IF NOT EXISTS alerts (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_alerts_status ON alerts(status);
-CREATE INDEX idx_alerts_severity ON alerts(severity);
-CREATE INDEX idx_alerts_type ON alerts(alert_type);
-CREATE INDEX idx_alerts_created ON alerts(created_at);
+CREATE INDEX IF NOT EXISTS idx_alerts_status ON alerts(status);
+CREATE INDEX IF NOT EXISTS idx_alerts_severity ON alerts(severity);
+CREATE INDEX IF NOT EXISTS idx_alerts_type ON alerts(alert_type);
+CREATE INDEX IF NOT EXISTS idx_alerts_created ON alerts(created_at);
 
 -- =============================================================
 -- جدول سجل التدقيق - Audit Log
@@ -240,11 +240,11 @@ CREATE TABLE IF NOT EXISTS audit_log (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_audit_table ON audit_log(table_name);
-CREATE INDEX idx_audit_action ON audit_log(action);
-CREATE INDEX idx_audit_user ON audit_log(user_id);
-CREATE INDEX idx_audit_created ON audit_log(created_at);
-CREATE INDEX idx_audit_tx ON audit_log(transaction_id);
+CREATE INDEX IF NOT EXISTS idx_audit_table ON audit_log(table_name);
+CREATE INDEX IF NOT EXISTS idx_audit_action ON audit_log(action);
+CREATE INDEX IF NOT EXISTS idx_audit_user ON audit_log(user_id);
+CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_log(created_at);
+CREATE INDEX IF NOT EXISTS idx_audit_tx ON audit_log(transaction_id);
 
 -- =============================================================
 -- جدول الوصفات - Recipes (optional)
