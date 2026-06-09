@@ -180,9 +180,11 @@ async def generate_daily_report(
     }
 
     # ── Upsert report ──────────────────────────────────────────
+    # Note: total_production is a GENERATED ALWAYS column (= total_produced),
+    # so we insert into total_produced only.
     row = await pool.fetchrow(
         """INSERT INTO daily_reports
-           (id, report_date, total_batches, total_production, total_inputs, total_waste,
+           (id, report_date, total_batches, total_produced, total_inputs, total_waste,
             total_scrap, total_alerts, day_cost, most_consumed_material,
             least_consumed_material, efficiency_pct, deviation_pct, waste_pct,
             snapshot, is_locked, locked_at, updated_at)
@@ -191,7 +193,7 @@ async def generate_daily_report(
                    CASE WHEN $15 THEN NOW() ELSE NULL END, NOW())
            ON CONFLICT (report_date)
            DO UPDATE SET
-             total_batches=$2, total_production=$3, total_inputs=$4, total_waste=$5,
+             total_batches=$2, total_produced=$3, total_inputs=$4, total_waste=$5,
              total_scrap=$6, total_alerts=$7, day_cost=$8,
              most_consumed_material=$9, least_consumed_material=$10,
              efficiency_pct=$11, deviation_pct=$12, waste_pct=$13,

@@ -75,9 +75,22 @@ def serialize_row(row) -> dict:
     return d
 
 
+_GRAM_UNITS = {"جرام", "gram", "g", "غرام", "gm"}
+
+
+def _to_kg(qty: float, unit: str) -> float:
+    """Convert quantity to kg. Gram-based units are divided by 1000."""
+    if unit and unit.strip().lower() in _GRAM_UNITS:
+        return qty / 1000.0
+    return qty
+
+
 def _extract_materials(batch: BatchCreate) -> list:
-    """Return a flat list of {material_id, name, quantity, unit} for ALL
-    materials in the batch that have a valid material_id and qty > 0."""
+    """Return a flat list of {material_id, name, quantity_kg, unit} for ALL
+    materials in the batch that have a valid material_id and qty > 0.
+
+    Quantities are automatically converted to KG (gram units ÷ 1000).
+    """
     items = []
     seen = {}
     for field in ("materials", "pigments", "additives"):
@@ -86,18 +99,22 @@ def _extract_materials(batch: BatchCreate) -> list:
             if not isinstance(item, dict):
                 continue
             mid = item.get("material_id") or item.get("id")
-            qty = float(item.get("quantity", 0) or 0)
-            if not mid or qty <= 0:
+            qty_raw = float(item.get("quantity", 0) or 0)
+            unit = item.get("unit", "كجم")
+            qty_kg = _to_kg(qty_raw, unit)
+            if not mid or qty_kg <= 0:
                 continue
             # Aggregate duplicates
             if mid in seen:
-                seen[mid]["quantity"] += qty
+                seen[mid]["quantity"] += qty_kg
+                seen[mid]["quantity_original"] += qty_raw
             else:
                 entry = {
                     "material_id": str(mid),
                     "name": item.get("name", ""),
-                    "quantity": qty,
-                    "unit": item.get("unit", "كجم"),
+                    "quantity": qty_kg,          # always KG for deduction
+                    "quantity_original": qty_raw,
+                    "unit": unit,
                 }
                 seen[mid] = entry
                 items.append(entry)
@@ -302,20 +319,26 @@ async def _reverse_deductions(pool, transaction_id: str,
 
 
 def _calc_batch_stats(batch_row: dict) -> dict:
-    """Compute production efficiency/deviation/waste KPIs from raw batch data."""
-    pvc = float(batch_row.get("pvc_qty") or 0)
-    dop = float(batch_row.get("dop_qty") or 0)
-    scrap = float(batch_row.get("scrap_qty") or 0)
-    calcium = float(batch_row.get("calcium_qty") or 0)
-    wax = float(batch_row.get("wax_qty") or 0)
+    """Compute total inputs from raw batch data (all quantities treated as KG already).
+
+    The fixed-field quantities (pvc_qty, dop_qty …) are stored as KG in the DB.
+    The dynamic materials in JSONB may carry a 'unit' field — apply gram→kg if needed.
+    """
+    pvc       = float(batch_row.get("pvc_qty") or 0)
+    dop       = float(batch_row.get("dop_qty") or 0)
+    scrap     = float(batch_row.get("scrap_qty") or 0)
+    calcium   = float(batch_row.get("calcium_qty") or 0)
+    wax       = float(batch_row.get("wax_qty") or 0)
     stabilizer = float(batch_row.get("stabilizer_qty") or 0)
-    titanium = float(batch_row.get("titanium_qty") or 0)
+    titanium  = float(batch_row.get("titanium_qty") or 0)
 
     dynamic_total = 0.0
     for field in ("materials", "pigments", "additives"):
         for item in _parse_json(batch_row.get(field)):
             if isinstance(item, dict):
-                dynamic_total += float(item.get("quantity", 0) or 0)
+                qty_raw = float(item.get("quantity", 0) or 0)
+                unit = item.get("unit", "كجم")
+                dynamic_total += _to_kg(qty_raw, unit)
 
     total_inputs = pvc + dop + scrap + calcium + wax + stabilizer + titanium + dynamic_total
     return {
@@ -384,28 +407,44 @@ async def get_batch_stats(batch_id: str):
         d.get("batch_number", ""),
     )
 
-    total_inputs = stats["total_inputs_kg"]
+    total_inputs   = stats["total_inputs_kg"]
     total_produced = float(prod["total_produced"]) if prod else 0
-    total_waste = float(prod["total_waste"]) if prod else 0
-    total_scrap = float(prod["total_scrap"]) if prod else 0
+    total_waste    = float(prod["total_waste"])    if prod else 0
+    total_scrap    = float(prod["total_scrap"])    if prod else 0
+    total_outputs  = total_produced + total_waste + total_scrap
 
-    production_diff = total_produced - total_inputs
-    efficiency = (total_produced / total_inputs * 100) if total_inputs > 0 else 0
-    deviation = (production_diff / total_inputs * 100) if total_inputs > 0 else 0
-    waste_pct = (total_waste / total_inputs * 100) if total_inputs > 0 else 0
-    scrap_pct = (total_scrap / total_inputs * 100) if total_inputs > 0 else 0
+    production_diff = total_outputs - total_inputs
+    efficiency  = (total_produced / total_inputs * 100) if total_inputs > 0 else 0
+    deviation   = (production_diff / total_inputs * 100) if total_inputs > 0 else 0
+    waste_pct   = (total_waste   / total_inputs * 100) if total_inputs > 0 else 0
+    scrap_pct   = (total_scrap   / total_inputs * 100) if total_inputs > 0 else 0
+
+    # ── Batch cost: sum(qty × cost_per_unit) from inventory_transactions ──
+    cost_row = await pool.fetchrow(
+        """SELECT COALESCE(SUM(it.quantity * COALESCE(rm.cost_per_unit, 0)), 0) AS batch_cost
+           FROM inventory_transactions it
+           JOIN raw_materials rm ON rm.id = it.material_id
+           WHERE it.transaction_ref = $1
+             AND it.transaction_type = 'out'""",
+        d.get("transaction_id", ""),
+    )
+    batch_cost = float(cost_row["batch_cost"]) if cost_row else 0.0
+    cost_per_kg = round(batch_cost / total_produced, 4) if total_produced > 0 else 0.0
 
     return {
         **stats,
-        "total_produced_kg": round(total_produced, 3),
-        "total_waste_kg": round(total_waste, 3),
-        "total_scrap_kg": round(total_scrap, 3),
+        "total_produced_kg":  round(total_produced, 3),
+        "total_outputs_kg":   round(total_outputs, 3),
+        "total_waste_kg":     round(total_waste, 3),
+        "total_scrap_kg":     round(total_scrap, 3),
         "total_stop_time_min": float(prod["total_stop_time"]) if prod else 0,
         "production_diff_kg": round(production_diff, 3),
-        "efficiency_pct": round(efficiency, 2),
-        "deviation_pct": round(deviation, 2),
-        "waste_pct": round(waste_pct, 2),
-        "scrap_pct": round(scrap_pct, 2),
+        "efficiency_pct":     round(efficiency, 2),
+        "deviation_pct":      round(deviation, 2),
+        "waste_pct":          round(waste_pct, 2),
+        "scrap_pct":          round(scrap_pct, 2),
+        "batch_cost":         round(batch_cost, 2),
+        "cost_per_kg":        cost_per_kg,
     }
 
 

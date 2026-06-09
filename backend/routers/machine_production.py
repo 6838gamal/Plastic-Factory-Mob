@@ -16,7 +16,7 @@ from database import get_pool
 
 router = APIRouter(prefix="/api/machine-production", tags=["machine_production"])
 
-DEVIATION_ALERT_THRESHOLD = 10.0  # % — alert when industrial deviation exceeds this
+DEVIATION_ALERT_THRESHOLD = 2.0  # % — alert when industrial deviation exceeds ±2%
 
 
 class ProductionCreate(BaseModel):
