@@ -1,3 +1,12 @@
+"""
+Opening Balances router.
+
+When an opening balance is set for a material + warehouse:
+ 1. Inserts/updates the opening_balances record.
+ 2. Syncs the inventory row to the opening balance value
+    (if no subsequent transactions have occurred, it IS the current balance).
+ 3. Logs an 'in' inventory_transaction for traceability.
+"""
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 from typing import Optional
@@ -8,7 +17,7 @@ router = APIRouter(prefix="/api/opening-balances", tags=["opening_balances"])
 
 class OpeningBalanceCreate(BaseModel):
     material_id: str
-    warehouse_type: Optional[str] = "mixer"
+    warehouse_type: Optional[str] = "main"
     balance: float
     balance_date: Optional[str] = None
     reason: Optional[str] = None
@@ -55,6 +64,43 @@ async def create_opening_balance(body: OpeningBalanceCreate):
         )
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+    # ── Sync inventory balance ────────────────────────────────
+    inv = await pool.fetchrow(
+        "SELECT balance FROM inventory WHERE material_id=$1 AND warehouse_type=$2",
+        body.material_id, body.warehouse_type,
+    )
+    current = float(inv["balance"]) if inv else None
+
+    # Only override if no movements exist yet (inventory is untouched or zero)
+    has_movements = await pool.fetchval(
+        """SELECT COUNT(*) FROM inventory_transactions
+           WHERE material_id=$1 AND warehouse_type=$2
+             AND transaction_type NOT IN ('adjustment')""",
+        body.material_id, body.warehouse_type,
+    )
+
+    if has_movements == 0 or current is None:
+        await pool.execute(
+            """INSERT INTO inventory (id, material_id, warehouse_type, balance, updated_at)
+               VALUES (gen_random_uuid(), $1, $2, $3, NOW())
+               ON CONFLICT (material_id, warehouse_type)
+               DO UPDATE SET balance=$3, updated_at=NOW()""",
+            body.material_id, body.warehouse_type, body.balance,
+        )
+
+        # Log opening balance as an 'in' transaction for traceability
+        old_bal = current or 0.0
+        await pool.execute(
+            """INSERT INTO inventory_transactions
+               (id, material_id, warehouse_type, transaction_type, quantity,
+                created_by, notes, balance_before, balance_after)
+               VALUES (gen_random_uuid(), $1, $2, 'in', $3, $4, $5, $6, $7)""",
+            body.material_id, body.warehouse_type, body.balance,
+            body.created_by, body.reason or "رصيد افتتاحي",
+            old_bal, body.balance,
+        )
+
     return dict(row)
 
 
