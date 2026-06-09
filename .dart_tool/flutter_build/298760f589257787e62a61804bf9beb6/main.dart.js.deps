@@ -1491,6 +1491,7 @@ file:///home/runner/workspace/lib/presentation/pages/admin/audit/audit_log_page.
 file:///home/runner/workspace/lib/presentation/pages/admin/batches/batches_admin_page.dart
 file:///home/runner/workspace/lib/presentation/pages/admin/dashboard/admin_dashboard_page.dart
 file:///home/runner/workspace/lib/presentation/pages/admin/inventory/inventory_page.dart
+file:///home/runner/workspace/lib/presentation/pages/admin/inventory/stock_take_page.dart
 file:///home/runner/workspace/lib/presentation/pages/admin/machines/machines_page.dart
 file:///home/runner/workspace/lib/presentation/pages/admin/materials/materials_page.dart
 file:///home/runner/workspace/lib/presentation/pages/admin/production/production_page.dart

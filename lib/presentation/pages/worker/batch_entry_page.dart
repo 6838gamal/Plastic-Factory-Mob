@@ -44,6 +44,25 @@ class _BatchEntryPageState extends ConsumerState<BatchEntryPage> {
   // Dynamic pigment/additive rows
   final List<Map<String, dynamic>> _pigmentRows = [];
   final List<Map<String, dynamic>> _additiveRows = [];
+  bool _loadingBatchNum = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadNextBatchNumber());
+  }
+
+  Future<void> _loadNextBatchNumber() async {
+    if (!mounted) return;
+    setState(() => _loadingBatchNum = true);
+    try {
+      final ds = ref.read(dataSourceProvider);
+      final next = await ds.getNextBatchNumber();
+      if (mounted) _batchNumberCtrl.text = next;
+    } catch (_) {} finally {
+      if (mounted) setState(() => _loadingBatchNum = false);
+    }
+  }
 
   @override
   void dispose() {
@@ -196,7 +215,7 @@ class _BatchEntryPageState extends ConsumerState<BatchEntryPage> {
 
   void _resetForm() {
     _formKey.currentState?.reset();
-    _batchNumberCtrl.clear();
+    _loadNextBatchNumber(); // auto-generate next batch number
     _pvcCtrl.clear();
     _dopCtrl.clear();
     _scrapCtrl.clear();
@@ -237,11 +256,39 @@ class _BatchEntryPageState extends ConsumerState<BatchEntryPage> {
             _SectionHeader(title: 'معلومات الطبخة', icon: Icons.info_outline),
             const SizedBox(height: 12),
 
-            // Batch Number
-            CustomTextField(
-              label: AppStrings.batchNumber,
-              controller: _batchNumberCtrl,
-              required: true,
+            // Batch Number — auto-generated (read-only)
+            Row(
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    controller: _batchNumberCtrl,
+                    readOnly: true,
+                    decoration: InputDecoration(
+                      labelText: AppStrings.batchNumber,
+                      prefixIcon: const Icon(Icons.tag),
+                      suffixText: 'تلقائي',
+                      suffixStyle: TextStyle(color: Colors.grey.shade500, fontSize: 12),
+                    ),
+                    validator: (v) => (v == null || v.trim().isEmpty)
+                        ? 'رقم الطبخة مطلوب'
+                        : null,
+                  ),
+                ),
+                if (_loadingBatchNum)
+                  const Padding(
+                    padding: EdgeInsets.only(right: 8),
+                    child: SizedBox(
+                      width: 22, height: 22,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  )
+                else
+                  IconButton(
+                    icon: const Icon(Icons.refresh),
+                    tooltip: 'توليد رقم جديد',
+                    onPressed: _loadNextBatchNumber,
+                  ),
+              ],
             ),
             const SizedBox(height: 12),
 

@@ -354,6 +354,7 @@ async def get_batches(
     from_: Optional[str] = Query(None, alias="from"),
     to: Optional[str] = Query(None),
     worker_id: Optional[str] = Query(None),
+    limit: Optional[int] = Query(None),
 ):
     pool = await get_pool()
     conditions = ["1=1"]
@@ -365,7 +366,8 @@ async def get_batches(
         conditions.append(f"date::text<=${i}"); params.append(to[:10]); i += 1
     if worker_id:
         conditions.append(f"worker_id=${i}"); params.append(worker_id); i += 1
-    query = f"SELECT * FROM batches WHERE {' AND '.join(conditions)} ORDER BY created_at DESC"
+    limit_clause = f" LIMIT {int(limit)}" if limit else ""
+    query = f"SELECT * FROM batches WHERE {' AND '.join(conditions)} ORDER BY created_at DESC{limit_clause}"
     rows = await pool.fetch(query, *params)
     result = []
     for r in rows:
@@ -446,6 +448,29 @@ async def get_batch_stats(batch_id: str):
         "batch_cost":         round(batch_cost, 2),
         "cost_per_kg":        cost_per_kg,
     }
+
+
+@router.get("/next-number")
+async def get_next_batch_number():
+    """
+    Return the next auto-incremented batch number in format B-YYYYMM-NNN.
+    Looks at existing batch_numbers for the current month and increments.
+    """
+    from datetime import datetime
+    pool = await get_pool()
+    prefix = datetime.now().strftime("B-%Y%m-")
+    last = await pool.fetchval(
+        "SELECT batch_number FROM batches WHERE batch_number LIKE $1 ORDER BY batch_number DESC LIMIT 1",
+        f"{prefix}%",
+    )
+    if last:
+        try:
+            seq = int(last.rsplit("-", 1)[-1]) + 1
+        except (ValueError, IndexError):
+            seq = 1
+    else:
+        seq = 1
+    return {"next_number": f"{prefix}{seq:03d}"}
 
 
 @router.post("")

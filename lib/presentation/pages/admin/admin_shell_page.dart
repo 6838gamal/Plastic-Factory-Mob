@@ -157,6 +157,14 @@ class _AdminDrawer extends ConsumerWidget {
                 ),
                 const Divider(),
                 _DrawerItem(
+                  icon: Icons.fact_check_outlined,
+                  selectedIcon: Icons.fact_check,
+                  title: 'الجرد الدوري',
+                  route: '/admin/stock-take',
+                  currentRoute: currentRoute,
+                ),
+                const Divider(),
+                _DrawerItem(
                   icon: Icons.warning_amber_outlined,
                   selectedIcon: Icons.warning_amber,
                   title: AppStrings.alerts,

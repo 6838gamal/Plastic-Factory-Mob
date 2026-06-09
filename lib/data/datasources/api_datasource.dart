@@ -318,6 +318,59 @@ class ApiDataSource {
     return body['url'] as String?;
   }
 
+  // ==================== BATCH NUMBER AUTO-INCREMENT ====================
+  Future<String> getNextBatchNumber() async {
+    final res = await _get('/api/batches/next-number');
+    return (res as Map<String, dynamic>)['next_number'] as String;
+  }
+
+  // ==================== RECENT BATCH NUMBERS (for autocomplete) ====================
+  Future<List<String>> getRecentBatchNumbers() async {
+    final res = await _get('/api/batches', query: {'limit': '60'});
+    final list = res as List;
+    return list
+        .map((e) => (e as Map<String, dynamic>)['batch_number'] as String? ?? '')
+        .where((s) => s.isNotEmpty)
+        .toList();
+  }
+
+  // ==================== STOCK TAKE ====================
+  Future<List<Map<String, dynamic>>> getStockTakeSessions() async {
+    final res = await _get('/api/stock-take/sessions');
+    return (res as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
+  }
+
+  Future<Map<String, dynamic>> createStockTakeSession(Map<String, dynamic> data) async {
+    final res = await _post('/api/stock-take/sessions', data);
+    return Map<String, dynamic>.from(res as Map);
+  }
+
+  Future<Map<String, dynamic>> getStockTakeSession(String id) async {
+    final res = await _get('/api/stock-take/sessions/$id');
+    return Map<String, dynamic>.from(res as Map);
+  }
+
+  Future<Map<String, dynamic>> updateStockTakeItem(
+      String sessionId, String itemId, double actualQty) async {
+    final base = await _getBaseUrl();
+    final uri = Uri.parse('$base/api/stock-take/sessions/$sessionId/items/$itemId');
+    final res = await http.patch(
+      uri,
+      headers: _headers,
+      body: jsonEncode({'actual_qty': actualQty}),
+    );
+    if (res.statusCode >= 400) {
+      final body = jsonDecode(res.body);
+      throw Exception(body['error'] ?? 'Request failed');
+    }
+    return Map<String, dynamic>.from(jsonDecode(res.body) as Map);
+  }
+
+  Future<Map<String, dynamic>> closeStockTakeSession(String id) async {
+    final res = await _post('/api/stock-take/sessions/$id/close', {});
+    return Map<String, dynamic>.from(res as Map);
+  }
+
   // ==================== DASHBOARD ====================
   Future<Map<String, dynamic>> getDashboardStats() async {
     final res = await _get('/api/dashboard/stats');

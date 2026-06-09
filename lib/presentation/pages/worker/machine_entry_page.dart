@@ -29,6 +29,28 @@ class _MachineEntryPageState extends ConsumerState<MachineEntryPage> {
   ProductModel? _selectedProduct;
   File? _productionImage;
 
+  // Recent batch numbers for autocomplete
+  List<String> _recentBatchNumbers = [];
+  bool _loadingBatchNums = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadRecentBatchNumbers());
+  }
+
+  Future<void> _loadRecentBatchNumbers() async {
+    if (!mounted) return;
+    setState(() => _loadingBatchNums = true);
+    try {
+      final ds = ref.read(dataSourceProvider);
+      final nums = await ds.getRecentBatchNumbers();
+      if (mounted) setState(() => _recentBatchNumbers = nums);
+    } catch (_) {} finally {
+      if (mounted) setState(() => _loadingBatchNums = false);
+    }
+  }
+
   @override
   void dispose() {
     _batchNumberCtrl.dispose();
@@ -80,6 +102,7 @@ class _MachineEntryPageState extends ConsumerState<MachineEntryPage> {
       'stop_time_minutes': double.tryParse(_stopTimeCtrl.text) ?? 0,
       'notes': _notesCtrl.text.trim(),
       'production_image_url': imageUrl,
+      'recorded_at': DateTime.now().toIso8601String(),
     };
 
     final result = await ref.read(batchOperationsProvider.notifier).saveProduction(data);
@@ -113,6 +136,7 @@ class _MachineEntryPageState extends ConsumerState<MachineEntryPage> {
       _selectedProduct = null;
       _productionImage = null;
     });
+    _loadRecentBatchNumbers();
   }
 
   @override
@@ -131,13 +155,88 @@ class _MachineEntryPageState extends ConsumerState<MachineEntryPage> {
             _buildSection('بيانات الإنتاج', Icons.precision_manufacturing),
             const SizedBox(height: 12),
 
-            TextFormField(
-              controller: _batchNumberCtrl,
-              decoration: const InputDecoration(labelText: '${AppStrings.batchNumber} *'),
-              validator: (v) => v == null || v.trim().isEmpty ? 'رقم الطبخة مطلوب' : null,
+            // ── Batch Number — autocomplete from saved batches ───────────
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('رقم الطبخة *',
+                    style: TextStyle(fontSize: 13, color: Colors.grey.shade700)),
+                const SizedBox(height: 4),
+                Autocomplete<String>(
+                  initialValue: TextEditingValue(text: _batchNumberCtrl.text),
+                  optionsBuilder: (TextEditingValue textEditingValue) {
+                    if (_recentBatchNumbers.isEmpty) return const Iterable<String>.empty();
+                    if (textEditingValue.text.isEmpty) return _recentBatchNumbers;
+                    return _recentBatchNumbers.where((b) => b
+                        .toLowerCase()
+                        .contains(textEditingValue.text.toLowerCase()));
+                  },
+                  onSelected: (String value) {
+                    setState(() => _batchNumberCtrl.text = value);
+                  },
+                  fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
+                    // Sync our controller text to autocomplete's controller
+                    controller.text = _batchNumberCtrl.text;
+                    controller.addListener(() {
+                      _batchNumberCtrl.text = controller.text;
+                    });
+                    return TextFormField(
+                      controller: controller,
+                      focusNode: focusNode,
+                      decoration: InputDecoration(
+                        hintText: _loadingBatchNums
+                            ? 'جاري تحميل الطبخات...'
+                            : 'اكتب أو اختر رقم الطبخة',
+                        prefixIcon: const Icon(Icons.tag),
+                        suffixIcon: _loadingBatchNums
+                            ? const Padding(
+                                padding: EdgeInsets.all(12),
+                                child: SizedBox(
+                                    width: 16, height: 16,
+                                    child: CircularProgressIndicator(strokeWidth: 2)),
+                              )
+                            : IconButton(
+                                icon: const Icon(Icons.refresh, size: 18),
+                                tooltip: 'تحديث القائمة',
+                                onPressed: _loadRecentBatchNumbers,
+                              ),
+                        border: const OutlineInputBorder(),
+                      ),
+                      validator: (v) =>
+                          (v == null || v.trim().isEmpty) ? 'رقم الطبخة مطلوب' : null,
+                    );
+                  },
+                  optionsViewBuilder: (context, onSelected, options) {
+                    return Align(
+                      alignment: Alignment.topLeft,
+                      child: Material(
+                        elevation: 4,
+                        borderRadius: BorderRadius.circular(8),
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxHeight: 200),
+                          child: ListView.builder(
+                            shrinkWrap: true,
+                            itemCount: options.length,
+                            itemBuilder: (_, i) {
+                              final opt = options.elementAt(i);
+                              return ListTile(
+                                dense: true,
+                                leading: const Icon(Icons.blender_outlined, size: 18),
+                                title: Text(opt),
+                                onTap: () => onSelected(opt),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ],
             ),
             const SizedBox(height: 12),
 
+            // ── Machine dropdown ─────────────────────────────────────────
             machines.when(
               data: (list) => DropdownButtonFormField<MachineModel>(
                 value: _selectedMachine,
@@ -152,6 +251,7 @@ class _MachineEntryPageState extends ConsumerState<MachineEntryPage> {
             ),
             const SizedBox(height: 12),
 
+            // ── Product dropdown ─────────────────────────────────────────
             products.when(
               data: (list) => DropdownButtonFormField<ProductModel>(
                 value: _selectedProduct,
@@ -178,90 +278,72 @@ class _MachineEntryPageState extends ConsumerState<MachineEntryPage> {
               controller: _stopTimeCtrl,
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
               decoration: const InputDecoration(
-                labelText: AppStrings.stopTime,
-                suffixText: 'دقيقة',
+                labelText: 'وقت الوقوف (دقيقة)',
+                prefixIcon: Icon(Icons.timer_off_outlined),
               ),
             ),
+            const SizedBox(height: 12),
 
-            const SizedBox(height: 20),
-            _buildSection('ملاحظات وصورة', Icons.notes),
+            // ── Production image ─────────────────────────────────────────
+            _buildSection('صورة الإنتاج', Icons.camera_alt_outlined),
+            const SizedBox(height: 8),
+            InkWell(
+              onTap: _pickImage,
+              child: Container(
+                height: 120,
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey.shade400),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: _productionImage != null
+                    ? ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.file(_productionImage!, fit: BoxFit.cover, width: double.infinity),
+                      )
+                    : Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.camera_alt, size: 36, color: Colors.grey.shade400),
+                          const SizedBox(height: 8),
+                          Text('اضغط لالتقاط صورة (اختياري)',
+                              style: TextStyle(color: Colors.grey.shade500)),
+                        ],
+                      ),
+              ),
+            ),
             const SizedBox(height: 12),
 
             TextFormField(
               controller: _notesCtrl,
-              maxLines: 3,
+              maxLines: 2,
               decoration: const InputDecoration(
                 labelText: AppStrings.notes,
-                alignLabelWithHint: true,
+                prefixIcon: Icon(Icons.notes_outlined),
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 24),
 
-            Container(
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey[300]!),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: _productionImage == null
-                  ? ListTile(
-                      leading: const Icon(Icons.camera_alt),
-                      title: const Text(AppStrings.productionImage),
-                      subtitle: const Text('اضغط لالتقاط صورة الإنتاج (اختياري)'),
-                      onTap: _pickImage,
-                    )
-                  : Stack(
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(10),
-                          child: Image.file(
-                            _productionImage!,
-                            width: double.infinity,
-                            height: 180,
-                            fit: BoxFit.cover,
-                          ),
-                        ),
-                        Positioned(
-                          top: 8,
-                          right: 8,
-                          child: GestureDetector(
-                            onTap: () => setState(() => _productionImage = null),
-                            child: Container(
-                              padding: const EdgeInsets.all(6),
-                              decoration: const BoxDecoration(
-                                  color: Colors.red, shape: BoxShape.circle),
-                              child: const Icon(Icons.delete, color: Colors.white, size: 20),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-            ),
-            const SizedBox(height: 32),
-
-            // Summary preview
-            if (_producedQtyCtrl.text.isNotEmpty ||
-                _scrapQtyCtrl.text.isNotEmpty ||
-                _wasteQtyCtrl.text.isNotEmpty) ...[
-              _buildSummaryCard(),
-              const SizedBox(height: 16),
-            ],
-
+            // ── Submit ───────────────────────────────────────────────────
             SizedBox(
               width: double.infinity,
-              height: 56,
               child: ElevatedButton.icon(
-                onPressed: opsState.isLoading ? null : _submit,
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
                 icon: opsState.isLoading
                     ? const SizedBox(
-                        height: 20,
-                        width: 20,
+                        width: 20, height: 20,
                         child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                       )
                     : const Icon(Icons.save_outlined),
-                label: const Text(AppStrings.saveAndSend, style: TextStyle(fontSize: 18)),
+                label: Text(
+                  opsState.isLoading ? 'جاري الحفظ...' : AppStrings.save,
+                  style: const TextStyle(fontSize: 16),
+                ),
+                onPressed: opsState.isLoading ? null : _submit,
               ),
             ),
-            const SizedBox(height: 32),
+            const SizedBox(height: 40),
           ],
         ),
       ),
@@ -269,95 +351,26 @@ class _MachineEntryPageState extends ConsumerState<MachineEntryPage> {
   }
 
   Widget _buildSection(String title, IconData icon) {
-    return Row(
-      children: [
-        Icon(icon, color: Theme.of(context).primaryColor, size: 20),
-        const SizedBox(width: 8),
-        Text(
-          title,
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: Theme.of(context).primaryColor,
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(child: Divider(color: Theme.of(context).primaryColor.withOpacity(0.3))),
-      ],
-    );
+    return Row(children: [
+      Icon(icon, size: 18, color: Theme.of(context).primaryColor),
+      const SizedBox(width: 8),
+      Text(title, style: TextStyle(fontWeight: FontWeight.bold, color: Theme.of(context).primaryColor)),
+    ]);
   }
 
   Widget _buildQuantityRow(String label, TextEditingController ctrl, {bool required = false}) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.only(bottom: 12),
       child: TextFormField(
         controller: ctrl,
         keyboardType: const TextInputType.numberWithOptions(decimal: true),
-        onChanged: (_) => setState(() {}),
         decoration: InputDecoration(
           labelText: required ? '$label *' : label,
           suffixText: 'كجم',
         ),
         validator: required
-            ? (v) {
-                if (v == null || v.trim().isEmpty) return '$label مطلوب';
-                if (double.tryParse(v) == null) return 'أدخل رقماً صحيحاً';
-                return null;
-              }
+            ? (v) => (v == null || v.trim().isEmpty) ? '$label مطلوب' : null
             : null,
-      ),
-    );
-  }
-
-  Widget _buildSummaryCard() {
-    final produced = double.tryParse(_producedQtyCtrl.text) ?? 0;
-    final scrap = double.tryParse(_scrapQtyCtrl.text) ?? 0;
-    final waste = double.tryParse(_wasteQtyCtrl.text) ?? 0;
-    final total = produced + scrap + waste;
-    final efficiency = total > 0 ? (produced / total) * 100 : 0;
-
-    return Card(
-      color: Theme.of(context).primaryColor.withOpacity(0.05),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: Theme.of(context).primaryColor.withOpacity(0.2)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('ملخص الإنتاج', style: TextStyle(fontWeight: FontWeight.bold, color: Theme.of(context).primaryColor)),
-            const SizedBox(height: 8),
-            _SummaryRow('الإنتاج', '${produced.toStringAsFixed(2)} كجم', Colors.green),
-            _SummaryRow('السكراب', '${scrap.toStringAsFixed(2)} كجم', Colors.orange),
-            _SummaryRow('الهالك', '${waste.toStringAsFixed(2)} كجم', Colors.red),
-            const Divider(),
-            _SummaryRow('الكفاءة', '${efficiency.toStringAsFixed(1)}%',
-                efficiency >= 90 ? Colors.green : efficiency >= 75 ? Colors.orange : Colors.red),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _SummaryRow extends StatelessWidget {
-  final String label;
-  final String value;
-  final Color color;
-  const _SummaryRow(this.label, this.value, this.color);
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label),
-          Text(value, style: TextStyle(fontWeight: FontWeight.bold, color: color)),
-        ],
       ),
     );
   }
