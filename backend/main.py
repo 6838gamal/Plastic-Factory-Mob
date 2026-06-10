@@ -221,9 +221,7 @@ app = FastAPI(title="Plastic Factory ERP API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://plastic-factory-mob-1.netlify.app",
-    ],
+    
     allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
