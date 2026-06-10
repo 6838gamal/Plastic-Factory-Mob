@@ -6,6 +6,7 @@ import '../../../widgets/common/loading_widget.dart';
 import '../../../../data/models/raw_material_model.dart';
 import '../../../../data/datasources/api_datasource.dart';
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/utils/helpers.dart';
 
 class MaterialsPage extends ConsumerStatefulWidget {
   const MaterialsPage({super.key});
@@ -61,7 +62,10 @@ class _MaterialsPageState extends ConsumerState<MaterialsPage> {
                     );
                   },
                   loading: () => const SizedBox.shrink(),
-                  error: (_, __) => const SizedBox.shrink(),
+                  error: (e, _) => ErrorWidget2(
+                    message: Helpers.friendlyError(e),
+                    onRetry: () => ref.invalidate(rawMaterialsProvider),
+                  ),
                 ),
               ],
             ),
@@ -90,7 +94,10 @@ class _MaterialsPageState extends ConsumerState<MaterialsPage> {
                 );
               },
               loading: () => const ShimmerList(),
-              error: (e, _) => ErrorWidget2(message: 'خطأ: $e'),
+              error: (e, _) => ErrorWidget2(
+                message: Helpers.friendlyError(e),
+                onRetry: () => ref.invalidate(rawMaterialsProvider),
+              ),
             ),
           ),
         ],

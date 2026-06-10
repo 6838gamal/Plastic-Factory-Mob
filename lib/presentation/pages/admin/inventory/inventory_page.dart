@@ -6,6 +6,7 @@ import '../../../../data/models/inventory_summary_model.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../widgets/common/loading_widget.dart';
+import '../../../../core/utils/helpers.dart';
 
 final _summaryProvider = FutureProvider<List<InventorySummaryModel>>((ref) async {
   final ds = ref.read(dataSourceProvider);
@@ -431,7 +432,7 @@ class _SummaryTab extends ConsumerWidget {
       },
       loading: () => const ShimmerList(),
       error: (e, _) => ErrorWidget2(
-        message: 'خطأ في التحميل: $e',
+        message: Helpers.friendlyError(e),
         onRetry: () => ref.invalidate(_summaryProvider),
       ),
     );
@@ -618,7 +619,7 @@ class _TransactionsTab extends ConsumerWidget {
       },
       loading: () => const ShimmerList(),
       error: (e, _) => ErrorWidget2(
-        message: 'خطأ: $e',
+        message: Helpers.friendlyError(e),
         onRetry: () => ref.invalidate(_txProvider('')),
       ),
     );

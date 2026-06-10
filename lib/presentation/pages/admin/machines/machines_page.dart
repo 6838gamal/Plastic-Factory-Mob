@@ -5,6 +5,7 @@ import '../../../widgets/common/loading_widget.dart';
 import '../../../../data/models/reference_models.dart';
 import '../../../../data/datasources/api_datasource.dart';
 import '../../../providers/auth_provider.dart';
+import '../../../../core/utils/helpers.dart';
 
 class MachinesPage extends ConsumerWidget {
   const MachinesPage({super.key});
@@ -37,7 +38,10 @@ class MachinesPage extends ConsumerWidget {
                     },
                   ),
                   loading: () => const ShimmerList(),
-                  error: (e, _) => ErrorWidget2(message: 'خطأ: $e'),
+                  error: (e, _) => ErrorWidget2(
+                    message: Helpers.friendlyError(e),
+                    onRetry: () => ref.invalidate(machinesProvider),
+                  ),
                 ),
                 // Mixers
                 mixers.when(
@@ -52,7 +56,10 @@ class MachinesPage extends ConsumerWidget {
                     },
                   ),
                   loading: () => const ShimmerList(),
-                  error: (e, _) => ErrorWidget2(message: 'خطأ: $e'),
+                  error: (e, _) => ErrorWidget2(
+                    message: Helpers.friendlyError(e),
+                    onRetry: () => ref.invalidate(mixersProvider),
+                  ),
                 ),
               ],
             ),

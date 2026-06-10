@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import '../../../../data/datasources/api_datasource.dart';
 import '../../../providers/auth_provider.dart';
+import '../../../widgets/common/loading_widget.dart';
+import '../../../../core/utils/helpers.dart';
 
 // ── providers ───────────────────────────────────────────────────────────────
 final _sessionsProvider = FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
@@ -636,7 +638,10 @@ class _HistoryTab extends ConsumerWidget {
     final sessAsync = ref.watch(_sessionsProvider);
     return sessAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(child: Text('خطأ: $e')),
+      error: (e, _) => ErrorWidget2(
+        message: Helpers.friendlyError(e),
+        onRetry: () => ref.invalidate(_sessionsProvider),
+      ),
       data: (sessions) {
         if (sessions.isEmpty) {
           return Center(

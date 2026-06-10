@@ -95,10 +95,16 @@ class _ReportsPageState extends ConsumerState<ReportsPage> with SingleTickerProv
                 data: (prodList) => batches.when(
                   data: (batchList) => _ReportContent(productions: prodList, batchCount: batchList.length),
                   loading: () => const ShimmerList(),
-                  error: (e, _) => ErrorWidget2(message: 'خطأ: $e'),
+                  error: (e, _) => ErrorWidget2(
+                    message: Helpers.friendlyError(e),
+                    onRetry: () => ref.invalidate(batchesProvider),
+                  ),
                 ),
                 loading: () => const ShimmerList(),
-                error: (e, _) => ErrorWidget2(message: 'خطأ: $e'),
+                error: (e, _) => ErrorWidget2(
+                  message: Helpers.friendlyError(e),
+                  onRetry: () => ref.invalidate(machineProductionsProvider),
+                ),
               );
             }),
           ),

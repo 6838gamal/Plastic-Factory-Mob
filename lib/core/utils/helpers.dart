@@ -79,4 +79,34 @@ class Helpers {
   static double calculateScrapBalance(double previousBalance, double produced, double used) {
     return previousBalance + produced - used;
   }
+
+  static String friendlyError(Object e) {
+    final msg = e.toString().toLowerCase();
+    if (msg.contains('socketexception') ||
+        msg.contains('failed host lookup') ||
+        msg.contains('network') ||
+        msg.contains('connection refused') ||
+        msg.contains('os error')) {
+      return 'تعذّر الاتصال بالخادم.\nتحقق من الاتصال بالإنترنت.';
+    }
+    if (msg.contains('timeoutexception') || msg.contains('timeout')) {
+      return 'انتهت مهلة الاتصال.\nيرجى المحاولة مجدداً.';
+    }
+    if (msg.contains('401') || msg.contains('unauthorized')) {
+      return 'انتهت جلسة العمل.\nيرجى إعادة تسجيل الدخول.';
+    }
+    if (msg.contains('403') || msg.contains('forbidden')) {
+      return 'ليس لديك صلاحية للوصول لهذه البيانات.';
+    }
+    if (msg.contains('404') || msg.contains('not found')) {
+      return 'البيانات المطلوبة غير موجودة.';
+    }
+    if (msg.contains('500') || msg.contains('internal server')) {
+      return 'خطأ في الخادم.\nيرجى المحاولة مجدداً لاحقاً.';
+    }
+    if (msg.contains('xmlhttprequest') || msg.contains('cors') || msg.contains('fetch')) {
+      return 'تعذّر الوصول للخادم.\nيرجى المحاولة مجدداً.';
+    }
+    return 'تعذّر تحميل البيانات.\nيرجى المحاولة مجدداً.';
+  }
 }

@@ -12,9 +12,13 @@ import '../models/reference_models.dart';
 import '../local/local_data_service.dart';
 
 class ApiDataSource {
-  // Empty base URL = relative paths → Flutter calls the same server that serves it.
-  // This eliminates all CORS issues whether accessed from Replit, a browser, or mobile.
-  static const String _baseUrl = '';
+  // API_BASE_URL is injected at build time via --dart-define.
+  // On Replit the workflow sets it to the Replit dev domain (same origin = no CORS).
+  // Default falls back to the Render deployment URL.
+  static const String _baseUrl = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: 'https://plastic-factory-api.onrender.com',
+  );
 
   String? _token;
 

@@ -41,7 +41,10 @@ class AdminDashboardPage extends ConsumerWidget {
             stats.when(
               data: (data) => _buildKpiGrid(context, data),
               loading: () => const ShimmerList(count: 4),
-              error: (e, _) => ErrorWidget2(message: 'خطأ في تحميل البيانات: $e'),
+              error: (e, _) => ErrorWidget2(
+                message: Helpers.friendlyError(e),
+                onRetry: () => ref.invalidate(dashboardStatsProvider),
+              ),
             ),
 
             const SizedBox(height: 20),
@@ -112,7 +115,10 @@ class AdminDashboardPage extends ConsumerWidget {
                 );
               },
               loading: () => const ShimmerList(count: 3),
-              error: (e, _) => ErrorWidget2(message: 'خطأ في تحميل التحذيرات'),
+              error: (e, _) => ErrorWidget2(
+                message: Helpers.friendlyError(e),
+                onRetry: () => ref.invalidate(alertsProvider),
+              ),
             ),
 
             const SizedBox(height: 20),

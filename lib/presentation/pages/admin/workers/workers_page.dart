@@ -5,6 +5,7 @@ import '../../../widgets/common/loading_widget.dart';
 import '../../../../data/models/reference_models.dart';
 import '../../../../data/datasources/api_datasource.dart';
 import '../../../providers/auth_provider.dart';
+import '../../../../core/utils/helpers.dart';
 
 class WorkersPage extends ConsumerWidget {
   const WorkersPage({super.key});
@@ -29,7 +30,10 @@ class WorkersPage extends ConsumerWidget {
           );
         },
         loading: () => const ShimmerList(),
-        error: (e, _) => ErrorWidget2(message: 'خطأ: $e'),
+        error: (e, _) => ErrorWidget2(
+          message: Helpers.friendlyError(e),
+          onRetry: () => ref.invalidate(workersProvider),
+        ),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showAddDialog(context, ref),

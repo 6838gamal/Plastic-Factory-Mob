@@ -85,7 +85,10 @@ class _AlertsList extends ConsumerWidget {
         );
       },
       loading: () => const ShimmerList(),
-      error: (e, _) => ErrorWidget2(message: 'خطأ: $e'),
+      error: (e, _) => ErrorWidget2(
+        message: Helpers.friendlyError(e),
+        onRetry: () => ref.invalidate(alertsProvider),
+      ),
     );
   }
 
