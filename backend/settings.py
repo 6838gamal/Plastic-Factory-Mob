@@ -17,10 +17,15 @@ FRONTEND_URL: str = os.getenv(
 )
 
 # ─── Database ─────────────────────────────────────────────────────────────────
-DATABASE_URL: str | None = (
+_DEFAULT_DB_URL = (
+    "postgresql://gamalalmaqtary:tqL6D95VvkoCR9f1gE1fZykYakFU9sXb"
+    "@dpg-d8j5350jo6nc73duopqg-a.virginia-postgres.render.com/plastic_factory_db"
+)
+DATABASE_URL: str = (
     os.getenv("RENDER_DATABASE_URL")
     or os.getenv("DATABASE_URL")
     or os.getenv("PG_DATABASE_URL")
+    or _DEFAULT_DB_URL
 )
 
 # ─── Security ─────────────────────────────────────────────────────────────────
