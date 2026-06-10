@@ -1,4 +1,4 @@
-- [Plastic Factory ERP setup](plastic-factory-erp.md) — Flutter web + FastAPI + Replit PostgreSQL; SSL must be disabled for Replit's helium DB host; rebuild Flutter after any Dart changes.
+- [Plastic Factory ERP setup](plastic-factory-erp.md) — Flutter web + FastAPI + Render PostgreSQL; SSL auto-detected by host; rebuild Flutter after any Dart changes (not on every workflow start).
 - [GoRouter + Riverpod auth redirect](go-router-riverpod-auth.md) — Never recreate GoRouter on auth change; use refreshListenable + ChangeNotifier instead.
 - [asyncpg date type requirement](asyncpg-date-types.md) — asyncpg rejects Python str for DATE columns; must use datetime.date objects. Fix: type Pydantic model fields as Optional[date], not str.
 - [daily_reports schema mismatch](daily-reports-schema.md) — DB columns are total_waste_kg/total_scrap_kg but code used total_waste/total_scrap; also missing total_inputs/total_alerts/KPI columns were added via ALTER TABLE.
@@ -8,3 +8,4 @@
 - [alerts.transaction_id unique index](alerts-unique-index.md) — alerts table has no UNIQUE constraint on transaction_id; ON CONFLICT requires a partial unique index; fix: CREATE UNIQUE INDEX WHERE transaction_id IS NOT NULL; created in init_db idempotently.
 - [Auto5 date string asyncpg bug](auto5-date-asyncpg.md) — passing str with $1::date to asyncpg fails ('toordinal'); must convert to datetime.date object before passing as query param.
 - [Auto11 notes enforcement](auto11-notes-enforcement.md) — machine_production router pre-checks projected deviation before insert; if > notes_threshold AND notes empty → HTTP 400 with structured Arabic error; uses _check_notes_required() helper.
+- [Production readiness config](production-config.md) — Central settings in backend/settings.py and lib/core/config/app_config.dart; Dockerfile/docker-compose/render.yaml created; Flutter must be rebuilt manually with Render URL; workflow MUST NOT rebuild Flutter on every start.

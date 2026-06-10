@@ -1,14 +1,15 @@
-import os
 import asyncio
 import asyncpg
 from urllib.parse import urlparse, parse_qs
 
-DATABASE_URL = os.getenv("DATABASE_URL") or os.getenv("PG_DATABASE_URL")
+from settings import DATABASE_URL as _DATABASE_URL
+
+DATABASE_URL: str = _DATABASE_URL or ""
 
 if not DATABASE_URL:
     raise RuntimeError(
         "DATABASE_URL environment variable is not set. "
-        "Please configure a PostgreSQL database."
+        "Please configure a PostgreSQL database in your environment."
     )
 
 _pool: asyncpg.Pool | None = None

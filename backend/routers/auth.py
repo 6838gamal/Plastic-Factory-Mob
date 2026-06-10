@@ -1,14 +1,13 @@
-import os
 import bcrypt
 import jwt
 from datetime import datetime, timedelta
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from database import get_pool
+from settings import SECRET_KEY
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
-JWT_SECRET = os.getenv("JWT_SECRET", "plastic_factory_secret_2024")
 JWT_EXPIRY_DAYS = 7
 
 
@@ -29,7 +28,7 @@ def make_token(user_id: str, email: str) -> str:
         "role": "admin",
         "exp": datetime.utcnow() + timedelta(days=JWT_EXPIRY_DAYS),
     }
-    return jwt.encode(payload, JWT_SECRET, algorithm="HS256")
+    return jwt.encode(payload, SECRET_KEY, algorithm="HS256")
 
 
 @router.post("/signin")

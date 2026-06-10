@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
+import '../../../../core/config/app_config.dart';
 
 class SplashPage extends StatefulWidget {
   const SplashPage({super.key});
@@ -44,9 +45,8 @@ class _SplashPageState extends State<SplashPage>
       });
 
       try {
-        final res = await http
-            .get(Uri.parse('/api/health'))
-            .timeout(const Duration(seconds: 5));
+        final uri = Uri.parse('${AppConfig.apiBaseUrl}/api/health');
+        final res = await http.get(uri).timeout(const Duration(seconds: 10));
 
         if (res.statusCode == 200) {
           final body = jsonDecode(res.body) as Map<String, dynamic>;
@@ -83,7 +83,6 @@ class _SplashPageState extends State<SplashPage>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Logo / Icon
               Container(
                 width: 100,
                 height: 100,
@@ -98,10 +97,8 @@ class _SplashPageState extends State<SplashPage>
                 ),
               ),
               const SizedBox(height: 28),
-
-              // App name
               Text(
-                'مصنع البلاسtiك',
+                'مصنع البلاستيك',
                 style: theme.textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.bold,
                   color: primary,
@@ -116,10 +113,7 @@ class _SplashPageState extends State<SplashPage>
                 ),
                 textAlign: TextAlign.center,
               ),
-
               const SizedBox(height: 48),
-
-              // Status message
               AnimatedSwitcher(
                 duration: const Duration(milliseconds: 300),
                 child: Text(
@@ -134,8 +128,6 @@ class _SplashPageState extends State<SplashPage>
                 ),
               ),
               const SizedBox(height: 20),
-
-              // Progress indicator
               if (!_connected)
                 SizedBox(
                   width: 200,

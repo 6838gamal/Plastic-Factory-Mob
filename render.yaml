@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: plastic-factory-api
+    env: python
+    region: virginia
+    plan: free
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: SECRET_KEY
+        sync: false
+      - key: API_BASE_URL
+        value: https://plastic-factory-api.onrender.com
+      - key: FRONTEND_URL
+        value: https://plastic-factory-mob-1.netlify.app
+      - key: ENVIRONMENT
+        value: production
+      - key: ADMIN_EMAIL
+        value: admin@factory.com
+      - key: ADMIN_PASSWORD
+        sync: false
