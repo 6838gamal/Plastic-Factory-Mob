@@ -1499,6 +1499,7 @@ file:///home/runner/workspace/lib/presentation/pages/admin/recipes/recipe_manage
 file:///home/runner/workspace/lib/presentation/pages/admin/reports/reports_page.dart
 file:///home/runner/workspace/lib/presentation/pages/admin/settings/settings_page.dart
 file:///home/runner/workspace/lib/presentation/pages/admin/workers/workers_page.dart
+file:///home/runner/workspace/lib/presentation/pages/splash/splash_page.dart
 file:///home/runner/workspace/lib/presentation/pages/worker/batch_entry_page.dart
 file:///home/runner/workspace/lib/presentation/pages/worker/machine_entry_page.dart
 file:///home/runner/workspace/lib/presentation/pages/worker/worker_home_page.dart

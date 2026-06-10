@@ -1,4 +1,5 @@
 import os
+import asyncio
 import asyncpg
 from urllib.parse import urlparse, parse_qs
 
@@ -15,14 +16,7 @@ _pool: asyncpg.Pool | None = None
 
 
 def _resolve_ssl(url: str):
-    """Determine SSL mode from the URL itself, then fall back to host heuristics.
-
-    Priority:
-      1. sslmode=disable in query string → no SSL
-      2. sslmode=require/verify-* in query string → SSL
-      3. Known local/internal hosts → no SSL
-      4. Default → require SSL (safe for any cloud provider)
-    """
+    """Determine SSL mode from the URL itself, then fall back to host heuristics."""
     try:
         parsed = urlparse(url)
         params = parse_qs(parsed.query)
@@ -44,16 +38,35 @@ def _resolve_ssl(url: str):
 
 
 async def get_pool() -> asyncpg.Pool:
+    """Return the shared connection pool, creating it with retry logic if needed."""
     global _pool
-    if _pool is None:
-        ssl_mode = _resolve_ssl(DATABASE_URL)
-        _pool = await asyncpg.create_pool(
-            DATABASE_URL,
-            ssl=ssl_mode,
-            min_size=1,
-            max_size=10,
-        )
-    return _pool
+    if _pool is not None:
+        return _pool
+
+    ssl_mode = _resolve_ssl(DATABASE_URL)
+    attempt = 0
+    while True:
+        attempt += 1
+        try:
+            if attempt == 1:
+                print("⏳ [DB] جاري الاتصال بقاعدة البيانات...")
+            else:
+                print(f"⏳ [DB] إعادة المحاولة رقم {attempt}...")
+
+            _pool = await asyncpg.create_pool(
+                DATABASE_URL,
+                ssl=ssl_mode,
+                min_size=1,
+                max_size=10,
+            )
+            print("✅ [DB] تم الاتصال بقاعدة البيانات بنجاح")
+            return _pool
+
+        except Exception as exc:
+            delay = min(5 * attempt, 30)
+            print(f"❌ [DB] فشل الاتصال: {exc}")
+            print(f"⏳ [DB] إعادة المحاولة بعد {delay} ثانية...")
+            await asyncio.sleep(delay)
 
 
 async def close_pool():

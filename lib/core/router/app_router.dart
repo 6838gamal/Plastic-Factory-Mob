@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../presentation/pages/splash/splash_page.dart';
 import '../../presentation/pages/worker/worker_home_page.dart';
 import '../../presentation/pages/admin/admin_shell_page.dart';
 import '../../presentation/pages/admin/dashboard/admin_dashboard_page.dart';
@@ -31,20 +32,27 @@ final _authRefreshProvider = ChangeNotifierProvider<_AuthRefreshNotifier>(
 );
 
 final routerProvider = Provider<GoRouter>((ref) {
-  // Keep the notifier alive for the lifetime of this provider.
   final notifier = ref.watch(_authRefreshProvider);
 
   final router = GoRouter(
-    initialLocation: '/worker',
+    initialLocation: '/splash',
     refreshListenable: notifier,
     redirect: (context, state) {
+      final path = state.uri.toString();
+      // Never redirect away from the splash screen — it handles its own nav
+      if (path.startsWith('/splash')) return null;
+
       final isAdmin = ref.read(authProvider).isAdmin;
-      final onAdmin = state.uri.toString().startsWith('/admin');
+      final onAdmin = path.startsWith('/admin');
       if (onAdmin && !isAdmin) return '/worker';
       if (isAdmin && !onAdmin) return '/admin';
       return null;
     },
     routes: [
+      GoRoute(
+        path: '/splash',
+        builder: (context, state) => const SplashPage(),
+      ),
       GoRoute(
         path: '/worker',
         builder: (context, state) => const WorkerHomePage(),

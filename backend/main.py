@@ -181,11 +181,33 @@ async def _seed_default_settings():
         )
 
 
+async def _run_safe_migrations():
+    """Apply only SAFE idempotent migrations (no CREATE TABLE, no DROP).
+    The schema is assumed to already exist — this function only adds
+    missing indexes or constraints that were introduced after initial setup.
+    """
+    pool = await get_pool()
+    # Partial unique index on alerts.transaction_id (safe / idempotent)
+    await pool.execute(
+        """CREATE UNIQUE INDEX IF NOT EXISTS alerts_transaction_id_key
+           ON alerts (transaction_id)
+           WHERE transaction_id IS NOT NULL"""
+    )
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    await get_pool()
+    # Connect to existing database — retries automatically until successful
+    pool = await get_pool()
     print("✅ Database pool ready")
-    await _init_db()
+
+    # Safe migrations only — never re-creates or drops existing data
+    try:
+        await _run_safe_migrations()
+        print("✅ Safe migrations applied")
+    except Exception as exc:
+        print(f"⚠️  Safe migrations skipped: {exc}")
+
     await _seed_default_admin()
     await _seed_default_settings()
     scheduler_task = asyncio.create_task(_daily_report_scheduler())
