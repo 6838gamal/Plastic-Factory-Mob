@@ -12,9 +12,9 @@ import '../models/reference_models.dart';
 import '../local/local_data_service.dart';
 
 class ApiDataSource {
-  // Use relative URLs — FastAPI serves Flutter from the same origin,
-  // so /api/... paths work on Replit, Render, or any deployment without config.
-  static const String _baseUrl = 'https://plastic-factory-api.onrender.com';
+  // Empty base URL = relative paths → Flutter calls the same server that serves it.
+  // This eliminates all CORS issues whether accessed from Replit, a browser, or mobile.
+  static const String _baseUrl = '';
 
   String? _token;
 

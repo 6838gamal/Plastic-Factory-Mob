@@ -47,3 +47,4 @@ publicDir = "build/web"
 [userenv]
 
 [userenv.shared]
+JWT_SECRET = "plastic_factory_jwt_secret_2024_replit_secure"
