@@ -3,15 +3,17 @@ from fastapi import APIRouter, Request
 
 router = APIRouter(prefix="/api", tags=["config"])
 
+_DEFAULT_API_BASE_URL = "https://plastic-factory-api.onrender.com"
+
 @router.get("/config")
 async def get_config(request: Request):
     """Return the API base URL so the Flutter frontend can find the backend.
 
     Priority:
       1. API_BASE_URL env var (explicit override)
-      2. Default: empty string = same-origin / relative URLs (correct for Replit)
+      2. Default: https://plastic-factory-api.onrender.com
     """
-    base_url = os.getenv("API_BASE_URL", "").rstrip("/")
+    base_url = os.getenv("API_BASE_URL", _DEFAULT_API_BASE_URL).rstrip("/")
     return {"base_url": base_url}
 
 
