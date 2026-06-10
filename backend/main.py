@@ -232,10 +232,20 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Plastic Factory ERP API", lifespan=lifespan)
 
+_REPLIT_DEV_DOMAIN = os.getenv("REPLIT_DEV_DOMAIN", "")
+_REPLIT_DOMAINS = os.getenv("REPLIT_DOMAINS", "")
+
+_allowed_origins = ["https://plastic-factory-mob-1.netlify.app"]
+if _REPLIT_DEV_DOMAIN:
+    _allowed_origins.append(f"https://{_REPLIT_DEV_DOMAIN}")
+for _d in _REPLIT_DOMAINS.split(","):
+    _d = _d.strip()
+    if _d:
+        _allowed_origins.append(f"https://{_d}")
+
 app.add_middleware(
     CORSMiddleware,
-    
-    allow_origins=["https://plastic-factory-mob-1.netlify.app"],
+    allow_origins=_allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

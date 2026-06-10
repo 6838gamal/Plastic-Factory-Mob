@@ -3,17 +3,13 @@ import asyncio
 import asyncpg
 from urllib.parse import urlparse, parse_qs
 
-# Default connection string — overridden by DATABASE_URL / PG_DATABASE_URL env vars if set
-_DEFAULT_DATABASE_URL = (
-    "postgresql://gamalalmaqtary:tqL6D95VvkoCR9f1gE1fZykYakFU9sXb"
-    "@dpg-d8j5350jo6nc73duopqg-a.virginia-postgres.render.com/plastic_factory_db"
-)
+DATABASE_URL = os.getenv("DATABASE_URL") or os.getenv("PG_DATABASE_URL")
 
-DATABASE_URL = (
-    os.getenv("DATABASE_URL")
-    or os.getenv("PG_DATABASE_URL")
-    or _DEFAULT_DATABASE_URL
-)
+if not DATABASE_URL:
+    raise RuntimeError(
+        "DATABASE_URL environment variable is not set. "
+        "Please configure a PostgreSQL database."
+    )
 
 _pool: asyncpg.Pool | None = None
 
