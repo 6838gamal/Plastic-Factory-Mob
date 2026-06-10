@@ -12,27 +12,9 @@ import '../models/reference_models.dart';
 import '../local/local_data_service.dart';
 
 class ApiDataSource {
-  // Empty string = use relative URLs (same origin). Correct for Replit hosting.
-  static const String _fallbackUrl = 'https://plastic-factory-api.onrender.com';
-
-  static String? _resolvedBaseUrl;
-
-  static Future<String> _getBaseUrl() async {
-    if (_resolvedBaseUrl != null) return _resolvedBaseUrl!;
-    try {
-      final res = await http.get(Uri.parse('https://plastic-factory-api.onrender.com/api/config')).timeout(
-        const Duration(seconds: 5),
-      );
-      if (res.statusCode == 200) {
-        final body = jsonDecode(res.body) as Map<String, dynamic>;
-        final configUrl = (body['base_url'] as String?) ?? '';
-        _resolvedBaseUrl = configUrl.isNotEmpty ? configUrl : _fallbackUrl;
-        return _resolvedBaseUrl!;
-      }
-    } catch (_) {}
-    _resolvedBaseUrl = _fallbackUrl;
-    return _resolvedBaseUrl!;
-  }
+  // Use relative URLs — FastAPI serves Flutter from the same origin,
+  // so /api/... paths work on Replit, Render, or any deployment without config.
+  static const String _baseUrl = '';
 
   String? _token;
 
@@ -44,11 +26,10 @@ class ApiDataSource {
       };
 
   Future<dynamic> _get(String path, {Map<String, String?>? query}) async {
-    final base = await _getBaseUrl();
     final filteredQuery = query?.entries
         .where((e) => e.value != null)
         .fold<Map<String, String>>({}, (m, e) => m..putIfAbsent(e.key, () => e.value!));
-    final uri = Uri.parse('$base$path').replace(
+    final uri = Uri.parse('$_baseUrl$path').replace(
       queryParameters: (filteredQuery?.isEmpty ?? true) ? null : filteredQuery,
     );
     final res = await http.get(uri, headers: _headers);
@@ -60,8 +41,7 @@ class ApiDataSource {
   }
 
   Future<dynamic> _post(String path, Map<String, dynamic> data) async {
-    final base = await _getBaseUrl();
-    final uri = Uri.parse('$base$path');
+    final uri = Uri.parse('$_baseUrl$path');
     final res = await http.post(uri, headers: _headers, body: jsonEncode(data));
     if (res.statusCode >= 400) {
       final body = jsonDecode(res.body);
@@ -71,8 +51,7 @@ class ApiDataSource {
   }
 
   Future<dynamic> _put(String path, Map<String, dynamic> data) async {
-    final base = await _getBaseUrl();
-    final uri = Uri.parse('$base$path');
+    final uri = Uri.parse('$_baseUrl$path');
     final res = await http.put(uri, headers: _headers, body: jsonEncode(data));
     if (res.statusCode >= 400) {
       final body = jsonDecode(res.body);
@@ -82,8 +61,7 @@ class ApiDataSource {
   }
 
   Future<void> _delete(String path) async {
-    final base = await _getBaseUrl();
-    final uri = Uri.parse('$base$path');
+    final uri = Uri.parse('$_baseUrl$path');
     final res = await http.delete(uri, headers: _headers);
     if (res.statusCode >= 400) {
       final body = jsonDecode(res.body);
@@ -322,8 +300,7 @@ class ApiDataSource {
 
   // ==================== IMAGES ====================
   Future<String?> uploadImage(String bucket, String path, List<int> bytes) async {
-    final base = await _getBaseUrl();
-    final uri = Uri.parse('$base/api/upload/$bucket');
+    final uri = Uri.parse('$_baseUrl/api/upload/$bucket');
     final request = http.MultipartRequest('POST', uri)
       ..headers.addAll(_token != null ? {'Authorization': 'Bearer $_token'} : {})
       ..files.add(http.MultipartFile.fromBytes('file', Uint8List.fromList(bytes), filename: path));
@@ -368,8 +345,7 @@ class ApiDataSource {
 
   Future<Map<String, dynamic>> updateStockTakeItem(
       String sessionId, String itemId, double actualQty) async {
-    final base = await _getBaseUrl();
-    final uri = Uri.parse('$base/api/stock-take/sessions/$sessionId/items/$itemId');
+    final uri = Uri.parse('$_baseUrl/api/stock-take/sessions/$sessionId/items/$itemId');
     final res = await http.patch(
       uri,
       headers: _headers,
