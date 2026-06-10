@@ -17,7 +17,11 @@ FRONTEND_URL: str = os.getenv(
 )
 
 # ─── Database ─────────────────────────────────────────────────────────────────
-DATABASE_URL: str | None = os.getenv("DATABASE_URL") or os.getenv("PG_DATABASE_URL")
+DATABASE_URL: str | None = (
+    os.getenv("RENDER_DATABASE_URL")
+    or os.getenv("DATABASE_URL")
+    or os.getenv("PG_DATABASE_URL")
+)
 
 # ─── Security ─────────────────────────────────────────────────────────────────
 SECRET_KEY: str = (
