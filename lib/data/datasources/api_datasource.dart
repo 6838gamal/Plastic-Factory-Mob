@@ -93,7 +93,7 @@ class ApiDataSource {
 
   // ==================== AUTH ====================
   Future<Map<String, dynamic>> signIn(String email, String password) async {
-    final res = await _post('https://plastic-factory-api.onrender.com/api/auth/signin', {'email': email, 'password': password});
+    final res = await _post('/api/auth/signin', {'email': email, 'password': password});
     _token = res['token'] as String?;
     return res as Map<String, dynamic>;
   }
@@ -104,21 +104,21 @@ class ApiDataSource {
 
   // ==================== RAW MATERIALS ====================
   Future<List<RawMaterialModel>> getRawMaterials() async {
-    final res = await _get('https://plastic-factory-api.onrender.com/api/materials');
+    final res = await _get('/api/materials');
     return (res as List).map((e) => RawMaterialModel.fromJson(e)).toList();
   }
 
   Future<void> upsertRawMaterial(Map<String, dynamic> data) async {
-    await _post('https://plastic-factory-api.onrender.com/api/materials/upsert', data);
+    await _post('/api/materials/upsert', data);
   }
 
   Future<void> deleteRawMaterial(String id) async {
-    await _delete('https://plastic-factory-api.onrender.com/api/materials/$id');
+    await _delete('/api/materials/$id');
   }
 
   // ==================== INVENTORY ====================
   Future<List<InventoryModel>> getInventory({String? warehouseType}) async {
-    final res = await _get('https://plastic-factory-api.onrender.com/api/inventory', query: {'warehouse_type': warehouseType});
+    final res = await _get('/api/inventory', query: {'warehouse_type': warehouseType});
     return (res as List).map((e) => InventoryModel.fromJson(e)).toList();
   }
 
