@@ -181,13 +181,30 @@ async def _seed_default_settings():
         )
 
 
-async def _run_safe_migrations():
-    """Apply only SAFE idempotent migrations (no CREATE TABLE, no DROP).
-    The schema is assumed to already exist — this function only adds
-    missing indexes or constraints that were introduced after initial setup.
+async def _init_db():
+    """Apply full schema on every startup — completely safe and idempotent.
+
+    Every statement in schema.sql uses CREATE TABLE IF NOT EXISTS /
+    CREATE INDEX IF NOT EXISTS, so running this on an existing database
+    only creates NEW tables/indexes that are missing — it never touches
+    existing data.  This ensures a fresh deployment (e.g. on Render) always
+    gets the complete schema without any manual steps.
     """
     pool = await get_pool()
-    # Partial unique index on alerts.transaction_id (safe / idempotent)
+
+    if not SCHEMA_PATH.exists():
+        print(f"⚠️  [init_db] schema.sql not found at {SCHEMA_PATH} — skipping.")
+        return
+
+    sql = SCHEMA_PATH.read_text(encoding="utf-8")
+    try:
+        await pool.execute(sql)
+        print("✅ [init_db] Schema applied (idempotent — existing data untouched)")
+    except Exception as exc:
+        print(f"❌ [init_db] Schema error: {exc}")
+        raise
+
+    # Extra idempotent index not in schema.sql (added as a later migration)
     await pool.execute(
         """CREATE UNIQUE INDEX IF NOT EXISTS alerts_transaction_id_key
            ON alerts (transaction_id)
@@ -201,12 +218,8 @@ async def lifespan(app: FastAPI):
     pool = await get_pool()
     print("✅ Database pool ready")
 
-    # Safe migrations only — never re-creates or drops existing data
-    try:
-        await _run_safe_migrations()
-        print("✅ Safe migrations applied")
-    except Exception as exc:
-        print(f"⚠️  Safe migrations skipped: {exc}")
+    # Apply full schema (idempotent — safe to run on every startup)
+    await _init_db()
 
     await _seed_default_admin()
     await _seed_default_settings()
