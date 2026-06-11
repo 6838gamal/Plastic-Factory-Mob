@@ -428,13 +428,13 @@ if WEB_DIR.exists():
     # SPA catch-all: serve index.html for any path not matched by API or static files
     @app.get("/{full_path:path}")
     async def spa_fallback(full_path: str):
-        # Only serve index.html for non-API, non-asset paths
-        if full_path.startswith("api/") or full_path.startswith("assets/"):
-            from fastapi import HTTPException as _HTTPException
-            raise _HTTPException(status_code=404)
+        # Try serving the exact static file first
         static_file = WEB_DIR / full_path
         if static_file.exists() and static_file.is_file():
             return FileResponse(str(static_file))
+        # For API paths, return 404
+        if full_path.startswith("api/"):
+            from fastapi import HTTPException as _HTTPException
+            raise _HTTPException(status_code=404)
+        # For everything else, serve the Flutter SPA entry point
         return FileResponse(str(WEB_DIR / "index.html"), headers=_NO_CACHE)
-
-    app.mount("/", StaticFiles(directory=str(WEB_DIR), html=True), name="flutter")

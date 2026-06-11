@@ -5,27 +5,20 @@ Every module should import from this file, never call os.getenv() directly.
 import os
 
 # ─── Environment ──────────────────────────────────────────────────────────────
-ENVIRONMENT: str = os.getenv("ENVIRONMENT", "production")
+ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
 APP_VERSION: str = "1.0.0"
 
 # ─── API / Frontend ───────────────────────────────────────────────────────────
-API_BASE_URL: str = os.getenv(
-    "API_BASE_URL", "https://plastic-factory-api.onrender.com"
-)
-FRONTEND_URL: str = os.getenv(
-    "FRONTEND_URL", "https://plastic-factory-mob-1.netlify.app"
-)
+API_BASE_URL: str = os.getenv("API_BASE_URL", "")
+FRONTEND_URL: str = os.getenv("FRONTEND_URL", "")
 
 # ─── Database ─────────────────────────────────────────────────────────────────
-_DEFAULT_DB_URL = (
-    "postgresql://gamalalmaqtary:tqL6D95VvkoCR9f1gE1fZykYakFU9sXb"
-    "@dpg-d8j5350jo6nc73duopqg-a.virginia-postgres.render.com/plastic_factory_db"
-)
+# Replit provisions DATABASE_URL automatically via the built-in PostgreSQL integration.
 DATABASE_URL: str = (
-    os.getenv("RENDER_DATABASE_URL")
-    or os.getenv("DATABASE_URL")
+    os.getenv("DATABASE_URL")
+    or os.getenv("RENDER_DATABASE_URL")
     or os.getenv("PG_DATABASE_URL")
-    or _DEFAULT_DB_URL
+    or ""
 )
 
 # ─── Security ─────────────────────────────────────────────────────────────────
@@ -41,18 +34,31 @@ ADMIN_PASSWORD: str = os.getenv("ADMIN_PASSWORD", "admin123")
 
 # ─── CORS ─────────────────────────────────────────────────────────────────────
 _base_origins = [
-    "https://plastic-factory-mob-1.netlify.app",
-    "https://plastic-factory-api.onrender.com",
     "http://localhost:3000",
     "http://localhost:5000",
     "http://localhost:8080",
 ]
-if FRONTEND_URL not in _base_origins:
+
+# Add Replit dev domain if available
+_replit_dev = os.getenv("REPLIT_DEV_DOMAIN", "")
+if _replit_dev:
+    _base_origins.append(f"https://{_replit_dev}")
+
+_replit_domains = os.getenv("REPLIT_DOMAINS", "")
+if _replit_domains:
+    for _d in _replit_domains.split(","):
+        _d = _d.strip()
+        if _d:
+            _base_origins.append(f"https://{_d}")
+
+if FRONTEND_URL and FRONTEND_URL not in _base_origins:
     _base_origins.append(FRONTEND_URL)
+
 _extra = os.getenv("CORS_ORIGINS", "")
 if _extra:
     for _o in _extra.split(","):
         _o = _o.strip()
         if _o and _o not in _base_origins:
             _base_origins.append(_o)
+
 CORS_ORIGINS: list[str] = _base_origins
