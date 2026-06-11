@@ -56,7 +56,7 @@ async def get_stats():
     cost_row = await pool.fetchrow(
         """SELECT COALESCE(SUM(it.quantity * COALESCE(rm.cost_per_unit, 0)), 0) AS day_cost
            FROM inventory_transactions it
-           JOIN raw_materials rm ON rm.id = it.material_id
+           JOIN raw_materials rm ON rm.id::text = it.material_id::text
            WHERE it.transaction_type = 'out'
              AND it.created_at BETWEEN $1 AND $2""",
         day_start, day_end,
@@ -75,7 +75,7 @@ async def get_stats():
     # ── Low-stock materials count ──────────────────────────────
     low_stock_count = await pool.fetchval(
         """SELECT COUNT(*) FROM inventory i
-           JOIN raw_materials r ON r.id = i.material_id
+           JOIN raw_materials r ON r.id::text = i.material_id::text
            WHERE r.min_stock > 0 AND i.balance <= r.min_stock"""
     )
 

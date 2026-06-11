@@ -156,7 +156,7 @@ async def generate_daily_report(
     cost_row = await pool.fetchrow(
         """SELECT COALESCE(SUM(it.quantity * rm.cost_per_unit),0) AS day_cost
            FROM inventory_transactions it
-           JOIN raw_materials rm ON rm.id = it.material_id
+           JOIN raw_materials rm ON rm.id::text = it.material_id::text
            WHERE it.transaction_type='out'
              AND it.created_at BETWEEN $1 AND $2""",
         day_start, day_end,
@@ -167,7 +167,7 @@ async def generate_daily_report(
     consumption_rows = await pool.fetch(
         """SELECT rm.name, COALESCE(SUM(it.quantity),0) AS consumed
            FROM inventory_transactions it
-           JOIN raw_materials rm ON rm.id = it.material_id
+           JOIN raw_materials rm ON rm.id::text = it.material_id::text
            WHERE it.transaction_type='out'
              AND it.created_at BETWEEN $1 AND $2
            GROUP BY rm.name
@@ -284,7 +284,7 @@ async def get_consumption_report(
             COALESCE(SUM(it.quantity * r.cost_per_unit), 0) AS total_cost,
             COUNT(it.id) AS transaction_count
         FROM inventory_transactions it
-        JOIN raw_materials r ON r.id = it.material_id
+        JOIN raw_materials r ON r.id::text = it.material_id::text
         WHERE {' AND '.join(conditions)}
         GROUP BY r.id, r.name, r.code, r.unit, r.cost_per_unit
         ORDER BY total_consumed DESC
@@ -352,7 +352,7 @@ async def get_material_balance_history(
     query = f"""
         SELECT it.*, rm.name AS material_name, rm.unit
         FROM inventory_transactions it
-        JOIN raw_materials rm ON rm.id = it.material_id
+        JOIN raw_materials rm ON rm.id::text = it.material_id::text
         WHERE {' AND '.join(conditions)}
         ORDER BY it.created_at DESC
         LIMIT ${i}

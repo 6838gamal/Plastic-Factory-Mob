@@ -113881,7 +113881,7 @@ var $async$lw=A.r(function(d,e){if(d===1)return A.t(e,r)
 while(true)switch(s){case 0:if(c==null)o=null
 else{n=A.i(c).h("dA<1,2>")
 m=t.N
-o=new A.aV(new A.dA(c,n),new A.agA(),n.h("aV<p.E>")).fT(0,A.G(m,m),new A.agB())}n=A.d1("https://plastic-factory-api.onrender.com"+b,0,null)
+o=new A.aV(new A.dA(c,n),new A.agA(),n.h("aV<p.E>")).fT(0,A.G(m,m),new A.agB())}n=A.d1("https://2e96b413-ed72-44a2-839a-50fdc389c55f-00-3enbhv8ocmr54.pike.replit.dev"+b,0,null)
 m=o==null?null:J.ei(o)
 s=3
 return A.q(A.b3x(n.a5B(0,m!==!1?null:o),p.gx6()),$async$lw)
@@ -113895,7 +113895,7 @@ return A.v($async$lw,r)},
 iX(a,b){return this.asM(a,b)},
 asM(a,b){var s=0,r=A.w(t.z),q,p=this,o,n,m
 var $async$iX=A.r(function(c,d){if(c===1)return A.t(d,r)
-while(true)switch(s){case 0:o=A.d1("https://plastic-factory-api.onrender.com"+a,0,null)
+while(true)switch(s){case 0:o=A.d1("https://2e96b413-ed72-44a2-839a-50fdc389c55f-00-3enbhv8ocmr54.pike.replit.dev"+a,0,null)
 n=p.gx6()
 s=3
 return A.q(A.bum(o,B.ax.yQ(b,null),n),$async$iX)
@@ -113909,7 +113909,7 @@ return A.v($async$iX,r)},
 xs(a,b,c){return this.asR(0,b,c)},
 asR(a,b,c){var s=0,r=A.w(t.z),q,p=this,o,n,m
 var $async$xs=A.r(function(d,e){if(d===1)return A.t(e,r)
-while(true)switch(s){case 0:o=A.d1("https://plastic-factory-api.onrender.com"+b,0,null)
+while(true)switch(s){case 0:o=A.d1("https://2e96b413-ed72-44a2-839a-50fdc389c55f-00-3enbhv8ocmr54.pike.replit.dev"+b,0,null)
 n=p.gx6()
 s=3
 return A.q(A.bup(o,B.ax.yQ(c,null),n),$async$xs)
@@ -113924,7 +113924,7 @@ q4(a,b){return this.ahY(0,b)},
 ahY(a,b){var s=0,r=A.w(t.H),q=this,p,o
 var $async$q4=A.r(function(c,d){if(c===1)return A.t(d,r)
 while(true)switch(s){case 0:s=2
-return A.q(A.bcw(A.d1("https://plastic-factory-api.onrender.com"+b,0,null),q.gx6()),$async$q4)
+return A.q(A.bcw(A.d1("https://2e96b413-ed72-44a2-839a-50fdc389c55f-00-3enbhv8ocmr54.pike.replit.dev"+b,0,null),q.gx6()),$async$q4)
 case 2:o=d
 if(o.b>=400){p=J.aI(B.ax.jB(0,A.m6(A.m3(o.e)).eq(0,o.w),null),"error")
 throw A.f(A.e7(p==null?"Request failed":p))}return A.u(null,r)}})
@@ -114243,7 +114243,7 @@ return A.v($async$AO,r)},
 vZ(a,b,c){return this.aHC(a,b,c)},
 aHC(a,b,c){var s=0,r=A.w(t.Q),q,p=this,o,n,m,l,k,j
 var $async$vZ=A.r(function(d,e){if(d===1)return A.t(e,r)
-while(true)switch(s){case 0:m=A.bkW("POST",A.d1("https://plastic-factory-api.onrender.com/api/upload/"+a,0,null))
+while(true)switch(s){case 0:m=A.bkW("POST",A.d1("https://2e96b413-ed72-44a2-839a-50fdc389c55f-00-3enbhv8ocmr54.pike.replit.dev/api/upload/"+a,0,null))
 l=p.a
 k=t.N
 l=l!=null?A.U(["Authorization","Bearer "+l],k,k):A.G(k,k)
@@ -114331,7 +114331,7 @@ return A.v($async$t2,r)},
 Hj(a,b,c){return this.aHA(a,b,c)},
 aHA(a,b,c){var s=0,r=A.w(t.P),q,p=this,o,n,m,l
 var $async$Hj=A.r(function(d,e){if(d===1)return A.t(e,r)
-while(true)switch(s){case 0:o=A.d1("https://plastic-factory-api.onrender.com/api/stock-take/sessions/"+a+"/items/"+b,0,null)
+while(true)switch(s){case 0:o=A.d1("https://2e96b413-ed72-44a2-839a-50fdc389c55f-00-3enbhv8ocmr54.pike.replit.dev/api/stock-take/sessions/"+a+"/items/"+b,0,null)
 n=p.gx6()
 m=t.N
 s=3
@@ -117551,7 +117551,7 @@ break}++n.d
 new A.aUU(n).$0()
 n.c.dt()
 p=6
-m=A.d1("https://plastic-factory-api.onrender.com/api/health",0,null)
+m=A.d1("https://2e96b413-ed72-44a2-839a-50fdc389c55f-00-3enbhv8ocmr54.pike.replit.dev/api/health",0,null)
 s=9
 return A.q(A.b3x(m,null).H4(0,B.S1),$async$u5)
 case 9:l=a1

@@ -158,7 +158,7 @@ async def _apply_deductions(pool, batch_id: str, batch_number: str,
             inv = await pool.fetchrow(
                 """SELECT i.balance, rm.min_stock
                    FROM inventory i
-                   JOIN raw_materials rm ON rm.id = i.material_id
+                   JOIN raw_materials rm ON rm.id::text = i.material_id::text
                    WHERE i.material_id=$1 AND i.warehouse_type='mixer'""",
                 item["material_id"],
             )
@@ -199,7 +199,7 @@ async def _apply_deductions(pool, batch_id: str, batch_number: str,
         inv = await pool.fetchrow(
             """SELECT i.balance, rm.min_stock
                FROM inventory i
-               JOIN raw_materials rm ON rm.id = i.material_id
+               JOIN raw_materials rm ON rm.id::text = i.material_id::text
                WHERE i.material_id=$1 AND i.warehouse_type='mixer'""",
             item["material_id"],
         )
@@ -427,7 +427,7 @@ async def get_batch_stats(batch_id: str):
     cost_row = await pool.fetchrow(
         """SELECT COALESCE(SUM(it.quantity * COALESCE(rm.cost_per_unit, 0)), 0) AS batch_cost
            FROM inventory_transactions it
-           JOIN raw_materials rm ON rm.id = it.material_id
+           JOIN raw_materials rm ON rm.id::text = it.material_id::text
            WHERE it.transaction_ref = $1
              AND it.transaction_type = 'out'""",
         d.get("transaction_id", ""),
@@ -710,7 +710,7 @@ async def get_recipe_deviation(batch_id: str):
     recipe_items = await pool.fetch(
         """SELECT ri.material_id, ri.quantity, ri.unit, rm.name, rm.unit AS mat_unit
            FROM recipe_items ri
-           JOIN raw_materials rm ON rm.id = ri.material_id
+           JOIN raw_materials rm ON rm.id::text = ri.material_id::text
            WHERE ri.recipe_id = $1
            ORDER BY rm.name""",
         recipe["id"],

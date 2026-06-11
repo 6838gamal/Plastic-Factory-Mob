@@ -72,7 +72,7 @@ async def create_session(body: SessionCreate):
         SELECT i.material_id, rm.name AS material_name, rm.unit,
                i.warehouse_type, i.balance
         FROM inventory i
-        JOIN raw_materials rm ON rm.id = i.material_id
+        JOIN raw_materials rm ON rm.id::text = i.material_id::text
         WHERE i.warehouse_type = $1
         ORDER BY rm.name
     """, body.warehouse_type)

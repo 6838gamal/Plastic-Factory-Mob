@@ -81,7 +81,7 @@ async def open_new_day():
     inv_rows = await pool.fetch(
         """SELECT i.material_id, rm.name, rm.unit, i.warehouse_type, i.balance
            FROM inventory i
-           JOIN raw_materials rm ON rm.id = i.material_id
+           JOIN raw_materials rm ON rm.id::text = i.material_id::text
            ORDER BY rm.name, i.warehouse_type"""
     )
     opening_snapshot = [

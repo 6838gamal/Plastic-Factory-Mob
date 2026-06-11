@@ -61,7 +61,7 @@ async def get_inventory(warehouse_type: Optional[str] = Query(None)):
                       CASE WHEN i.balance <= 0 THEN 'out_of_stock'
                            WHEN r.min_stock > 0 AND i.balance <= r.min_stock THEN 'low'
                            ELSE 'normal' END AS stock_status
-               FROM inventory i JOIN raw_materials r ON r.id=i.material_id
+               FROM inventory i JOIN raw_materials r ON r.id::text=i.material_id::text
                WHERE i.warehouse_type=$1 ORDER BY r.name""",
             warehouse_type,
         )
@@ -72,7 +72,7 @@ async def get_inventory(warehouse_type: Optional[str] = Query(None)):
                       CASE WHEN i.balance <= 0 THEN 'out_of_stock'
                            WHEN r.min_stock > 0 AND i.balance <= r.min_stock THEN 'low'
                            ELSE 'normal' END AS stock_status
-               FROM inventory i JOIN raw_materials r ON r.id=i.material_id
+               FROM inventory i JOIN raw_materials r ON r.id::text=i.material_id::text
                ORDER BY r.name"""
         )
     return [dict(r) for r in rows]
@@ -107,7 +107,7 @@ async def get_material_inventory(material_id: str, warehouse_type: str = Query(.
                   CASE WHEN i.balance <= 0 THEN 'out_of_stock'
                        WHEN r.min_stock > 0 AND i.balance <= r.min_stock THEN 'low'
                        ELSE 'normal' END AS stock_status
-           FROM inventory i JOIN raw_materials r ON r.id=i.material_id
+           FROM inventory i JOIN raw_materials r ON r.id::text=i.material_id::text
            WHERE i.material_id=$1 AND i.warehouse_type=$2""",
         material_id, warehouse_type,
     )
@@ -138,7 +138,7 @@ async def get_transactions(
     query = f"""
         SELECT it.*, r.name AS material_name, r.unit
         FROM inventory_transactions it
-        LEFT JOIN raw_materials r ON r.id = it.material_id
+        LEFT JOIN raw_materials r ON r.id::text = it.material_id::text
         WHERE {' AND '.join(conditions)}
         ORDER BY it.created_at DESC
         LIMIT ${i}

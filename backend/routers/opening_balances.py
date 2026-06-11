@@ -40,7 +40,7 @@ async def get_opening_balances(
     query = f"""
         SELECT ob.*, r.name AS material_name, r.unit
         FROM opening_balances ob
-        JOIN raw_materials r ON r.id = ob.material_id
+        JOIN raw_materials r ON r.id::text = ob.material_id::text
         WHERE {' AND '.join(conditions)}
         ORDER BY ob.balance_date DESC, ob.created_at DESC
     """
