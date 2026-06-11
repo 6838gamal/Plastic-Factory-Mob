@@ -84,6 +84,13 @@ class ApiDataSource {
     }
   }
 
+  // ==================== HEALTH ====================
+  Future<void> checkHealth() async {
+    final uri = Uri.parse('$_baseUrl/api/health');
+    final res = await http.get(uri, headers: _headers).timeout(const Duration(seconds: 8));
+    if (res.statusCode >= 400) throw Exception('Server error ${res.statusCode}');
+  }
+
   // ==================== AUTH ====================
   Future<Map<String, dynamic>> signIn(String email, String password) async {
     final res = await _post('/api/auth/signin', {'email': email, 'password': password});

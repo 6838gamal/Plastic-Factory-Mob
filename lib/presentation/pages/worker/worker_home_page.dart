@@ -5,6 +5,7 @@ import '../../widgets/admin/admin_login_dialog.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../../core/constants/app_strings.dart';
+import '../../widgets/common/offline_banner.dart';
 import 'batch_entry_page.dart';
 import 'machine_entry_page.dart';
 
@@ -43,7 +44,7 @@ class _WorkerHomePageState extends ConsumerState<WorkerHomePage> {
       drawer: _WorkerDrawer(
         onAdminAccess: () => _showAdminLogin(),
       ),
-      body: _pages[_selectedIndex],
+      body: OfflineBannerWrapper(child: _pages[_selectedIndex]),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedIndex,
         onDestinationSelected: (index) => setState(() => _selectedIndex = index),

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../../core/constants/app_strings.dart';
+import '../../widgets/common/offline_banner.dart';
 
 Future<void> _confirmAndSignOut(BuildContext context, WidgetRef ref) async {
   final confirmed = await showDialog<bool>(
@@ -59,7 +60,7 @@ class AdminShellPage extends ConsumerWidget {
           ],
         ),
         drawer: _AdminDrawer(),
-        body: child,
+        body: OfflineBannerWrapper(child: child),
       ),
     );
   }

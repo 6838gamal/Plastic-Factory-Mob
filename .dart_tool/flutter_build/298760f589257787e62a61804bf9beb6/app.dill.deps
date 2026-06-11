@@ -1506,10 +1506,12 @@ file:///home/runner/workspace/lib/presentation/pages/worker/machine_entry_page.d
 file:///home/runner/workspace/lib/presentation/pages/worker/worker_home_page.dart
 file:///home/runner/workspace/lib/presentation/providers/auth_provider.dart
 file:///home/runner/workspace/lib/presentation/providers/batch_provider.dart
+file:///home/runner/workspace/lib/presentation/providers/connectivity_provider.dart
 file:///home/runner/workspace/lib/presentation/providers/reference_data_provider.dart
 file:///home/runner/workspace/lib/presentation/providers/theme_provider.dart
 file:///home/runner/workspace/lib/presentation/widgets/admin/admin_login_dialog.dart
 file:///home/runner/workspace/lib/presentation/widgets/common/loading_widget.dart
+file:///home/runner/workspace/lib/presentation/widgets/common/offline_banner.dart
 file:///home/runner/workspace/lib/presentation/widgets/common/severity_chip.dart
 file:///home/runner/workspace/lib/presentation/widgets/common/stat_card.dart
 file:///nix/store/6xjp9yn2lnm3hvr7l78n7v0z3a6g784i-dart-3.8.0/lib/libraries.json
