@@ -92,6 +92,15 @@ async def _init_db():
         "ALTER TABLE recipes DROP CONSTRAINT IF EXISTS recipes_product_id_fkey",
         "ALTER TABLE stock_take_items DROP CONSTRAINT IF EXISTS stock_take_items_material_id_fkey",
         "ALTER TABLE stock_take_items DROP CONSTRAINT IF EXISTS stock_take_items_session_id_fkey",
+        # batches — FK constraints that block worker/mixer/product/mixture_type UUID→VARCHAR
+        "ALTER TABLE batches DROP CONSTRAINT IF EXISTS batches_worker_id_fkey",
+        "ALTER TABLE batches DROP CONSTRAINT IF EXISTS batches_mixer_id_fkey",
+        "ALTER TABLE batches DROP CONSTRAINT IF EXISTS batches_product_id_fkey",
+        "ALTER TABLE batches DROP CONSTRAINT IF EXISTS batches_mixture_type_id_fkey",
+        # machine_production — FK constraints that block machine/product UUID→VARCHAR
+        "ALTER TABLE machine_production DROP CONSTRAINT IF EXISTS machine_production_machine_id_fkey",
+        "ALTER TABLE machine_production DROP CONSTRAINT IF EXISTS machine_production_product_id_fkey",
+        "ALTER TABLE machine_production DROP CONSTRAINT IF EXISTS machine_production_worker_id_fkey",
     ]
     for stmt in _drop_fks:
         try:
