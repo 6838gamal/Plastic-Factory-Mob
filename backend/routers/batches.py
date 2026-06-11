@@ -676,8 +676,11 @@ async def get_recipe_deviation(batch_id: str):
     """
     pool = await get_pool()
 
-    # ── Load batch ────────────────────────────────────────────
-    batch = await pool.fetchrow("SELECT * FROM batches WHERE id=$1", batch_id)
+    # ── Load batch — accept both UUID id and transaction_id ──
+    batch = await pool.fetchrow(
+        "SELECT * FROM batches WHERE id::text=$1 OR transaction_id=$1",
+        batch_id,
+    )
     if not batch:
         raise HTTPException(status_code=404, detail="Batch not found")
 
@@ -707,28 +710,19 @@ async def get_recipe_deviation(batch_id: str):
             },
         }
 
+    # recipe_items stores material_name + standard_qty (no material_id foreign key)
     recipe_items = await pool.fetch(
-        """SELECT ri.material_id, ri.quantity, ri.unit, rm.name, rm.unit AS mat_unit
+        """SELECT ri.material_name, ri.standard_qty, ri.unit
            FROM recipe_items ri
-           JOIN raw_materials rm ON rm.id::text = ri.material_id::text
            WHERE ri.recipe_id = $1
-           ORDER BY rm.name""",
+           ORDER BY ri.material_name""",
         recipe["id"],
     )
 
-    # ── Build actual-quantities map from batch ────────────────
+    # ── Build actual-quantities map from batch keyed by material_name ──────
+    # Collect name → qty_kg from all dynamic JSONB fields
     actual_map: dict = {}
 
-    # Fixed fields
-    field_to_name = {
-        "pvc_qty": "PVC",
-        "dop_qty": "DOP",
-        "scrap_qty": "scrap",
-        "calcium_qty": "calcium",
-        "wax_qty": "wax",
-        "stabilizer_qty": "stabilizer",
-        "titanium_qty": "titanium",
-    }
     for field in ("materials", "pigments", "additives"):
         raw = batch[field]
         if isinstance(raw, str):
@@ -739,11 +733,25 @@ async def get_recipe_deviation(batch_id: str):
         if raw:
             for item in raw:
                 if isinstance(item, dict):
-                    mid = str(item.get("material_id") or item.get("id") or "")
-                    if mid:
+                    name_key = (item.get("material_name") or item.get("name") or "").strip()
+                    if name_key:
                         qty_raw = to_f(item.get("quantity", 0))
                         unit = item.get("unit", "كجم")
-                        actual_map[mid] = actual_map.get(mid, 0.0) + _to_kg(qty_raw, unit)
+                        actual_map[name_key] = actual_map.get(name_key, 0.0) + _to_kg(qty_raw, unit)
+
+    # Also include fixed batch fields by their Arabic names for completeness
+    _fixed_fields = {
+        "PVC":          to_f(batch["pvc_qty"]),
+        "DOP":          to_f(batch["dop_qty"]),
+        "سكراب":        to_f(batch["scrap_qty"]),
+        "كالسيوم":      to_f(batch["calcium_qty"]),
+        "شمع":          to_f(batch["wax_qty"]),
+        "مثبت":         to_f(batch["stabilizer_qty"]),
+        "تيتانيوم":     to_f(batch["titanium_qty"]),
+    }
+    for fname, fqty in _fixed_fields.items():
+        if fqty > 0:
+            actual_map[fname] = actual_map.get(fname, 0.0) + fqty
 
     # ── Compute deviations ────────────────────────────────────
     items = []
@@ -751,15 +759,16 @@ async def get_recipe_deviation(batch_id: str):
     total_actual   = 0.0
 
     for ri in recipe_items:
-        material_id = str(ri["material_id"])
-        recipe_qty  = to_f(ri["quantity"])
+        mat_name    = ri["material_name"] or ""
+        recipe_qty  = to_f(ri["standard_qty"])
         recipe_unit = ri["unit"] or "كجم"
         recipe_qty_kg = _to_kg(recipe_qty, recipe_unit)
 
         # Standard = scale recipe qty proportionally to actual PVC
+        # الكمية المعيارية = (PVC الفعلي ÷ 100) × كمية المادة في الوصفة
         standard_kg = (actual_pvc / 100.0) * recipe_qty_kg if actual_pvc > 0 else recipe_qty_kg
 
-        actual_kg = actual_map.get(material_id, 0.0)
+        actual_kg = actual_map.get(mat_name, 0.0)
 
         deviation_kg = actual_kg - standard_kg
         if standard_kg > 0:
@@ -768,8 +777,7 @@ async def get_recipe_deviation(batch_id: str):
             deviation_pct = 0.0
 
         items.append({
-            "material_id": material_id,
-            "material_name": ri["name"],
+            "material_name": mat_name,
             "recipe_qty_per_100kg_pvc": round(recipe_qty_kg, 4),
             "standard_qty_kg": round(standard_kg, 4),
             "actual_qty_kg":   round(actual_kg, 4),

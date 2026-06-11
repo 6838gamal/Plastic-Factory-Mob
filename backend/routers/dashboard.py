@@ -64,8 +64,11 @@ async def get_stats():
     cost_today = float(cost_row["day_cost"])
 
     # ── KPIs ───────────────────────────────────────────────────
+    # الانحراف = (المخرجات - المدخلات) / المدخلات × 100
+    # المخرجات = الإنتاج النهائي + السكراب + الهالك
+    total_outputs = total_produced + total_waste + total_scrap
     efficiency_pct = round(total_produced / total_inputs * 100, 1) if total_inputs > 0 else 0.0
-    deviation_pct  = round((total_produced - total_inputs) / total_inputs * 100, 1) if total_inputs > 0 else 0.0
+    deviation_pct  = round((total_outputs - total_inputs) / total_inputs * 100, 1) if total_inputs > 0 else 0.0
     waste_pct      = round(total_waste / total_inputs * 100, 1) if total_inputs > 0 else 0.0
     cost_per_kg    = round(cost_today / total_produced, 2) if total_produced > 0 else 0.0
 

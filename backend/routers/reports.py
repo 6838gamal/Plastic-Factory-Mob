@@ -179,9 +179,12 @@ async def generate_daily_report(
     consumption_snapshot = [{"name": r["name"], "consumed": float(r["consumed"])} for r in consumption_rows]
 
     # ── KPI formulas ───────────────────────────────────────────
+    # الانحراف = (المخرجات - المدخلات) / المدخلات × 100
+    # المخرجات = الإنتاج النهائي + السكراب + الهالك
+    total_outputs = total_produced + total_scrap + total_waste
     if total_inputs > 0:
         efficiency_pct = round(total_produced / total_inputs * 100, 2)
-        deviation_pct  = round((total_produced - total_inputs) / total_inputs * 100, 2)
+        deviation_pct  = round((total_outputs - total_inputs) / total_inputs * 100, 2)
         waste_pct      = round(total_waste / total_inputs * 100, 2)
     else:
         efficiency_pct = deviation_pct = waste_pct = 0.0

@@ -422,8 +422,10 @@ ALTER TABLE daily_reports ADD COLUMN IF NOT EXISTS locked_at TIMESTAMPTZ;
 
 -- =============================================================
 -- عرض ملخص المخزون - Inventory Summary View
+-- (DROP + CREATE to handle column changes idempotently)
 -- =============================================================
-CREATE OR REPLACE VIEW inventory_summary AS
+DROP VIEW IF EXISTS inventory_summary CASCADE;
+CREATE VIEW inventory_summary AS
   SELECT
     i.id,
     i.material_id,
@@ -434,9 +436,10 @@ CREATE OR REPLACE VIEW inventory_summary AS
     i.warehouse_type,
     i.balance,
     i.updated_at,
+    COALESCE(rm.cost_per_unit, 0) AS cost_per_unit,
     CASE WHEN i.balance <= 0 THEN 'out_of_stock'
-         WHEN rm.min_stock > 0 AND i.balance <= rm.min_stock THEN 'low_stock'
-         ELSE 'ok'
+         WHEN rm.min_stock > 0 AND i.balance <= rm.min_stock THEN 'low'
+         ELSE 'normal'
     END AS stock_status
   FROM inventory i
   JOIN raw_materials rm ON rm.id = i.material_id;

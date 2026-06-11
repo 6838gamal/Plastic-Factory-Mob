@@ -55,6 +55,12 @@ async def _init_db():
            WHERE transaction_id IS NOT NULL"""
     )
 
+    # ── Ensure UNIQUE constraint on opening_balances ────────────────────
+    await pool.execute("""
+        CREATE UNIQUE INDEX IF NOT EXISTS opening_balances_mat_wh_date_key
+        ON opening_balances (material_id, warehouse_type, balance_date)
+    """)
+
     # ── Idempotent column migrations (ADD IF NOT EXISTS) ──────────────
     _col_migrations = [
         "ALTER TABLE raw_materials ADD COLUMN IF NOT EXISTS code VARCHAR(50)",
@@ -67,6 +73,11 @@ async def _init_db():
         "ALTER TABLE alerts ADD COLUMN IF NOT EXISTS assigned_to VARCHAR(200)",
         # machine_production: optional batch FK for cross-referencing
         "ALTER TABLE machine_production ADD COLUMN IF NOT EXISTS batch_id VARCHAR(50)",
+        # recipe_items: add name-based columns (recipes.py uses material_name + standard_qty)
+        # The table was originally created with material_id + quantity via schema.sql
+        "ALTER TABLE recipe_items ADD COLUMN IF NOT EXISTS material_name TEXT",
+        "ALTER TABLE recipe_items ADD COLUMN IF NOT EXISTS standard_qty NUMERIC(12,4) DEFAULT 0",
+        "ALTER TABLE recipe_items ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW()",
     ]
     for stmt in _col_migrations:
         try:
