@@ -55,12 +55,26 @@ class ApiDataSource {
     return jsonDecode(res.body);
   }
 
+  /// Extract a human-readable message from a FastAPI error response body.
+  /// FastAPI wraps errors as {"detail": "string"} or {"detail": {"message":..., "error":...}}.
+  String _extractError(dynamic body) {
+    if (body is Map) {
+      final detail = body['detail'];
+      if (detail is Map) {
+        return (detail['message'] ?? detail['error'] ?? 'Request failed').toString();
+      } else if (detail is String && detail.isNotEmpty) {
+        return detail;
+      }
+      return (body['error'] ?? body['message'] ?? 'Request failed').toString();
+    }
+    return 'Request failed';
+  }
+
   Future<dynamic> _post(String path, Map<String, dynamic> data) async {
     final uri = Uri.parse('$_baseUrl$path');
     final res = await http.post(uri, headers: _headers, body: jsonEncode(data));
     if (res.statusCode >= 400) {
-      final body = jsonDecode(res.body);
-      throw Exception(body['error'] ?? 'Request failed');
+      throw Exception(_extractError(jsonDecode(res.body)));
     }
     return jsonDecode(res.body);
   }
@@ -69,8 +83,7 @@ class ApiDataSource {
     final uri = Uri.parse('$_baseUrl$path');
     final res = await http.put(uri, headers: _headers, body: jsonEncode(data));
     if (res.statusCode >= 400) {
-      final body = jsonDecode(res.body);
-      throw Exception(body['error'] ?? 'Request failed');
+      throw Exception(_extractError(jsonDecode(res.body)));
     }
     return jsonDecode(res.body);
   }
@@ -79,8 +92,7 @@ class ApiDataSource {
     final uri = Uri.parse('$_baseUrl$path');
     final res = await http.delete(uri, headers: _headers);
     if (res.statusCode >= 400) {
-      final body = jsonDecode(res.body);
-      throw Exception(body['error'] ?? 'Request failed');
+      throw Exception(_extractError(jsonDecode(res.body)));
     }
   }
 

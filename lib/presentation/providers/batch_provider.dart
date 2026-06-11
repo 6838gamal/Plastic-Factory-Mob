@@ -303,7 +303,8 @@ class BatchOperationsNotifier extends Notifier<AsyncValue<void>> {
       return ProductionSaveResult(success: true, production: production);
     } catch (e) {
       state = AsyncValue.error(e, StackTrace.current);
-      return ProductionSaveResult(success: false, error: 'فشل الحفظ: $e');
+      final msg = e.toString().replaceFirst('Exception: ', '');
+      return ProductionSaveResult(success: false, error: msg);
     }
   }
 }
