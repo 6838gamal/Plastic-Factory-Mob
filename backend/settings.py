@@ -13,8 +13,13 @@ API_BASE_URL: str = os.getenv("API_BASE_URL", "")
 FRONTEND_URL: str = os.getenv("FRONTEND_URL", "")
 
 # ─── Database ─────────────────────────────────────────────────────────────────
-# Replit provisions DATABASE_URL automatically via the built-in PostgreSQL integration.
-DATABASE_URL: str = os.getenv("DATABASE_URL", "")
+# RENDER_DATABASE_URL is the permanent production database (Render PostgreSQL).
+# Falls back to DATABASE_URL (Replit built-in) if not set.
+DATABASE_URL: str = (
+    os.getenv("RENDER_DATABASE_URL")
+    or os.getenv("DATABASE_URL")
+    or ""
+)
 
 # ─── Security ─────────────────────────────────────────────────────────────────
 SECRET_KEY: str = (
