@@ -55,6 +55,20 @@ async def _init_db():
            WHERE transaction_id IS NOT NULL"""
     )
 
+    # ── Idempotent column migrations (ADD IF NOT EXISTS) ──────────────
+    _col_migrations = [
+        "ALTER TABLE raw_materials ADD COLUMN IF NOT EXISTS code VARCHAR(50)",
+        "ALTER TABLE raw_materials ADD COLUMN IF NOT EXISTS cost_per_unit NUMERIC(12,4) NOT NULL DEFAULT 0",
+        "ALTER TABLE inventory_transactions ADD COLUMN IF NOT EXISTS balance_before DECIMAL(12,3)",
+        "ALTER TABLE inventory_transactions ADD COLUMN IF NOT EXISTS balance_after DECIMAL(12,3)",
+    ]
+    for stmt in _col_migrations:
+        try:
+            await pool.execute(stmt)
+        except Exception as exc:
+            logger.warning(f"[init_db] Column migration skipped: {exc}")
+    logger.info("[init_db] Column migrations applied")
+
 
 async def _seed_default_admin():
     """Ensure a default admin user always exists on startup."""

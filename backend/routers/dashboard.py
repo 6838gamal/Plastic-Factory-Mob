@@ -52,8 +52,16 @@ async def get_stats():
     )
     total_inputs = float(inv_row["total_inputs"])
 
-    # ── Day cost (cost_per_unit not in schema — defaulting to 0) ──
-    cost_today = 0.0
+    # ── Day cost ───────────────────────────────────────────────
+    cost_row = await pool.fetchrow(
+        """SELECT COALESCE(SUM(it.quantity * COALESCE(rm.cost_per_unit, 0)), 0) AS day_cost
+           FROM inventory_transactions it
+           JOIN raw_materials rm ON rm.id = it.material_id
+           WHERE it.transaction_type = 'out'
+             AND it.created_at BETWEEN $1 AND $2""",
+        day_start, day_end,
+    )
+    cost_today = float(cost_row["day_cost"])
 
     # ── KPIs ───────────────────────────────────────────────────
     efficiency_pct = round(total_produced / total_inputs * 100, 1) if total_inputs > 0 else 0.0
