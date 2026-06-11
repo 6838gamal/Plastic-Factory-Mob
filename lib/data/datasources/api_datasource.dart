@@ -1,7 +1,10 @@
 import 'dart:convert';
 import 'dart:typed_data';
 // ignore: avoid_web_libraries_in_flutter
-import 'dart:html' as html show window;
+//import 'dart:html' as html show window;
+
+import 'package:flutter/foundation.dart';
+
 import 'package:http/http.dart' as http;
 import '../models/raw_material_model.dart';
 import '../models/inventory_model.dart';
@@ -18,15 +21,26 @@ class ApiDataSource {
   // This ensures the app works on any domain (Replit dev, deployed, etc.)
   // without needing a rebuild.
   static String get _baseUrl {
+  if (kIsWeb) {
     try {
-      final origin = html.window.location.origin;
+      final origin = Uri.base.origin;
+
       if (origin.isNotEmpty && origin != 'null') {
         return origin;
       }
     } catch (_) {}
-    const injected = String.fromEnvironment('API_BASE_URL', defaultValue: '');
-    if (injected.isNotEmpty) return injected;
-    return '';
+  }
+
+  const injected = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: '',
+  );
+
+  if (injected.isNotEmpty) {
+    return injected;
+  }
+
+  return 'https://plastic-factory-api.onrender.com';
   }
 
   static String get baseUrl => _baseUrl;
