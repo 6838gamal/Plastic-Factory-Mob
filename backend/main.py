@@ -368,4 +368,16 @@ if WEB_DIR.exists():
     async def flutter_bootstrap():
         return FileResponse(str(WEB_DIR / "flutter_bootstrap.js"), headers=_NO_CACHE)
 
+    # SPA catch-all: serve index.html for any path not matched by API or static files
+    @app.get("/{full_path:path}")
+    async def spa_fallback(full_path: str):
+        # Only serve index.html for non-API, non-asset paths
+        if full_path.startswith("api/") or full_path.startswith("assets/"):
+            from fastapi import HTTPException as _HTTPException
+            raise _HTTPException(status_code=404)
+        static_file = WEB_DIR / full_path
+        if static_file.exists() and static_file.is_file():
+            return FileResponse(str(static_file))
+        return FileResponse(str(WEB_DIR / "index.html"), headers=_NO_CACHE)
+
     app.mount("/", StaticFiles(directory=str(WEB_DIR), html=True), name="flutter")

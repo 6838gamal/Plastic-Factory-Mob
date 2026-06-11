@@ -9,10 +9,23 @@ Daily report generation:
   - Writes an audit_log entry
 """
 import json
-from datetime import date as date_type, datetime
+from datetime import date as date_type, datetime, timezone
 from fastapi import APIRouter, Query, HTTPException
 from typing import Optional
 from database import get_pool
+
+
+def _parse_date(s: str) -> date_type:
+    """Convert a YYYY-MM-DD string to datetime.date (asyncpg needs date objects)."""
+    return date_type.fromisoformat(s[:10])
+
+
+def _parse_dt(s: str) -> datetime:
+    """Convert an ISO datetime string to datetime object for asyncpg."""
+    try:
+        return datetime.fromisoformat(s.replace("Z", "+00:00"))
+    except Exception:
+        return datetime.combine(_parse_date(s), datetime.min.time())
 
 router = APIRouter(prefix="/api/reports", tags=["reports"])
 
@@ -30,9 +43,9 @@ async def get_daily_reports(
     params: list = []
     i = 1
     if from_:
-        conditions.append(f"report_date >= ${i}::date"); params.append(from_[:10]); i += 1
+        conditions.append(f"report_date >= ${i}"); params.append(_parse_date(from_)); i += 1
     if to:
-        conditions.append(f"report_date <= ${i}::date"); params.append(to[:10]); i += 1
+        conditions.append(f"report_date <= ${i}"); params.append(_parse_date(to)); i += 1
     params.append(limit)
     query = f"""
         SELECT * FROM daily_reports
@@ -57,7 +70,7 @@ async def get_daily_reports(
 async def get_daily_report(report_date: str):
     pool = await get_pool()
     row = await pool.fetchrow(
-        "SELECT * FROM daily_reports WHERE report_date=$1::date", report_date[:10]
+        "SELECT * FROM daily_reports WHERE report_date=$1", _parse_date(report_date)
     )
     if not row:
         raise HTTPException(status_code=404, detail="Report not found")
@@ -257,9 +270,9 @@ async def get_consumption_report(
     params: list = []
     i = 1
     if from_:
-        conditions.append(f"it.created_at >= ${i}::timestamptz"); params.append(from_); i += 1
+        conditions.append(f"it.created_at >= ${i}"); params.append(_parse_dt(from_)); i += 1
     if to:
-        conditions.append(f"it.created_at <= ${i}::timestamptz"); params.append(to); i += 1
+        conditions.append(f"it.created_at <= ${i}"); params.append(_parse_dt(to)); i += 1
     query = f"""
         SELECT
             r.id AS material_id,
@@ -332,9 +345,9 @@ async def get_material_balance_history(
     params: list = [material_id]
     i = 2
     if from_:
-        conditions.append(f"it.created_at>=${i}::timestamptz"); params.append(from_); i += 1
+        conditions.append(f"it.created_at>=${i}"); params.append(_parse_dt(from_)); i += 1
     if to:
-        conditions.append(f"it.created_at<=${i}::timestamptz"); params.append(to); i += 1
+        conditions.append(f"it.created_at<=${i}"); params.append(_parse_dt(to)); i += 1
     params.append(limit)
     query = f"""
         SELECT it.*, rm.name AS material_name, rm.unit
