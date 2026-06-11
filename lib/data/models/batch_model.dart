@@ -12,8 +12,8 @@ class BatchMaterialModel {
   });
 
   factory BatchMaterialModel.fromJson(Map<String, dynamic> json) => BatchMaterialModel(
-        materialId: json['material_id'] as String,
-        materialName: json['material_name'] as String? ?? '',
+        materialId: json['material_id'] as String? ?? '',
+        materialName: (json['material_name'] ?? json['name']) as String? ?? '',
         quantity: (json['quantity'] as num).toDouble(),
         unit: json['unit'] as String? ?? 'كجم',
       );
