@@ -25,10 +25,10 @@ Future<void> _confirmAndSignOut(BuildContext context, WidgetRef ref) async {
       ],
     ),
   );
-  if (confirmed == true) {
+  if (confirmed == true && context.mounted) {
     await ref.read(authProvider.notifier).signOut();
-    // The router's refreshListenable detects isAdmin=false
-    // and redirects to /worker automatically — no need for context.go.
+    // Explicit navigation as safety net — GoRouter redirect also fires.
+    if (context.mounted) context.go('/worker');
   }
 }
 
