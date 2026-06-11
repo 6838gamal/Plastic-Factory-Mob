@@ -59,7 +59,7 @@ class AdminShellPage extends ConsumerWidget {
             ),
           ],
         ),
-        drawer: _AdminDrawer(),
+        drawer: _AdminDrawer(scaffoldContext: context),
         body: OfflineBannerWrapper(child: child),
       ),
     );
@@ -67,6 +67,9 @@ class AdminShellPage extends ConsumerWidget {
 }
 
 class _AdminDrawer extends ConsumerWidget {
+  final BuildContext scaffoldContext;
+  const _AdminDrawer({required this.scaffoldContext});
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final currentRoute = GoRouterState.of(context).uri.toString();
@@ -212,7 +215,7 @@ class _AdminDrawer extends ConsumerWidget {
               title: const Text(AppStrings.logout, style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
               onTap: () async {
                 Navigator.pop(context); // close drawer first
-                await _confirmAndSignOut(context, ref);
+                await _confirmAndSignOut(scaffoldContext, ref);
               },
             ),
           ),

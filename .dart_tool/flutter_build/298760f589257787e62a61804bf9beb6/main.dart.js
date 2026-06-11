@@ -32982,9 +32982,11 @@ this.a=b},
 agJ:function agJ(a){this.a=a},
 agK:function agK(a,b){this.a=a
 this.b=b},
-a4C:function a4C(a){this.a=a},
-aFW:function aFW(a,b){this.a=a
-this.b=b},
+a4C:function a4C(a,b){this.e=a
+this.a=b},
+aFW:function aFW(a,b,c){this.a=a
+this.b=b
+this.c=c},
 i2:function i2(a,b,c,d,e,f){var _=this
 _.c=a
 _.d=b
@@ -114716,7 +114718,7 @@ return null},
 $S:0}
 A.xz.prototype={
 hv(a,b){var s=null
-return A.bmg(!1,A.kN(A.Rs(A.a([A.eW(s,s,s,A.cR(b.e_($.xr(),t.jm)===B.di?B.nR:B.nN,s,s,s),s,s,new A.agJ(b),s,s,s,s),A.eW(s,s,s,B.UV,s,s,new A.agK(a,b),s,s,s,"\u062a\u0633\u062c\u064a\u0644 \u0627\u0644\u062e\u0631\u0648\u062c")],t.p),s,s,s,s,s,s,s,s,s,B.akC),s,new A.Ho(this.e,s),s,new A.a4C(s),s),s,t.z)},
+return A.bmg(!1,A.kN(A.Rs(A.a([A.eW(s,s,s,A.cR(b.e_($.xr(),t.jm)===B.di?B.nR:B.nN,s,s,s),s,s,new A.agJ(b),s,s,s,s),A.eW(s,s,s,B.UV,s,s,new A.agK(a,b),s,s,s,"\u062a\u0633\u062c\u064a\u0644 \u0627\u0644\u062e\u0631\u0648\u062c")],t.p),s,s,s,s,s,s,s,s,s,B.akC),s,new A.Ho(this.e,s),s,new A.a4C(a,s),s),s,t.z)},
 gP(){return this.e}}
 A.agJ.prototype={
 $0(){return this.a.c1(0,$.xr().gmM(),t.hQ).vS()},
@@ -114728,14 +114730,13 @@ A.a4C.prototype={
 hv(a,b){var s,r=null,q=A.bkg(a).b.j(0),p=b.e_($.tl(),t.FB).a
 p=p==null?r:p.b
 s=t.p
-return A.b6I(A.aX(A.a([A.b6J(A.aX(A.a([B.PA,B.U,B.alE,A.X(p==null?"":p,r,r,B.aL,r,r,B.aj2,r,r,r)],s),B.l,B.bJ,B.n),B.qC),A.bN(A.GB(A.a([new A.i2(B.Ul,B.TW,"\u0644\u0648\u062d\u0629 \u0627\u0644\u062a\u062d\u0643\u0645","/admin",q,r),new A.i2(B.hI,B.tX,"\u0627\u0644\u0645\u062e\u0632\u0648\u0646","/admin/inventory",q,r),new A.i2(B.nY,B.u3,"\u0627\u0644\u0645\u0648\u0627\u062f \u0627\u0644\u062e\u0627\u0645","/admin/materials",q,r),new A.i2(B.hH,B.ev,"\u0627\u0644\u0637\u0628\u062e\u0627\u062a","/admin/batches",q,r),new A.i2(B.jG,B.dT,"\u0627\u0644\u0625\u0646\u062a\u0627\u062c","/admin/production",q,r),new A.i2(B.u1,B.u0,"\u0627\u0644\u0639\u0645\u0627\u0644","/admin/workers",q,r),new A.i2(B.u8,B.Ue,"\u0627\u0644\u0645\u0627\u0643\u064a\u0646\u0627\u062a","/admin/machines",q,r),B.bR,new A.i2(B.nW,B.U0,"\u0627\u0644\u062c\u0631\u062f \u0627\u0644\u062f\u0648\u0631\u064a","/admin/stock-take",q,r),new A.i2(B.u7,B.tZ,"\u0648\u0635\u0641\u0627\u062a \u0627\u0644\u062e\u0644\u0637\u0627\u062a","/admin/recipes",q,r),B.bR,new A.i2(B.Uw,B.hG,"\u0627\u0644\u062a\u062d\u0630\u064a\u0631\u0627\u062a","/admin/alerts",q,r),new A.i2(B.nX,B.nQ,"\u0633\u062c\u0644 \u0627\u0644\u062a\u062f\u0642\u064a\u0642","/admin/audit",q,r),new A.i2(B.u5,B.tR,"\u0627\u0644\u062a\u0642\u0627\u0631\u064a\u0631","/admin/reports",q,r),new A.i2(B.Us,B.u4,"\u0627\u0644\u0625\u0639\u062f\u0627\u062f\u0627\u062a","/admin/settings",q,r)],s),r,B.a7,r,!1),1,r),new A.aC(B.ce,A.eo(!1,r,r,r,!0,r,r,!0,r,B.V5,r,r,new A.aFW(a,b),!1,r,r,new A.cE(A.cl(12),B.u),r,A.ai(20,B.O.q()>>>16&255,B.O.q()>>>8&255,B.O.q()&255),B.al8,r,r),r)],s),B.l,B.j,B.n))}}
+return A.b6I(A.aX(A.a([A.b6J(A.aX(A.a([B.PA,B.U,B.alE,A.X(p==null?"":p,r,r,B.aL,r,r,B.aj2,r,r,r)],s),B.l,B.bJ,B.n),B.qC),A.bN(A.GB(A.a([new A.i2(B.Ul,B.TW,"\u0644\u0648\u062d\u0629 \u0627\u0644\u062a\u062d\u0643\u0645","/admin",q,r),new A.i2(B.hI,B.tX,"\u0627\u0644\u0645\u062e\u0632\u0648\u0646","/admin/inventory",q,r),new A.i2(B.nY,B.u3,"\u0627\u0644\u0645\u0648\u0627\u062f \u0627\u0644\u062e\u0627\u0645","/admin/materials",q,r),new A.i2(B.hH,B.ev,"\u0627\u0644\u0637\u0628\u062e\u0627\u062a","/admin/batches",q,r),new A.i2(B.jG,B.dT,"\u0627\u0644\u0625\u0646\u062a\u0627\u062c","/admin/production",q,r),new A.i2(B.u1,B.u0,"\u0627\u0644\u0639\u0645\u0627\u0644","/admin/workers",q,r),new A.i2(B.u8,B.Ue,"\u0627\u0644\u0645\u0627\u0643\u064a\u0646\u0627\u062a","/admin/machines",q,r),B.bR,new A.i2(B.nW,B.U0,"\u0627\u0644\u062c\u0631\u062f \u0627\u0644\u062f\u0648\u0631\u064a","/admin/stock-take",q,r),new A.i2(B.u7,B.tZ,"\u0648\u0635\u0641\u0627\u062a \u0627\u0644\u062e\u0644\u0637\u0627\u062a","/admin/recipes",q,r),B.bR,new A.i2(B.Uw,B.hG,"\u0627\u0644\u062a\u062d\u0630\u064a\u0631\u0627\u062a","/admin/alerts",q,r),new A.i2(B.nX,B.nQ,"\u0633\u062c\u0644 \u0627\u0644\u062a\u062f\u0642\u064a\u0642","/admin/audit",q,r),new A.i2(B.u5,B.tR,"\u0627\u0644\u062a\u0642\u0627\u0631\u064a\u0631","/admin/reports",q,r),new A.i2(B.Us,B.u4,"\u0627\u0644\u0625\u0639\u062f\u0627\u062f\u0627\u062a","/admin/settings",q,r)],s),r,B.a7,r,!1),1,r),new A.aC(B.ce,A.eo(!1,r,r,r,!0,r,r,!0,r,B.V5,r,r,new A.aFW(this,a,b),!1,r,r,new A.cE(A.cl(12),B.u),r,A.ai(20,B.O.q()>>>16&255,B.O.q()>>>8&255,B.O.q()&255),B.al8,r,r),r)],s),B.l,B.j,B.n))}}
 A.aFW.prototype={
-$0(){var s=0,r=A.w(t.H),q=this,p
+$0(){var s=0,r=A.w(t.H),q=this
 var $async$$0=A.r(function(a,b){if(a===1)return A.t(b,r)
-while(true)switch(s){case 0:p=q.a
-A.br(p,!1).cb(null)
+while(true)switch(s){case 0:A.br(q.b,!1).cb(null)
 s=2
-return A.q(A.Qy(p,q.b),$async$$0)
+return A.q(A.Qy(q.a.e,q.c),$async$$0)
 case 2:return A.u(null,r)}})
 return A.v($async$$0,r)},
 $S:3}
