@@ -143,8 +143,10 @@ class BatchOperationsNotifier extends Notifier<AsyncValue<void>> {
       }
 
       final materials = batchData['materials'] as List<Map<String, dynamic>>? ?? [];
+      // Only check inventory for materials that have an explicit material_id
       for (final mat in materials) {
-        final materialId = mat['material_id'] as String;
+        final materialId = mat['material_id'] as String?;
+        if (materialId == null) continue;
         final required = (mat['quantity'] as num).toDouble();
         final inventory = await ds.getMaterialInventory(materialId, AppConstants.warehouseMixer);
         if (inventory != null && inventory.balance < required) {
@@ -175,7 +177,8 @@ class BatchOperationsNotifier extends Notifier<AsyncValue<void>> {
       final batch = await ds.saveBatch(data);
 
       for (final mat in materials) {
-        final materialId = mat['material_id'] as String;
+        final materialId = mat['material_id'] as String?;
+        if (materialId == null) continue;
         final quantity = (mat['quantity'] as num).toDouble();
         final inv = await ds.getMaterialInventory(materialId, AppConstants.warehouseMixer);
         if (inv != null) {
