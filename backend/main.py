@@ -61,12 +61,69 @@ async def _init_db():
         "ALTER TABLE raw_materials ADD COLUMN IF NOT EXISTS cost_per_unit NUMERIC(12,4) NOT NULL DEFAULT 0",
         "ALTER TABLE inventory_transactions ADD COLUMN IF NOT EXISTS balance_before DECIMAL(12,3)",
         "ALTER TABLE inventory_transactions ADD COLUMN IF NOT EXISTS balance_after DECIMAL(12,3)",
+        # alerts: worker and assignee tracking
+        "ALTER TABLE alerts ADD COLUMN IF NOT EXISTS worker_id VARCHAR(50)",
+        "ALTER TABLE alerts ADD COLUMN IF NOT EXISTS worker_name VARCHAR(200)",
+        "ALTER TABLE alerts ADD COLUMN IF NOT EXISTS assigned_to VARCHAR(200)",
+        # machine_production: optional batch FK for cross-referencing
+        "ALTER TABLE machine_production ADD COLUMN IF NOT EXISTS batch_id VARCHAR(50)",
     ]
     for stmt in _col_migrations:
         try:
             await pool.execute(stmt)
         except Exception as exc:
             logger.warning(f"[init_db] Column migration skipped: {exc}")
+
+    # ── Drop FK constraints that block UUID→VARCHAR conversion ─────────────
+    _drop_fks = [
+        "ALTER TABLE alerts DROP CONSTRAINT IF EXISTS alerts_material_id_fkey",
+        "ALTER TABLE alerts DROP CONSTRAINT IF EXISTS alerts_batch_id_fkey",
+        "ALTER TABLE alerts DROP CONSTRAINT IF EXISTS alerts_machine_id_fkey",
+        "ALTER TABLE batch_items DROP CONSTRAINT IF EXISTS batch_items_batch_id_fkey",
+        "ALTER TABLE batch_items DROP CONSTRAINT IF EXISTS batch_items_material_id_fkey",
+        "ALTER TABLE deduction_log DROP CONSTRAINT IF EXISTS deduction_log_batch_id_fkey",
+        "ALTER TABLE deduction_log DROP CONSTRAINT IF EXISTS deduction_log_material_id_fkey",
+        "ALTER TABLE inventory DROP CONSTRAINT IF EXISTS inventory_material_id_fkey",
+        "ALTER TABLE inventory_transactions DROP CONSTRAINT IF EXISTS inventory_transactions_material_id_fkey",
+        "ALTER TABLE opening_balances DROP CONSTRAINT IF EXISTS opening_balances_material_id_fkey",
+        "ALTER TABLE recipe_items DROP CONSTRAINT IF EXISTS recipe_items_material_id_fkey",
+        "ALTER TABLE recipe_items DROP CONSTRAINT IF EXISTS recipe_items_recipe_id_fkey",
+        "ALTER TABLE recipes DROP CONSTRAINT IF EXISTS recipes_mixture_type_id_fkey",
+        "ALTER TABLE recipes DROP CONSTRAINT IF EXISTS recipes_product_id_fkey",
+        "ALTER TABLE stock_take_items DROP CONSTRAINT IF EXISTS stock_take_items_material_id_fkey",
+        "ALTER TABLE stock_take_items DROP CONSTRAINT IF EXISTS stock_take_items_session_id_fkey",
+    ]
+    for stmt in _drop_fks:
+        try:
+            await pool.execute(stmt)
+        except Exception as exc:
+            logger.warning(f"[init_db] Drop FK skipped: {exc}")
+
+    # ── UUID → VARCHAR conversions (Flutter stores plain strings, not UUIDs) ──
+    # Must run after FK drops above.
+    _uuid_to_varchar = [
+        # batches
+        "ALTER TABLE batches ALTER COLUMN worker_id TYPE VARCHAR(100) USING worker_id::text",
+        "ALTER TABLE batches ALTER COLUMN mixer_id TYPE VARCHAR(100) USING mixer_id::text",
+        "ALTER TABLE batches ALTER COLUMN product_id TYPE VARCHAR(100) USING product_id::text",
+        "ALTER TABLE batches ALTER COLUMN mixture_type_id TYPE VARCHAR(100) USING mixture_type_id::text",
+        # machine_production
+        "ALTER TABLE machine_production ALTER COLUMN machine_id TYPE VARCHAR(100) USING machine_id::text",
+        "ALTER TABLE machine_production ALTER COLUMN product_id TYPE VARCHAR(100) USING product_id::text",
+        "ALTER TABLE machine_production ALTER COLUMN worker_id TYPE VARCHAR(100) USING worker_id::text",
+        # alerts
+        "ALTER TABLE alerts ALTER COLUMN material_id TYPE VARCHAR(100) USING material_id::text",
+        "ALTER TABLE alerts ALTER COLUMN batch_id TYPE VARCHAR(100) USING batch_id::text",
+        "ALTER TABLE alerts ALTER COLUMN machine_id TYPE VARCHAR(100) USING machine_id::text",
+        # Note: inventory.material_id stays as UUID (references raw_materials.id)
+        # inventory_transactions.material_id stays as UUID (references raw_materials.id)
+    ]
+    for stmt in _uuid_to_varchar:
+        try:
+            await pool.execute(stmt)
+        except Exception as exc:
+            logger.warning(f"[init_db] UUID→VARCHAR skipped: {exc}")
+
     logger.info("[init_db] Column migrations applied")
 
 

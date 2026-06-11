@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, HTTPException
 from pydantic import BaseModel
 from typing import Optional
 from database import get_pool
@@ -68,8 +68,16 @@ async def create_alert(body: AlertCreate):
 @router.put("/{alert_id}/status")
 async def update_status(alert_id: str, body: AlertStatusUpdate):
     pool = await get_pool()
-    row = await pool.fetchrow(
-        "UPDATE alerts SET status=$1, resolved_at=NOW(), updated_at=NOW() WHERE id=$2 RETURNING *",
-        body.status, alert_id,
-    )
+    if body.status == "resolved":
+        row = await pool.fetchrow(
+            "UPDATE alerts SET status=$1, resolved_at=NOW(), updated_at=NOW() WHERE id=$2 RETURNING *",
+            body.status, alert_id,
+        )
+    else:
+        row = await pool.fetchrow(
+            "UPDATE alerts SET status=$1, updated_at=NOW() WHERE id=$2 RETURNING *",
+            body.status, alert_id,
+        )
+    if not row:
+        raise HTTPException(status_code=404, detail="Alert not found")
     return dict(row)
