@@ -287,10 +287,12 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS — allow * for maximum compatibility (API is auth-protected via JWT)
+# CORS — allow all origins (API is auth-protected via JWT)
+_cors_origins = cfg.CORS_ORIGINS or ["*"]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_cors_origins,
+    allow_origin_regex=r"https?://.*",
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],

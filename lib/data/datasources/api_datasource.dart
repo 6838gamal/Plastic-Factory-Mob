@@ -1,5 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
+// ignore: avoid_web_libraries_in_flutter
+import 'dart:html' as html show window;
 import 'package:http/http.dart' as http;
 import '../models/raw_material_model.dart';
 import '../models/inventory_model.dart';
@@ -12,13 +14,20 @@ import '../models/reference_models.dart';
 import '../local/local_data_service.dart';
 
 class ApiDataSource {
-  // API_BASE_URL is injected at build time via --dart-define.
-  // Defaults to the Render production URL when not set.
-  // Use AppConfig.apiBaseUrl for access outside this class.
-  static const String _baseUrl = String.fromEnvironment(
-    'API_BASE_URL',
-    defaultValue: 'https://plastic-factory-api.onrender.com',
-  );
+  // Resolve the API base URL at runtime from the browser's current origin.
+  // This ensures the app works on any domain (Replit dev, deployed, etc.)
+  // without needing a rebuild.
+  static String get _baseUrl {
+    try {
+      final origin = html.window.location.origin;
+      if (origin.isNotEmpty && origin != 'null') {
+        return origin;
+      }
+    } catch (_) {}
+    const injected = String.fromEnvironment('API_BASE_URL', defaultValue: '');
+    if (injected.isNotEmpty) return injected;
+    return '';
+  }
 
   static String get baseUrl => _baseUrl;
 
