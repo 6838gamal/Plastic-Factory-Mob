@@ -14,12 +14,7 @@ FRONTEND_URL: str = os.getenv("FRONTEND_URL", "")
 
 # ─── Database ─────────────────────────────────────────────────────────────────
 # Replit provisions DATABASE_URL automatically via the built-in PostgreSQL integration.
-DATABASE_URL: str = (
-    os.getenv("DATABASE_URL")
-    or os.getenv("RENDER_DATABASE_URL")
-    or os.getenv("PG_DATABASE_URL")
-    or ""
-)
+DATABASE_URL: str = os.getenv("DATABASE_URL", "")
 
 # ─── Security ─────────────────────────────────────────────────────────────────
 SECRET_KEY: str = (
