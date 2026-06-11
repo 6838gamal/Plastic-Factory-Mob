@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/datasources/api_datasource.dart';
 import '../../data/models/batch_model.dart';
@@ -7,6 +8,101 @@ import '../../data/models/inventory_model.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/utils/helpers.dart';
 import 'auth_provider.dart';
+
+// ── Typed filter keys (Map keys have no structural equality in Dart) ──────────
+
+@immutable
+class BatchFilters {
+  final DateTime? from;
+  final DateTime? to;
+  final String? workerId;
+
+  const BatchFilters({this.from, this.to, this.workerId});
+
+  @override
+  bool operator ==(Object other) =>
+      other is BatchFilters &&
+      other.from == from &&
+      other.to == to &&
+      other.workerId == workerId;
+
+  @override
+  int get hashCode => Object.hash(from, to, workerId);
+}
+
+@immutable
+class ProductionFilters {
+  final DateTime? from;
+  final DateTime? to;
+  final String? machineId;
+
+  const ProductionFilters({this.from, this.to, this.machineId});
+
+  @override
+  bool operator ==(Object other) =>
+      other is ProductionFilters &&
+      other.from == from &&
+      other.to == to &&
+      other.machineId == machineId;
+
+  @override
+  int get hashCode => Object.hash(from, to, machineId);
+}
+
+@immutable
+class AlertFilters {
+  final String? status;
+  final String? severity;
+
+  const AlertFilters({this.status, this.severity});
+
+  @override
+  bool operator ==(Object other) =>
+      other is AlertFilters &&
+      other.status == status &&
+      other.severity == severity;
+
+  @override
+  int get hashCode => Object.hash(status, severity);
+}
+
+// ── Providers ─────────────────────────────────────────────────────────────────
+
+final batchesProvider = FutureProvider.family<List<BatchModel>, BatchFilters>(
+  (ref, filters) async {
+    final ds = ref.read(dataSourceProvider);
+    return ds.getBatches(
+      from: filters.from,
+      to: filters.to,
+      workerId: filters.workerId,
+    );
+  },
+);
+
+final machineProductionsProvider =
+    FutureProvider.family<List<MachineProductionModel>, ProductionFilters>(
+  (ref, filters) async {
+    final ds = ref.read(dataSourceProvider);
+    return ds.getMachineProductions(
+      from: filters.from,
+      to: filters.to,
+      machineId: filters.machineId,
+    );
+  },
+);
+
+final alertsProvider =
+    FutureProvider.family<List<AlertModel>, AlertFilters>(
+  (ref, filters) async {
+    final ds = ref.read(dataSourceProvider);
+    return ds.getAlerts(
+      status: filters.status,
+      severity: filters.severity,
+    );
+  },
+);
+
+// ── Save result types ─────────────────────────────────────────────────────────
 
 class BatchSaveResult {
   final bool success;
@@ -24,38 +120,7 @@ class ProductionSaveResult {
   const ProductionSaveResult({required this.success, this.error, this.production});
 }
 
-final batchesProvider = FutureProvider.family<List<BatchModel>, Map<String, dynamic>>(
-  (ref, filters) async {
-    final ds = ref.read(dataSourceProvider);
-    return ds.getBatches(
-      from: filters['from'] as DateTime?,
-      to: filters['to'] as DateTime?,
-      workerId: filters['worker_id'] as String?,
-    );
-  },
-);
-
-final machineProductionsProvider =
-    FutureProvider.family<List<MachineProductionModel>, Map<String, dynamic>>(
-  (ref, filters) async {
-    final ds = ref.read(dataSourceProvider);
-    return ds.getMachineProductions(
-      from: filters['from'] as DateTime?,
-      to: filters['to'] as DateTime?,
-      machineId: filters['machine_id'] as String?,
-    );
-  },
-);
-
-final alertsProvider = FutureProvider.family<List<AlertModel>, Map<String, dynamic>>(
-  (ref, filters) async {
-    final ds = ref.read(dataSourceProvider);
-    return ds.getAlerts(
-      status: filters['status'] as String?,
-      severity: filters['severity'] as String?,
-    );
-  },
-);
+// ── Batch operations notifier ─────────────────────────────────────────────────
 
 class BatchOperationsNotifier extends Notifier<AsyncValue<void>> {
   @override
@@ -68,7 +133,6 @@ class BatchOperationsNotifier extends Notifier<AsyncValue<void>> {
     final transactionId = Helpers.generateTransactionId();
 
     try {
-      // Check for duplicate transaction
       final isDuplicate = await ds.checkTransactionExists(transactionId);
       if (isDuplicate) {
         state = const AsyncValue.data(null);
@@ -78,7 +142,6 @@ class BatchOperationsNotifier extends Notifier<AsyncValue<void>> {
         );
       }
 
-      // Check inventory for each material
       final materials = batchData['materials'] as List<Map<String, dynamic>>? ?? [];
       for (final mat in materials) {
         final materialId = mat['material_id'] as String;
@@ -90,19 +153,20 @@ class BatchOperationsNotifier extends Notifier<AsyncValue<void>> {
             'severity': AppConstants.severityCritical,
             'material_id': materialId,
             'material_name': inventory.materialName,
-            'description': 'الكمية المطلوبة من ${inventory.materialName} ($required كجم) أكبر من المتوفر (${inventory.balance} كجم)',
+            'description':
+                'الكمية المطلوبة من ${inventory.materialName} ($required كجم) أكبر من المتوفر (${inventory.balance} كجم)',
             'status': AppConstants.alertPending,
             'transaction_id': transactionId,
           });
           state = const AsyncValue.data(null);
           return BatchSaveResult(
             success: false,
-            error: 'الكمية المطلوبة من ${inventory.materialName} ($required ${inventory.unit}) أكبر من المتوفر (${inventory.balance} ${inventory.unit})',
+            error:
+                'الكمية المطلوبة من ${inventory.materialName} ($required ${inventory.unit}) أكبر من المتوفر (${inventory.balance} ${inventory.unit})',
           );
         }
       }
 
-      // Save the batch
       final data = {
         ...batchData,
         'transaction_id': transactionId,
@@ -110,7 +174,6 @@ class BatchOperationsNotifier extends Notifier<AsyncValue<void>> {
       };
       final batch = await ds.saveBatch(data);
 
-      // Deduct materials from mixer warehouse
       for (final mat in materials) {
         final materialId = mat['material_id'] as String;
         final quantity = (mat['quantity'] as num).toDouble();
@@ -142,7 +205,8 @@ class BatchOperationsNotifier extends Notifier<AsyncValue<void>> {
               'material_name': inv.materialName,
               'batch_id': batch.id,
               'batch_number': batch.batchNumber,
-              'description': 'مخزون ${inv.materialName} منخفض: ${newBalance.toStringAsFixed(2)} ${inv.unit}',
+              'description':
+                  'مخزون ${inv.materialName} منخفض: ${newBalance.toStringAsFixed(2)} ${inv.unit}',
               'status': AppConstants.alertPending,
               'transaction_id': transactionId,
             });
@@ -150,7 +214,6 @@ class BatchOperationsNotifier extends Notifier<AsyncValue<void>> {
         }
       }
 
-      // Audit log
       await ds.addAuditLog({
         'action': AppConstants.auditCreate,
         'table_name': AppConstants.tbBatches,
@@ -202,7 +265,8 @@ class BatchOperationsNotifier extends Notifier<AsyncValue<void>> {
             'alert_type': 'high_waste',
             'severity': AppConstants.severityHigh,
             'machine_id': productionData['machine_id'],
-            'description': 'هالك مرتفع: ${wastePercent.toStringAsFixed(2)}% في ماكينة ${productionData['machine_name']}',
+            'description':
+                'هالك مرتفع: ${wastePercent.toStringAsFixed(2)}% في ماكينة ${productionData['machine_name']}',
             'status': AppConstants.alertPending,
             'transaction_id': transactionId,
           });

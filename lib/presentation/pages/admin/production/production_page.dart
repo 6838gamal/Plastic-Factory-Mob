@@ -21,7 +21,7 @@ class _ProductionPageState extends ConsumerState<ProductionPage> {
 
   @override
   Widget build(BuildContext context) {
-    final productions = ref.watch(machineProductionsProvider({'from': _from, 'to': _to}));
+    final productions = ref.watch(machineProductionsProvider(ProductionFilters(from: _from, to: _to)));
 
     return Column(
       children: [
@@ -80,7 +80,7 @@ class _ProductionPageState extends ConsumerState<ProductionPage> {
 
               return RefreshIndicator(
                 onRefresh: () async =>
-                    ref.invalidate(machineProductionsProvider({'from': _from, 'to': _to})),
+                    ref.invalidate(machineProductionsProvider(ProductionFilters(from: _from, to: _to))),
                 child: ListView(
                   padding: const EdgeInsets.symmetric(horizontal: 12),
                   children: [
@@ -99,7 +99,7 @@ class _ProductionPageState extends ConsumerState<ProductionPage> {
             loading: () => const ShimmerList(),
             error: (e, _) => ErrorWidget2(
               message: Helpers.friendlyError(e),
-              onRetry: () => ref.invalidate(machineProductionsProvider),
+              onRetry: () => ref.invalidate(machineProductionsProvider(ProductionFilters(from: _from, to: _to))),
             ),
           ),
         ),
@@ -173,7 +173,7 @@ class _ProductionPageState extends ConsumerState<ProductionPage> {
                   'notes': notesCtrl.text.trim().isEmpty ? null : notesCtrl.text.trim(),
                   'status': p.status,
                 });
-                ref.invalidate(machineProductionsProvider({'from': _from, 'to': _to}));
+                ref.invalidate(machineProductionsProvider(ProductionFilters(from: _from, to: _to)));
                 if (ctx.mounted) {
                   Navigator.pop(ctx);
                   ScaffoldMessenger.of(ctx).showSnackBar(
@@ -216,7 +216,7 @@ class _ProductionPageState extends ConsumerState<ProductionPage> {
       try {
         final ds = ref.read(dataSourceProvider);
         await ds.deleteMachineProduction(p.id);
-        ref.invalidate(machineProductionsProvider({'from': _from, 'to': _to}));
+        ref.invalidate(machineProductionsProvider(ProductionFilters(from: _from, to: _to)));
         if (mounted) {
           ScaffoldMessenger.of(context)
               .showSnackBar(const SnackBar(content: Text('تم حذف السجل')));

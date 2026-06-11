@@ -16,12 +16,12 @@ class AdminDashboardPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final stats = ref.watch(dashboardStatsProvider);
-    final alerts = ref.watch(alertsProvider({'status': 'pending'}));
+    final alerts = ref.watch(alertsProvider(const AlertFilters(status: 'pending')));
 
     return RefreshIndicator(
       onRefresh: () async {
         ref.invalidate(dashboardStatsProvider);
-        ref.invalidate(alertsProvider({'status': 'pending'}));
+        ref.invalidate(alertsProvider(const AlertFilters(status: 'pending')));
       },
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
@@ -117,7 +117,7 @@ class AdminDashboardPage extends ConsumerWidget {
               loading: () => const ShimmerList(count: 3),
               error: (e, _) => ErrorWidget2(
                 message: Helpers.friendlyError(e),
-                onRetry: () => ref.invalidate(alertsProvider),
+                onRetry: () => ref.invalidate(alertsProvider(const AlertFilters(status: 'pending'))),
               ),
             ),
 

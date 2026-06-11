@@ -65,7 +65,7 @@ class _AlertsList extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final alerts = ref.watch(alertsProvider({'status': status}));
+    final alerts = ref.watch(alertsProvider(AlertFilters(status: status)));
 
     return alerts.when(
       data: (list) {
@@ -76,7 +76,7 @@ class _AlertsList extends ConsumerWidget {
           );
         }
         return RefreshIndicator(
-          onRefresh: () async => ref.invalidate(alertsProvider({'status': status})),
+          onRefresh: () async => ref.invalidate(alertsProvider(AlertFilters(status: status))),
           child: ListView.builder(
             padding: const EdgeInsets.all(12),
             itemCount: list.length,
@@ -87,7 +87,7 @@ class _AlertsList extends ConsumerWidget {
       loading: () => const ShimmerList(),
       error: (e, _) => ErrorWidget2(
         message: Helpers.friendlyError(e),
-        onRetry: () => ref.invalidate(alertsProvider),
+        onRetry: () => ref.invalidate(alertsProvider(AlertFilters(status: status))),
       ),
     );
   }
@@ -194,9 +194,9 @@ class _AlertCard extends ConsumerWidget {
   Future<void> _updateStatus(BuildContext context, WidgetRef ref, String status) async {
     final ds = ref.read(dataSourceProvider);
     await ds.updateAlertStatus(alert.id, status);
-    ref.invalidate(alertsProvider({'status': 'pending'}));
-    ref.invalidate(alertsProvider({'status': 'acknowledged'}));
-    ref.invalidate(alertsProvider({'status': 'resolved'}));
+    ref.invalidate(alertsProvider(const AlertFilters(status: 'pending')));
+    ref.invalidate(alertsProvider(const AlertFilters(status: 'acknowledged')));
+    ref.invalidate(alertsProvider(const AlertFilters(status: 'resolved')));
   }
 }
 

@@ -21,7 +21,7 @@ class _BatchesAdminPageState extends ConsumerState<BatchesAdminPage> {
 
   @override
   Widget build(BuildContext context) {
-    final batches = ref.watch(batchesProvider({'from': _from, 'to': _to}));
+    final batches = ref.watch(batchesProvider(BatchFilters(from: _from, to: _to)));
 
     return Column(
       children: [
@@ -74,7 +74,7 @@ class _BatchesAdminPageState extends ConsumerState<BatchesAdminPage> {
 
               return RefreshIndicator(
                 onRefresh: () async =>
-                    ref.invalidate(batchesProvider({'from': _from, 'to': _to})),
+                    ref.invalidate(batchesProvider(BatchFilters(from: _from, to: _to))),
                 child: ListView.builder(
                   padding: const EdgeInsets.symmetric(horizontal: 12),
                   itemCount: filtered.length,
@@ -88,7 +88,7 @@ class _BatchesAdminPageState extends ConsumerState<BatchesAdminPage> {
             loading: () => const ShimmerList(),
             error: (e, _) => ErrorWidget2(
               message: Helpers.friendlyError(e),
-              onRetry: () => ref.invalidate(batchesProvider),
+              onRetry: () => ref.invalidate(batchesProvider(BatchFilters(from: _from, to: _to))),
             ),
           ),
         ),
@@ -148,7 +148,7 @@ class _BatchesAdminPageState extends ConsumerState<BatchesAdminPage> {
       try {
         final ds = ref.read(dataSourceProvider);
         await ds.deleteBatch(batch.id);
-        ref.invalidate(batchesProvider({'from': _from, 'to': _to}));
+        ref.invalidate(batchesProvider(BatchFilters(from: _from, to: _to)));
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('تم حذف طبخة #${batch.batchNumber}')),

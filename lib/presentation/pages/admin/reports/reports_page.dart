@@ -54,8 +54,8 @@ class _ReportsPageState extends ConsumerState<ReportsPage> with SingleTickerProv
   @override
   Widget build(BuildContext context) {
     final range = _dateRange;
-    final productions = ref.watch(machineProductionsProvider({'from': range.start, 'to': range.end.add(const Duration(days: 1))}));
-    final batches = ref.watch(batchesProvider({'from': range.start, 'to': range.end}));
+    final productions = ref.watch(machineProductionsProvider(ProductionFilters(from: range.start, to: range.end.add(const Duration(days: 1)))));
+    final batches = ref.watch(batchesProvider(BatchFilters(from: range.start, to: range.end)));
 
     return Column(
       children: [
@@ -97,13 +97,13 @@ class _ReportsPageState extends ConsumerState<ReportsPage> with SingleTickerProv
                   loading: () => const ShimmerList(),
                   error: (e, _) => ErrorWidget2(
                     message: Helpers.friendlyError(e),
-                    onRetry: () => ref.invalidate(batchesProvider),
+                    onRetry: () => ref.invalidate(batchesProvider(BatchFilters(from: range.start, to: range.end))),
                   ),
                 ),
                 loading: () => const ShimmerList(),
                 error: (e, _) => ErrorWidget2(
                   message: Helpers.friendlyError(e),
-                  onRetry: () => ref.invalidate(machineProductionsProvider),
+                  onRetry: () => ref.invalidate(machineProductionsProvider(ProductionFilters(from: range.start, to: range.end.add(const Duration(days: 1))))),
                 ),
               );
             }),
