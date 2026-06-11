@@ -8,10 +8,11 @@ router = APIRouter(prefix="/api/recipes", tags=["recipes"])
 # ── DB table init ──────────────────────────────────────────────────────────
 async def ensure_tables():
     pool = await get_pool()
+    # Create tables with TEXT mixture_type_id (no FK — Flutter uses plain string IDs)
     await pool.execute("""
         CREATE TABLE IF NOT EXISTS recipes (
             id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            mixture_type_id UUID REFERENCES mixture_types(id) ON DELETE CASCADE,
+            mixture_type_id TEXT,
             name            TEXT NOT NULL,
             notes           TEXT,
             is_active       BOOLEAN DEFAULT true,
@@ -20,13 +21,37 @@ async def ensure_tables():
             UNIQUE(mixture_type_id)
         );
         CREATE TABLE IF NOT EXISTS recipe_items (
-            id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            recipe_id    UUID REFERENCES recipes(id) ON DELETE CASCADE,
+            id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            recipe_id     UUID REFERENCES recipes(id) ON DELETE CASCADE,
             material_name TEXT NOT NULL,
             standard_qty  NUMERIC(12,4) DEFAULT 0,
             unit          TEXT DEFAULT 'كجم',
             created_at    TIMESTAMPTZ DEFAULT NOW()
         );
+    """)
+    # Migrate existing UUID column → TEXT (idempotent)
+    await pool.execute("""
+        DO $$
+        BEGIN
+            -- Drop FK if still present
+            IF EXISTS (
+                SELECT 1 FROM information_schema.table_constraints
+                WHERE table_name='recipes'
+                  AND constraint_type='FOREIGN KEY'
+                  AND constraint_name LIKE '%mixture_type_id%'
+            ) THEN
+                ALTER TABLE recipes DROP CONSTRAINT IF EXISTS recipes_mixture_type_id_fkey;
+            END IF;
+            -- Convert UUID → TEXT if needed
+            IF EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name='recipes'
+                  AND column_name='mixture_type_id'
+                  AND data_type='uuid'
+            ) THEN
+                ALTER TABLE recipes ALTER COLUMN mixture_type_id TYPE TEXT USING mixture_type_id::text;
+            END IF;
+        END$$;
     """)
 
 
@@ -64,7 +89,7 @@ async def list_recipes():
     recipes = await pool.fetch(
         """SELECT r.*, mt.name as mixture_type_name
            FROM recipes r
-           LEFT JOIN mixture_types mt ON mt.id = r.mixture_type_id
+           LEFT JOIN mixture_types mt ON mt.id::text = r.mixture_type_id
            WHERE r.is_active=true ORDER BY r.created_at"""
     )
     result = []
