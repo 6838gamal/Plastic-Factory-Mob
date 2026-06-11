@@ -10,7 +10,16 @@ When an opening balance is set for a material + warehouse:
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 from typing import Optional
+from datetime import date as DateType
 from database import get_pool
+
+
+def _parse_date(val) -> DateType:
+    if val is None:
+        return DateType.today()
+    if isinstance(val, DateType):
+        return val
+    return DateType.fromisoformat(str(val)[:10])
 
 router = APIRouter(prefix="/api/opening-balances", tags=["opening_balances"])
 
@@ -51,16 +60,17 @@ async def get_opening_balances(
 @router.post("")
 async def create_opening_balance(body: OpeningBalanceCreate):
     pool = await get_pool()
+    balance_date = _parse_date(body.balance_date)
     try:
         row = await pool.fetchrow(
             """INSERT INTO opening_balances
                (material_id, warehouse_type, balance, balance_date, reason, created_by)
-               VALUES ($1, $2, $3, COALESCE($4::date, CURRENT_DATE), $5, $6)
+               VALUES ($1, $2, $3, $4, $5, $6)
                ON CONFLICT (material_id, warehouse_type, balance_date)
                DO UPDATE SET balance=$3, reason=$5, created_by=$6
                RETURNING *""",
             body.material_id, body.warehouse_type, body.balance,
-            body.balance_date, body.reason, body.created_by,
+            balance_date, body.reason, body.created_by,
         )
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))

@@ -168,15 +168,17 @@ async def _apply_deductions(pool, batch_id: str, batch_number: str,
 
         if insufficient:
             for it in insufficient:
+                alert_tx_id = f"{transaction_id}_{it['material_id']}" if transaction_id else None
                 await pool.execute(
                     """INSERT INTO alerts
                        (id, alert_type, severity, material_id, material_name,
                         batch_number, description, status, transaction_id)
                        VALUES (gen_random_uuid(),'insufficient_stock','critical',
-                               $1,$2,$3,$4,'pending',$5)""",
+                               $1,$2,$3,$4,'pending',$5)
+                       ON CONFLICT (transaction_id) WHERE transaction_id IS NOT NULL DO NOTHING""",
                     it["material_id"], it["name"], batch_number,
                     f"مخزون غير كافٍ: {it['name']} — مطلوب {it['quantity']:.3f}، متاح {it['available']:.3f} كجم",
-                    transaction_id,
+                    alert_tx_id,
                 )
             await pool.execute(
                 """INSERT INTO audit_log
