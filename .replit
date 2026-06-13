@@ -48,6 +48,7 @@ publicDir = "build/web"
 
 [userenv.shared]
 JWT_SECRET = "plastic_factory_jwt_secret_2024_replit_secure"
+ADMIN_EMAIL = "admin@factory.com"
+ADMIN_PASSWORD = "admin123"
 
 [userenv.development]
-ENVIRONMENT = "development"
