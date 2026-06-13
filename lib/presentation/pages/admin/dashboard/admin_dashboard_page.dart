@@ -132,41 +132,123 @@ class AdminDashboardPage extends ConsumerWidget {
   }
 
   Widget _buildKpiGrid(BuildContext context, Map<String, dynamic> data) {
-    return GridView.count(
-      crossAxisCount: 2,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisSpacing: 12,
-      mainAxisSpacing: 12,
-      childAspectRatio: 1.4,
+    final frozenShifts    = (data['frozen_shifts_today'] as num?)?.toInt() ?? 0;
+    final custodyDebts    = (data['custody_debts_count'] as num?)?.toInt() ?? 0;
+    final custodyTotalKg  = (data['custody_debts_total_kg'] as num?)?.toDouble() ?? 0.0;
+    final scrapBalance    = (data['scrap_balance_kg'] as num?)?.toDouble() ?? 0.0;
+    final pendingAlerts   = (data['pending_alerts'] as num?)?.toInt() ?? 0;
+
+    return Column(
       children: [
-        StatCard(
-          title: AppStrings.todayProduction,
-          value: '${(data['production_today'] as num).toStringAsFixed(0)} كجم',
-          icon: Icons.precision_manufacturing,
-          color: Colors.blue,
-          onTap: () => context.go('/admin/production'),
-        ),
-        StatCard(
-          title: AppStrings.alertsCount,
-          value: '${data['pending_alerts']}',
-          icon: Icons.warning_amber,
-          color: (data['pending_alerts'] as int) > 0 ? Colors.red : Colors.green,
-          onTap: () => context.go('/admin/alerts'),
-        ),
-        StatCard(
-          title: AppStrings.wastePercentage,
-          value: '${(data['waste_percentage'] as num).toStringAsFixed(2)}%',
-          icon: Icons.delete_sweep,
-          color: (data['waste_percentage'] as num) > 5 ? Colors.red : Colors.green,
-        ),
-        StatCard(
-          title: 'طبخات اليوم',
-          value: '${data['batches_today']}',
-          icon: Icons.blender,
-          color: Colors.teal,
+        // ── تنبيه أحمر فوري إذا وجدت ورديات مجمَّدة أو مديونيات ──
+        if (frozenShifts > 0 || custodyDebts > 0)
+          Container(
+            width: double.infinity,
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: Colors.red.shade50,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.red.shade400, width: 1.5),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(children: [
+                  const Icon(Icons.warning_amber_rounded,
+                      color: Colors.red, size: 22),
+                  const SizedBox(width: 8),
+                  const Text('⚠️ تنبيهات العهدة — تحتاج اتخاذ إجراء',
+                      style: TextStyle(
+                          color: Colors.red,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14)),
+                ]),
+                const SizedBox(height: 8),
+                if (frozenShifts > 0)
+                  _alertRow(Icons.ac_unit, Colors.red,
+                      '$frozenShifts وردية مجمَّدة اليوم',
+                      onTap: () => context.go('/admin/shift-handover')),
+                if (custodyDebts > 0)
+                  _alertRow(Icons.person_off, Colors.orange,
+                      '$custodyDebts مديونية عهدة معلقة — ${custodyTotalKg.toStringAsFixed(1)} كجم إجمالي',
+                      onTap: () => context.go('/admin/shift-handover')),
+              ],
+            ),
+          ),
+
+        // ── KPIs شبكة ─────────────────────────────────────────────
+        GridView.count(
+          crossAxisCount: 2,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          crossAxisSpacing: 12,
+          mainAxisSpacing: 12,
+          childAspectRatio: 1.4,
+          children: [
+            StatCard(
+              title: AppStrings.todayProduction,
+              value: '${(data['production_today'] as num).toStringAsFixed(0)} كجم',
+              icon: Icons.precision_manufacturing,
+              color: Colors.blue,
+              onTap: () => context.go('/admin/production'),
+            ),
+            StatCard(
+              title: 'التحذيرات',
+              value: '$pendingAlerts',
+              icon: Icons.warning_amber,
+              color: pendingAlerts > 0 ? Colors.red : Colors.green,
+              onTap: () => context.go('/admin/alerts'),
+            ),
+            StatCard(
+              title: 'نسبة الهدر',
+              value: '${(data['waste_percentage'] as num).toStringAsFixed(2)}%',
+              icon: Icons.delete_sweep,
+              color: (data['waste_percentage'] as num) > 5
+                  ? Colors.red
+                  : Colors.green,
+            ),
+            StatCard(
+              title: 'طبخات اليوم',
+              value: '${data['batches_today']}',
+              icon: Icons.blender,
+              color: Colors.teal,
+            ),
+            StatCard(
+              title: '♻️ رصيد السكراب',
+              value: '${scrapBalance.toStringAsFixed(1)} كجم',
+              icon: Icons.recycling,
+              color: Colors.orange,
+            ),
+            StatCard(
+              title: 'الكفاءة',
+              value: '${(data['efficiency_pct'] as num?)?.toStringAsFixed(1) ?? 0}%',
+              icon: Icons.speed,
+              color: Colors.purple,
+            ),
+          ],
         ),
       ],
+    );
+  }
+
+  Widget _alertRow(IconData icon, Color color, String label,
+      {VoidCallback? onTap}) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(children: [
+          Icon(icon, color: color, size: 16),
+          const SizedBox(width: 8),
+          Expanded(
+              child: Text(label,
+                  style: TextStyle(color: color, fontSize: 13))),
+          if (onTap != null)
+            Icon(Icons.arrow_forward_ios, color: color, size: 12),
+        ]),
+      ),
     );
   }
 }

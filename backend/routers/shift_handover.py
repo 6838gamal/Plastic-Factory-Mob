@@ -1,18 +1,19 @@
 """
-Shift Handover Router — نظام تسليم الورديات
+Shift Handover Router — نظام تسليم الورديات (Plan v3.0)
 
 Flow:
-1. GET /current-balance   — احسب الرصيد المتوقع في الصالة الآن
-2. POST /close            — مشرف الوردية يغلق ورديته (يدخل الوزن الفعلي + المخلفات)
-   • يحسب العجز/الفائض تلقائياً
-   • يضيف الرايش والتالف والهالك لمستودع السكراب
-   • إذا كان عجز → يجمّد الوردية + ينشئ مديونية عهدة + ينبّه المدير
-3. POST /{id}/confirm     — مشرف الوردية القادمة يؤكد الاستلام
+1. GET /current-balance   — احسب الرصيد المتوقع (معادلة مقفلة)
+                            Expected = Opening_From_Last_Shift + Received_From_Main - Batch_Inputs
+2. POST /close            — مشرف الوردية يغلق ورديته
+   • يحسب opening_stock من آخر تسليم مؤكَّد
+   • يحسب العجز الكلي + الهدر المجهول
+   • يضيف الرايش والتالف والهدر لمستودع السكراب
+   • عجز > 0.5 كجم → يجمّد + مديونية عهدة + تنبيه أحمر فوري للمدير
+3. POST /{id}/confirm     — مشرف الوردية القادمة يؤكد الاستلام (تُقفل نهائياً)
 4. GET /                  — قائمة عمليات التسليم
-5. GET /custody-debts     — قائمة مديونيات العهدة
-6. PUT /custody-debts/{id}/resolve — سداد مديونية عهدة
+5. GET /custody-debts     — مديونيات العهدة
+6. PUT /custody-debts/{id}/resolve — سداد مديونية
 """
-import json
 from datetime import date as DateType, datetime
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
@@ -21,6 +22,8 @@ from database import get_pool
 
 router = APIRouter(prefix="/api/shift-handover", tags=["shift-handover"])
 
+DEFICIT_TOLERANCE_KG = 0.5  # تسامح نصف كيلو
+
 
 # ─────────────────────────── Models ────────────────────────────
 
@@ -28,10 +31,14 @@ class ShiftHandoverClose(BaseModel):
     shift_name: str
     supervisor_name: str
     handover_date: Optional[DateType] = None
-    flashing_kg: float = 0
-    rejected_kg: float = 0
-    waste_kg: float = 0
+    # المخلفات التي تُضاف لمستودع السكراب
+    flashing_kg: float = 0        # الرايش
+    rejected_kg: float = 0        # التالف
+    waste_kg: float = 0           # الهدر العام
+    # الوزن الفعلي على الميزان (يُدخله المشرف)
     actual_stock_kg: float
+    # استلام من الرئيسي (اختياري — يُحسب تلقائياً إذا لم يُدخل)
+    received_from_main_kg: Optional[float] = None
     notes: Optional[str] = None
 
 
@@ -48,7 +55,6 @@ class CustodyDebtResolve(BaseModel):
 # ─────────────────────────── Helpers ───────────────────────────
 
 async def _get_scrap_material_id(pool) -> Optional[str]:
-    """Return the configured scrap material id from settings."""
     row = await pool.fetchrow("SELECT value FROM settings WHERE key='scrap_material_id'")
     val = row["value"].strip() if row and row["value"] else ""
     return val if val else None
@@ -56,13 +62,13 @@ async def _get_scrap_material_id(pool) -> Optional[str]:
 
 async def _add_to_scrap_warehouse(pool, material_id: str, qty_kg: float,
                                    ref: str, notes: str = "") -> float:
-    """Add qty_kg to the scrap warehouse for scrap_material_id. Returns new balance."""
+    """Add qty_kg to the scrap warehouse. Returns new balance."""
     inv = await pool.fetchrow(
         "SELECT balance FROM inventory WHERE material_id=$1 AND warehouse_type='scrap'",
         material_id,
     )
     balance_before = float(inv["balance"]) if inv else 0.0
-    balance_after = balance_before + qty_kg
+    balance_after  = balance_before + qty_kg
 
     await pool.execute(
         """INSERT INTO inventory (id, material_id, warehouse_type, balance, updated_at)
@@ -81,29 +87,51 @@ async def _add_to_scrap_warehouse(pool, material_id: str, qty_kg: float,
     return balance_after
 
 
-async def _calculate_expected_balance(pool, handover_date: DateType) -> dict:
+async def _get_opening_stock(pool, before_date: DateType) -> tuple[float, Optional[str]]:
     """
-    العجز = الرصيد الحالي في جدول المخزون (mixer) وهو المتوقع بعد كل المعاملات.
-    الرصيد المتوقع = مجموع inventory.balance حيث warehouse_type='mixer'
-    تفصيل: المستلم من الرئيسي اليوم + رصيد أمس - مدخلات الطبخات اليوم
+    الرصيد الافتتاحي = الوزن الفعلي لآخر وردية مغلقة/مؤكَّدة/مجمَّدة قبل هذا التاريخ.
+    الوردية المجمَّدة: يُفتح بالوزن الفعلي (لا بالمتوقع) لضمان ذمة نظيفة للمشرف الجديد.
+    """
+    row = await pool.fetchrow(
+        """SELECT actual_stock_kg, shift_name, supervisor_name, handover_date
+           FROM shift_handovers
+           WHERE status IN ('confirmed', 'closed', 'frozen')
+             AND handover_date <= $1
+           ORDER BY handover_date DESC, created_at DESC
+           LIMIT 1""",
+        before_date,
+    )
+    if row and row["actual_stock_kg"] is not None:
+        return float(row["actual_stock_kg"]), (
+            f"وردية {row['shift_name']} — {row['supervisor_name']} ({row['handover_date']})"
+        )
+    return 0.0, None
+
+
+async def _calculate_expected_balance(pool, handover_date: DateType,
+                                       received_override: Optional[float] = None) -> dict:
+    """
+    المعادلة المقفلة (المستند قسم ثالثاً):
+    Expected_Stock = (Opening_From_Last_Shift + Received_From_Main) - (Batch_Inputs)
     """
     day_start = datetime(handover_date.year, handover_date.month, handover_date.day)
     day_end   = datetime(handover_date.year, handover_date.month, handover_date.day, 23, 59, 59)
 
-    # الرصيد الحالي في الصالة (mixer) - هو المتوقع الفعلي حسب السيستم
-    mixer_balance = await pool.fetchval(
-        "SELECT COALESCE(SUM(balance), 0) FROM inventory WHERE warehouse_type='mixer'"
-    )
+    # 1. الرصيد الافتتاحي من آخر وردية مغلقة
+    opening_stock_kg, opening_ref = await _get_opening_stock(pool, handover_date)
 
-    # ما استُلم من الرئيسي اليوم
-    received_today = await pool.fetchval(
+    # 2. ما استُلم من الرئيسي اليوم (transactions in → mixer)
+    received_auto = await pool.fetchval(
         """SELECT COALESCE(SUM(quantity), 0) FROM inventory_transactions
            WHERE warehouse_type='mixer' AND transaction_type='in'
              AND created_at BETWEEN $1 AND $2""",
         day_start, day_end,
     )
+    received_from_main_kg = (
+        received_override if received_override is not None else float(received_auto)
+    )
 
-    # مجموع ما استهلكته الطبخات اليوم
+    # 3. مجموع مدخلات الطبخات اليوم (transactions out ← mixer)
     consumed_today = await pool.fetchval(
         """SELECT COALESCE(SUM(quantity), 0) FROM inventory_transactions
            WHERE warehouse_type='mixer' AND transaction_type='out'
@@ -111,14 +139,18 @@ async def _calculate_expected_balance(pool, handover_date: DateType) -> dict:
         day_start, day_end,
     )
 
-    # عدد طبخات اليوم
+    # 4. عدد الطبخات
     batch_count = await pool.fetchval(
         "SELECT COUNT(*) FROM batches WHERE date=$1", handover_date,
     )
 
+    expected_stock_kg = round(opening_stock_kg + received_from_main_kg - float(consumed_today), 3)
+
     return {
-        "expected_stock_kg": round(float(mixer_balance), 3),
-        "received_from_main_kg": round(float(received_today), 3),
+        "expected_stock_kg": expected_stock_kg,
+        "opening_stock_kg": round(opening_stock_kg, 3),
+        "opening_ref": opening_ref,
+        "received_from_main_kg": round(received_from_main_kg, 3),
         "total_batch_inputs_kg": round(float(consumed_today), 3),
         "batch_count_today": int(batch_count),
         "handover_date": str(handover_date),
@@ -144,15 +176,16 @@ async def get_custody_debts(
 ):
     pool = await get_pool()
     conditions = ["1=1"]
-    params = []
+    params: list = []
     i = 1
     if status:
-        conditions.append(f"status=${i}"); params.append(status); i += 1
+        conditions.append(f"cd.status=${i}"); params.append(status); i += 1
     if supervisor_name:
-        conditions.append(f"supervisor_name ILIKE ${i}"); params.append(f"%{supervisor_name}%"); i += 1
+        conditions.append(f"cd.supervisor_name ILIKE ${i}"); params.append(f"%{supervisor_name}%"); i += 1
 
     rows = await pool.fetch(
-        f"""SELECT cd.*, sh.shift_name as shift_name_ref, sh.actual_stock_kg, sh.expected_stock_kg
+        f"""SELECT cd.*, sh.shift_name as shift_name_ref,
+                   sh.actual_stock_kg, sh.expected_stock_kg, sh.unknown_waste_kg
             FROM custody_debts cd
             JOIN shift_handovers sh ON sh.id = cd.handover_id
             WHERE {' AND '.join(conditions)}
@@ -189,7 +222,7 @@ async def list_handovers(
 ):
     pool = await get_pool()
     conditions = ["1=1"]
-    params = []
+    params: list = []
     i = 1
     if from_date:
         conditions.append(f"handover_date>=${i}"); params.append(from_date[:10]); i += 1
@@ -210,29 +243,37 @@ async def list_handovers(
 @router.post("/close")
 async def close_shift(body: ShiftHandoverClose):
     """
-    إغلاق الوردية:
-    1. احسب الرصيد المتوقع من البيانات
-    2. قارن بالوزن الفعلي الذي أدخله المشرف
-    3. أضف الرايش والتالف والهدر لمستودع السكراب
-    4. إذا كان عجز → جمّد الوردية + أنشئ مديونية + أرسل تنبيه للمدير
-    5. إذا تطابق → أغلق الوردية (status='closed')
+    إغلاق الوردية بالمعادلة المقفلة من المستند:
+
+    Expected = Opening_From_Last_Shift + Received_From_Main - Batch_Inputs
+
+    - الوردية المجمَّدة تُفتح للمشرف الجديد بالوزن الفعلي (لا بالمتوقع).
+    - العجز > 0.5 كجم → تجميد + مديونية + تنبيه أحمر.
+    - المخلفات (رايش + تالف + هدر) تُضاف فوراً لمستودع السكراب.
+    - الهدر المجهول = عجز لا يُفسّره المخلفات المُعلَنة.
     """
     pool = await get_pool()
     target_date = body.handover_date or DateType.today()
 
-    # ── 1. احسب الرصيد المتوقع ────────────────────────────────
-    balance_info = await _calculate_expected_balance(pool, target_date)
-    expected_kg = balance_info["expected_stock_kg"]
-    actual_kg   = round(body.actual_stock_kg, 3)
+    # ── 1. احسب الرصيد المتوقع بالمعادلة المقفلة ──────────────
+    balance_info = await _calculate_expected_balance(
+        pool, target_date,
+        received_override=body.received_from_main_kg,
+    )
+    expected_kg     = balance_info["expected_stock_kg"]
+    opening_kg      = balance_info["opening_stock_kg"]
+    received_kg     = balance_info["received_from_main_kg"]
+    consumed_kg     = balance_info["total_batch_inputs_kg"]
+    actual_kg       = round(body.actual_stock_kg, 3)
 
-    # ── 2. احسب العجز ─────────────────────────────────────────
-    deficit_kg = round(max(expected_kg - actual_kg, 0), 3)
-    scrap_total = round(body.flashing_kg + body.rejected_kg + body.waste_kg, 3)
+    # ── 2. احسب العجز والمخلفات ────────────────────────────────
+    scrap_total     = round(body.flashing_kg + body.rejected_kg + body.waste_kg, 3)
+    deficit_kg      = round(max(expected_kg - actual_kg, 0.0), 3)
+    # الهدر المجهول: العجز الذي لا يُفسّره المخلفات المُعلَنة
+    unknown_waste_kg = round(max(deficit_kg - scrap_total, 0.0), 3)
 
-    # تحديد الحالة
-    TOLERANCE = 0.5  # تسامح نصف كيلو
-    has_deficit = deficit_kg > TOLERANCE
-    status = "frozen" if has_deficit else "closed"
+    has_deficit = deficit_kg > DEFICIT_TOLERANCE_KG
+    status      = "frozen" if has_deficit else "closed"
 
     # ── 3. أنشئ سجل تسليم الوردية ─────────────────────────────
     row = await pool.fetchrow(
@@ -241,76 +282,74 @@ async def close_shift(body: ShiftHandoverClose):
             opening_stock_kg, received_from_main_kg, total_batch_inputs_kg,
             expected_stock_kg, actual_stock_kg,
             flashing_kg, rejected_kg, waste_kg, scrap_added_kg,
-            deficit_kg, status, notes, frozen_at)
-           VALUES (gen_random_uuid(), $1, $2, $3, 0, $4, $5, $6, $7,
-                   $8, $9, $10, $11, $12, $13, $14,
-                   CASE WHEN $13='frozen' THEN NOW() ELSE NULL END)
+            deficit_kg, unknown_waste_kg, status, notes, frozen_at)
+           VALUES (gen_random_uuid(), $1, $2, $3,
+                   $4, $5, $6, $7, $8,
+                   $9, $10, $11, $12,
+                   $13, $14, $15, $16,
+                   CASE WHEN $15='frozen' THEN NOW() ELSE NULL END)
            RETURNING *""",
         body.shift_name, body.supervisor_name, target_date,
-        balance_info["received_from_main_kg"],
-        balance_info["total_batch_inputs_kg"],
-        expected_kg, actual_kg,
+        opening_kg, received_kg, consumed_kg, expected_kg, actual_kg,
         body.flashing_kg, body.rejected_kg, body.waste_kg, scrap_total,
-        deficit_kg, status, body.notes,
+        deficit_kg, unknown_waste_kg, status, body.notes,
     )
     handover_id = str(row["id"])
 
     # ── 4. أضف المخلفات لمستودع السكراب ──────────────────────
     scrap_material_id = await _get_scrap_material_id(pool)
+    scrap_balance_after = 0.0
     if scrap_material_id and scrap_total > 0:
-        await _add_to_scrap_warehouse(
+        scrap_balance_after = await _add_to_scrap_warehouse(
             pool, scrap_material_id, scrap_total,
             ref=f"handover_{handover_id}",
-            notes=f"مخلفات وردية {body.shift_name} — {body.supervisor_name}: رايش {body.flashing_kg}، تالف {body.rejected_kg}، هدر {body.waste_kg} كجم",
+            notes=(
+                f"مخلفات وردية {body.shift_name} — {body.supervisor_name}: "
+                f"رايش {body.flashing_kg}، تالف {body.rejected_kg}، هدر {body.waste_kg} كجم"
+            ),
         )
 
-    # ── 5. أضف سكراب ماكينات اليوم لمستودع السكراب ───────────
-    if scrap_material_id:
-        day_start = datetime(target_date.year, target_date.month, target_date.day)
-        day_end   = datetime(target_date.year, target_date.month, target_date.day, 23, 59, 59)
-        machine_scrap = await pool.fetchval(
-            """SELECT COALESCE(SUM(scrap_quantity + waste_quantity), 0)
-               FROM machine_production
-               WHERE created_at BETWEEN $1 AND $2""",
-            day_start, day_end,
-        )
-        machine_scrap_kg = float(machine_scrap)
-        if machine_scrap_kg > 0:
-            await _add_to_scrap_warehouse(
-                pool, scrap_material_id, machine_scrap_kg,
-                ref=f"machine_scrap_{handover_id}",
-                notes=f"سكراب ماكينات وردية {body.shift_name} — {body.supervisor_name}",
-            )
-
-    # ── 6. إذا عجز → أنشئ مديونية + تنبيه المدير ─────────────
+    # ── 5. إذا عجز → أنشئ مديونية + تنبيه فوري ─────────────
     if has_deficit:
         await pool.execute(
             """INSERT INTO custody_debts
-               (id, handover_id, supervisor_name, shift_name, deficit_kg,
-                handover_date, status, notes)
+               (id, handover_id, supervisor_name, shift_name,
+                deficit_kg, handover_date, status, notes)
                VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, 'pending', $6)""",
             handover_id, body.supervisor_name, body.shift_name,
             deficit_kg, target_date,
             f"عجز عهدة وردية {body.shift_name} بتاريخ {target_date}",
         )
 
+        # تنبيه أحمر فوري للمدير
         await pool.execute(
             """INSERT INTO alerts
                (id, alert_type, severity, description, status)
                VALUES (gen_random_uuid(), 'custody_deficit', 'critical', $1, 'pending')""",
-            f"⚠️ عجز عهدة: المشرف {body.supervisor_name} — وردية {body.shift_name} — العجز {deficit_kg:.3f} كجم (متوقع {expected_kg:.3f}، فعلي {actual_kg:.3f})",
+            (
+                f"⚠️ عجز عهدة: المشرف {body.supervisor_name} — وردية {body.shift_name} "
+                f"— العجز {deficit_kg:.3f} كجم"
+                f" (متوقع {expected_kg:.3f}، فعلي {actual_kg:.3f})"
+                + (f" — هدر مجهول {unknown_waste_kg:.3f} كجم" if unknown_waste_kg > 0 else "")
+            ),
         )
 
     return {
         "id": handover_id,
         "status": status,
+        "opening_stock_kg": opening_kg,
+        "received_from_main_kg": received_kg,
+        "total_batch_inputs_kg": consumed_kg,
         "expected_stock_kg": expected_kg,
         "actual_stock_kg": actual_kg,
-        "deficit_kg": deficit_kg,
         "scrap_added_kg": scrap_total,
+        "deficit_kg": deficit_kg,
+        "unknown_waste_kg": unknown_waste_kg,
+        "scrap_balance_after_kg": round(scrap_balance_after, 3),
         "has_deficit": has_deficit,
         "message": (
             f"تم تجميد الوردية — عجز {deficit_kg:.3f} كجم مسجل بذمة {body.supervisor_name}"
+            + (f" (هدر مجهول {unknown_waste_kg:.3f} كجم)" if unknown_waste_kg > 0 else "")
             if has_deficit else
             "تم إغلاق الوردية بنجاح — لا يوجد عجز"
         ),
@@ -321,13 +360,11 @@ async def close_shift(body: ShiftHandoverClose):
 async def confirm_handover(handover_id: str, body: ShiftHandoverConfirm):
     """
     مشرف الوردية القادمة يؤكد الاستلام.
-    - تُقفل الوردية السابقة نهائياً
-    - يُسجّل اسم المستلم
+    - تُقفل الوردية السابقة نهائياً (confirmed) ولا يمكن تعديلها.
+    - تبدأ ذمة المشرف الجديد من الوزن الفعلي (بما في حالة العجز).
     """
     pool = await get_pool()
-    row = await pool.fetchrow(
-        "SELECT * FROM shift_handovers WHERE id=$1", handover_id
-    )
+    row = await pool.fetchrow("SELECT * FROM shift_handovers WHERE id=$1", handover_id)
     if not row:
         raise HTTPException(status_code=404, detail="عملية التسليم غير موجودة")
     if row["status"] == "confirmed":
@@ -353,8 +390,11 @@ async def confirm_handover(handover_id: str, body: ShiftHandoverConfirm):
 
     return {
         "success": True,
-        "message": f"تم تأكيد استلام العهدة من {row['supervisor_name']} إلى {body.next_supervisor_name}",
-        "actual_stock_kg": float(row["actual_stock_kg"]) if row["actual_stock_kg"] else 0,
+        "message": (
+            f"تم تأكيد استلام العهدة من {row['supervisor_name']} "
+            f"إلى {body.next_supervisor_name}"
+        ),
+        "next_opening_stock_kg": float(row["actual_stock_kg"]) if row["actual_stock_kg"] else 0,
         "deficit_kg": float(row["deficit_kg"]),
     }
 

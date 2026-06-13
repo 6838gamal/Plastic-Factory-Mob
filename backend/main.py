@@ -111,6 +111,8 @@ async def _init_db():
             logger.warning(f"[init_db] Shift handover migration skipped: {exc}")
 
     _col_migrations = [
+        "ALTER TABLE shift_handovers ADD COLUMN IF NOT EXISTS unknown_waste_kg DECIMAL(12,3) NOT NULL DEFAULT 0",
+        "ALTER TABLE shift_handovers ADD COLUMN IF NOT EXISTS received_from_main_kg DECIMAL(12,3) NOT NULL DEFAULT 0",
         "ALTER TABLE raw_materials ADD COLUMN IF NOT EXISTS code VARCHAR(50)",
         "ALTER TABLE raw_materials ADD COLUMN IF NOT EXISTS cost_per_unit NUMERIC(12,4) NOT NULL DEFAULT 0",
         "ALTER TABLE inventory_transactions ADD COLUMN IF NOT EXISTS balance_before DECIMAL(12,3)",
