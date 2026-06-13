@@ -52,7 +52,7 @@ async def update_sms_settings(data: dict):
             """INSERT INTO settings (key, value, description)
                VALUES ($1, $2, $3)
                ON CONFLICT (key)
-               DO UPDATE SET value=$2, updated_at=NOW()""",
+               DO UPDATE SET value=$2, description=$3""",
             key, str(value),
             {"sms_enabled": "تفعيل إشعارات SMS",
              "sms_api_key": "مفتاح API لخدمة SMS",
