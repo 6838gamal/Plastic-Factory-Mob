@@ -166,6 +166,25 @@ class ApiDataSource {
     return res as Map<String, dynamic>;
   }
 
+  Future<Map<String, dynamic>> sendOtp(String phone) async {
+    final res = await _post('/api/auth/send-otp', {'phone': phone});
+    return res as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> verifyOtp(String phone, String code) async {
+    final res = await _post('/api/auth/verify-otp', {'phone': phone, 'code': code});
+    return res as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> resetPasswordWithToken(
+      String resetToken, String newPassword) async {
+    final res = await _post('/api/auth/reset-password-with-token', {
+      'reset_token': resetToken,
+      'new_password': newPassword,
+    });
+    return res as Map<String, dynamic>;
+  }
+
   // ==================== RAW MATERIALS ====================
   Future<List<RawMaterialModel>> getRawMaterials() async {
     final res = await _get('/api/materials');
