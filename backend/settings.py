@@ -13,11 +13,9 @@ API_BASE_URL: str = os.getenv("API_BASE_URL", "")
 FRONTEND_URL: str = os.getenv("FRONTEND_URL", "")
 
 # ─── Database ─────────────────────────────────────────────────────────────────
-# RENDER_DATABASE_URL is the permanent production database (Render PostgreSQL).
-# Falls back to DATABASE_URL (Replit built-in) if not set.
+# Use Replit built-in PostgreSQL (DATABASE_URL set automatically by Replit).
 DATABASE_URL: str = (
-    os.getenv("RENDER_DATABASE_URL")
-    or os.getenv("DATABASE_URL")
+    os.getenv("DATABASE_URL")
     or ""
 )
 
