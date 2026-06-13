@@ -63,6 +63,41 @@ class AuthNotifier extends Notifier<AuthState> {
     await ds.signOut();
     state = const AuthState();
   }
+
+  Future<bool> changePassword(String currentPassword, String newPassword) async {
+    final userId = state.user?.id;
+    if (userId == null) return false;
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      final ds = ref.read(dataSourceProvider);
+      await ds.changePassword(userId, currentPassword, newPassword);
+      state = state.copyWith(isLoading: false);
+      return true;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: e.toString());
+      return false;
+    }
+  }
+
+  Future<bool> changeEmail(String currentPassword, String newEmail) async {
+    final userId = state.user?.id;
+    if (userId == null) return false;
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      final ds = ref.read(dataSourceProvider);
+      final res = await ds.changeEmail(userId, currentPassword, newEmail);
+      final userMap = res['user'] as Map<String, dynamic>;
+      final user = AppUser(
+        id: userMap['id'] as String,
+        email: userMap['email'] as String,
+      );
+      state = state.copyWith(user: user, isLoading: false);
+      return true;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: e.toString());
+      return false;
+    }
+  }
 }
 
 final authProvider = NotifierProvider<AuthNotifier, AuthState>(AuthNotifier.new);

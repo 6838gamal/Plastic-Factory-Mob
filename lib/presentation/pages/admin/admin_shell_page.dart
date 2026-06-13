@@ -161,6 +161,13 @@ class _AdminDrawer extends ConsumerWidget {
                 ),
                 const Divider(),
                 _DrawerItem(
+                  icon: Icons.account_balance_wallet_outlined,
+                  selectedIcon: Icons.account_balance_wallet,
+                  title: 'الأرصدة الافتتاحية',
+                  route: '/admin/opening-balances',
+                  currentRoute: currentRoute,
+                ),
+                _DrawerItem(
                   icon: Icons.fact_check_outlined,
                   selectedIcon: Icons.fact_check,
                   title: 'الجرد الدوري',
@@ -258,8 +265,10 @@ class _DrawerItem extends StatelessWidget {
       leading: Icon(_isSelected ? selectedIcon : icon),
       title: Text(title),
       onTap: () {
+        // Capture router BEFORE Navigator.pop to avoid deactivated-context issue
+        final router = GoRouter.of(context);
         Navigator.pop(context);
-        context.go(route);
+        router.go(route);
       },
     );
   }

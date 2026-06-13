@@ -228,6 +228,19 @@ async def _seed_default_settings():
             "ON CONFLICT (key) DO NOTHING",
             key, value, description,
         )
+    # SMS settings
+    sms_defaults = [
+        ("sms_enabled",        "false", "تفعيل إشعارات SMS"),
+        ("sms_api_key",        "",      "مفتاح API لخدمة SMS Gateway"),
+        ("sms_phone_numbers",  "",      "أرقام الهواتف (مفصولة بفاصلة)"),
+        ("sms_device_id",      "0",     "معرّف الجهاز في SMS Gateway"),
+    ]
+    for key, value, description in sms_defaults:
+        await pool.execute(
+            "INSERT INTO settings (key, value, description) VALUES ($1, $2, $3) "
+            "ON CONFLICT (key) DO NOTHING",
+            key, value, description,
+        )
 
 
 # ─── Scheduler ────────────────────────────────────────────────────────────────
@@ -330,7 +343,7 @@ from routers import (
     machine_production, alerts, audit, dashboard, config,
     shifts, opening_balances, reports, settings, day,
 )
-from routers import stock_take, recipes, shift_handover
+from routers import stock_take, recipes, shift_handover, sms
 
 
 @asynccontextmanager
@@ -430,6 +443,7 @@ app.include_router(settings.router)
 app.include_router(day.router)
 app.include_router(recipes.router)
 app.include_router(shift_handover.router)
+app.include_router(sms.router)
 
 
 # ─── Health & System Info ─────────────────────────────────────────────────────

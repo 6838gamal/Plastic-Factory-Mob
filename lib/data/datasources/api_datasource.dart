@@ -136,6 +136,36 @@ class ApiDataSource {
     _token = null;
   }
 
+  Future<Map<String, dynamic>> changePassword(
+      String userId, String currentPassword, String newPassword) async {
+    final res = await _put('/api/auth/change-password', {
+      'user_id': userId,
+      'current_password': currentPassword,
+      'new_password': newPassword,
+    });
+    return res as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> changeEmail(
+      String userId, String currentPassword, String newEmail) async {
+    final res = await _put('/api/auth/change-email', {
+      'user_id': userId,
+      'current_password': currentPassword,
+      'new_email': newEmail,
+    });
+    if (res['token'] != null) _token = res['token'] as String;
+    return res as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> forgotPassword(
+      String email, String newPassword) async {
+    final res = await _post('/api/auth/forgot-password', {
+      'email': email,
+      'new_password': newPassword,
+    });
+    return res as Map<String, dynamic>;
+  }
+
   // ==================== RAW MATERIALS ====================
   Future<List<RawMaterialModel>> getRawMaterials() async {
     final res = await _get('/api/materials');
@@ -163,6 +193,39 @@ class ApiDataSource {
 
   Future<void> addOpeningBalance(Map<String, dynamic> data) async {
     await _post('/api/opening-balances', data);
+  }
+
+  Future<List<Map<String, dynamic>>> getOpeningBalances({
+    String? materialId,
+    String? warehouseType,
+  }) async {
+    final res = await _get('/api/opening-balances', query: {
+      'material_id': materialId,
+      'warehouse_type': warehouseType,
+    });
+    return (res as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
+  }
+
+  Future<void> updateOpeningBalance(String id, Map<String, dynamic> data) async {
+    await _put('/api/opening-balances/$id', data);
+  }
+
+  Future<void> deleteOpeningBalance(String id) async {
+    await _delete('/api/opening-balances/$id');
+  }
+
+  Future<Map<String, dynamic>> getSmsSettings() async {
+    final res = await _get('/api/sms/settings');
+    return res as Map<String, dynamic>;
+  }
+
+  Future<void> updateSmsSettings(Map<String, dynamic> data) async {
+    await _put('/api/sms/settings', data);
+  }
+
+  Future<Map<String, dynamic>> sendTestSms(String message) async {
+    final res = await _post('/api/sms/test', {'message': message});
+    return res as Map<String, dynamic>;
   }
 
   Future<InventoryModel?> getMaterialInventory(String materialId, String warehouseType) async {

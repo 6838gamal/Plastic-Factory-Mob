@@ -7,6 +7,11 @@ import '../../../../data/models/reference_models.dart';
 import '../../../../data/models/raw_material_model.dart';
 import '../../../providers/auth_provider.dart';
 
+final _smsSettingsProvider = FutureProvider<Map<String, dynamic>>((ref) async {
+  final ds = ref.read(dataSourceProvider);
+  return ds.getSmsSettings();
+});
+
 class SettingsPage extends ConsumerStatefulWidget {
   const SettingsPage({super.key});
 
@@ -21,10 +26,12 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   Widget build(BuildContext context) {
     final themeMode = ref.watch(themeProvider);
     final isDark = themeMode == ThemeMode.dark;
+    final authState = ref.watch(authProvider);
 
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
+        // ── المظهر ──────────────────────────────────────────────
         _SectionTitle('المظهر'),
         Card(
           child: SwitchListTile(
@@ -32,13 +39,69 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             subtitle: const Text('تبديل بين الوضع الفاتح والداكن'),
             secondary: Icon(isDark ? Icons.dark_mode : Icons.light_mode),
             value: isDark,
-            onChanged: (v) => ref.read(themeProvider.notifier).setTheme(v ? ThemeMode.dark : ThemeMode.light),
+            onChanged: (v) => ref.read(themeProvider.notifier).setTheme(
+                v ? ThemeMode.dark : ThemeMode.light),
           ),
         ),
 
         const SizedBox(height: 16),
-        _SectionTitle('إعداد البيانات المرجعية'),
 
+        // ── إدارة الحساب ────────────────────────────────────────
+        _SectionTitle('إدارة الحساب'),
+        Card(
+          child: Column(
+            children: [
+              ListTile(
+                leading: const Icon(Icons.email_outlined, color: Colors.blue),
+                title: const Text('تغيير البريد الإلكتروني'),
+                subtitle: Text(authState.user?.email ?? '—',
+                    style: const TextStyle(fontSize: 12)),
+                trailing: const Icon(Icons.arrow_forward_ios, size: 14),
+                onTap: () => _showChangeEmailDialog(context),
+              ),
+              const Divider(height: 0),
+              ListTile(
+                leading: const Icon(Icons.lock_outline, color: Colors.orange),
+                title: const Text('تغيير كلمة المرور'),
+                subtitle: const Text('يتطلب كلمة المرور الحالية'),
+                trailing: const Icon(Icons.arrow_forward_ios, size: 14),
+                onTap: () => _showChangePasswordDialog(context),
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 16),
+
+        // ── إشعارات SMS ─────────────────────────────────────────
+        _SectionTitle('إشعارات SMS'),
+        ref.watch(_smsSettingsProvider).when(
+          data: (settings) => _SmsSettingsCard(
+            settings: settings,
+            onSaved: () => ref.invalidate(_smsSettingsProvider),
+          ),
+          loading: () => const Card(
+            child: Padding(
+              padding: EdgeInsets.all(24),
+              child: Center(child: CircularProgressIndicator()),
+            ),
+          ),
+          error: (e, _) => Card(
+            child: ListTile(
+              leading: const Icon(Icons.error_outline, color: Colors.red),
+              title: Text('خطأ في تحميل إعدادات SMS: $e'),
+              trailing: ElevatedButton(
+                onPressed: () => ref.invalidate(_smsSettingsProvider),
+                child: const Text('إعادة'),
+              ),
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 16),
+
+        // ── البيانات المرجعية ────────────────────────────────────
+        _SectionTitle('إعداد البيانات المرجعية'),
         Card(
           child: Column(
             children: [
@@ -47,7 +110,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 title: const Text('المواد الخام الافتراضية'),
                 subtitle: const Text('إنشاء المواد الخام الأساسية للمصنع'),
                 trailing: _isSeeding
-                    ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))
+                    ? const SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(strokeWidth: 2))
                     : ElevatedButton(
                         onPressed: _seedMaterials,
                         child: const Text('إنشاء'),
@@ -57,7 +123,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               ListTile(
                 leading: const Icon(Icons.people),
                 title: const Text('إضافة عمال'),
-                subtitle: const Text('إضافة عمال المصنع'),
                 trailing: ElevatedButton(
                   onPressed: () => _showAddWorkerDialog(context),
                   child: const Text('إضافة'),
@@ -67,7 +132,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               ListTile(
                 leading: const Icon(Icons.precision_manufacturing),
                 title: const Text('إضافة ماكينات'),
-                subtitle: const Text('إضافة ماكينات الإنتاج'),
                 trailing: ElevatedButton(
                   onPressed: () => _showAddMachineDialog(context),
                   child: const Text('إضافة'),
@@ -105,23 +169,25 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         ),
 
         const SizedBox(height: 16),
+
+        // ── معلومات التطبيق ──────────────────────────────────────
         _SectionTitle('معلومات التطبيق'),
         Card(
           child: Column(
-            children: [
-              const ListTile(
+            children: const [
+              ListTile(
                 leading: Icon(Icons.info_outline),
                 title: Text('اسم النظام'),
                 trailing: Text('نظام ERP مصنع البلاستيك'),
               ),
-              const Divider(),
-              const ListTile(
+              Divider(),
+              ListTile(
                 leading: Icon(Icons.verified),
                 title: Text('الإصدار'),
                 trailing: Text('1.0.0'),
               ),
-              const Divider(),
-              const ListTile(
+              Divider(),
+              ListTile(
                 leading: Icon(Icons.storage),
                 title: Text('قاعدة البيانات'),
                 trailing: Text('PostgreSQL'),
@@ -133,6 +199,196 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     );
   }
 
+  // ── تغيير البريد ──────────────────────────────────────────────
+  void _showChangeEmailDialog(BuildContext context) {
+    final newEmailCtrl = TextEditingController();
+    final passwordCtrl = TextEditingController();
+    bool obscure = true;
+    String? errorMsg;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, ss) => AlertDialog(
+          title: const Row(children: [
+            Icon(Icons.email_outlined, color: Colors.blue),
+            SizedBox(width: 8),
+            Text('تغيير البريد الإلكتروني'),
+          ]),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: newEmailCtrl,
+                keyboardType: TextInputType.emailAddress,
+                decoration: const InputDecoration(
+                  labelText: 'البريد الإلكتروني الجديد',
+                  prefixIcon: Icon(Icons.email_outlined),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: passwordCtrl,
+                obscureText: obscure,
+                decoration: InputDecoration(
+                  labelText: 'كلمة المرور الحالية',
+                  prefixIcon: const Icon(Icons.lock_outline),
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                        obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined),
+                    onPressed: () => ss(() => obscure = !obscure),
+                  ),
+                ),
+              ),
+              if (errorMsg != null) ...[
+                const SizedBox(height: 8),
+                Text(errorMsg!,
+                    style: const TextStyle(color: Colors.red, fontSize: 13)),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('إلغاء')),
+            ElevatedButton(
+              onPressed: () async {
+                if (newEmailCtrl.text.trim().isEmpty ||
+                    passwordCtrl.text.isEmpty) {
+                  ss(() => errorMsg = 'يرجى ملء جميع الحقول');
+                  return;
+                }
+                final success = await ref
+                    .read(authProvider.notifier)
+                    .changeEmail(passwordCtrl.text, newEmailCtrl.text.trim());
+                if (success) {
+                  if (ctx.mounted) Navigator.pop(ctx);
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                        content: Text('تم تغيير البريد الإلكتروني بنجاح'),
+                        backgroundColor: Colors.green));
+                  }
+                } else {
+                  ss(() => errorMsg =
+                      ref.read(authProvider).error ?? 'حدث خطأ');
+                }
+              },
+              child: const Text('حفظ'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── تغيير كلمة المرور ─────────────────────────────────────────
+  void _showChangePasswordDialog(BuildContext context) {
+    final currentCtrl = TextEditingController();
+    final newCtrl = TextEditingController();
+    final confirmCtrl = TextEditingController();
+    bool obscureCurrent = true;
+    bool obscureNew = true;
+    String? errorMsg;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, ss) => AlertDialog(
+          title: const Row(children: [
+            Icon(Icons.lock_outline, color: Colors.orange),
+            SizedBox(width: 8),
+            Text('تغيير كلمة المرور'),
+          ]),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: currentCtrl,
+                obscureText: obscureCurrent,
+                decoration: InputDecoration(
+                  labelText: 'كلمة المرور الحالية',
+                  prefixIcon: const Icon(Icons.lock_outline),
+                  suffixIcon: IconButton(
+                    icon: Icon(obscureCurrent
+                        ? Icons.visibility_outlined
+                        : Icons.visibility_off_outlined),
+                    onPressed: () => ss(() => obscureCurrent = !obscureCurrent),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: newCtrl,
+                obscureText: obscureNew,
+                decoration: InputDecoration(
+                  labelText: 'كلمة المرور الجديدة',
+                  prefixIcon: const Icon(Icons.lock_open_outlined),
+                  suffixIcon: IconButton(
+                    icon: Icon(obscureNew
+                        ? Icons.visibility_outlined
+                        : Icons.visibility_off_outlined),
+                    onPressed: () => ss(() => obscureNew = !obscureNew),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: confirmCtrl,
+                obscureText: true,
+                decoration: const InputDecoration(
+                  labelText: 'تأكيد كلمة المرور الجديدة',
+                  prefixIcon: Icon(Icons.check_circle_outline),
+                ),
+              ),
+              if (errorMsg != null) ...[
+                const SizedBox(height: 8),
+                Text(errorMsg!,
+                    style: const TextStyle(color: Colors.red, fontSize: 13)),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('إلغاء')),
+            ElevatedButton(
+              onPressed: () async {
+                if (currentCtrl.text.isEmpty || newCtrl.text.isEmpty) {
+                  ss(() => errorMsg = 'يرجى ملء جميع الحقول');
+                  return;
+                }
+                if (newCtrl.text != confirmCtrl.text) {
+                  ss(() => errorMsg = 'كلمة المرور الجديدة غير متطابقة');
+                  return;
+                }
+                if (newCtrl.text.length < 6) {
+                  ss(() => errorMsg = 'كلمة المرور يجب أن تكون 6 أحرف على الأقل');
+                  return;
+                }
+                final success = await ref
+                    .read(authProvider.notifier)
+                    .changePassword(currentCtrl.text, newCtrl.text);
+                if (success) {
+                  if (ctx.mounted) Navigator.pop(ctx);
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                        content: Text('تم تغيير كلمة المرور بنجاح'),
+                        backgroundColor: Colors.green));
+                  }
+                } else {
+                  ss(() => errorMsg =
+                      ref.read(authProvider).error ?? 'حدث خطأ');
+                }
+              },
+              child: const Text('حفظ'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── البيانات المرجعية ─────────────────────────────────────────
   Future<void> _seedMaterials() async {
     setState(() => _isSeeding = true);
     final ds = ref.read(dataSourceProvider);
@@ -142,15 +398,14 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       }
       ref.invalidate(rawMaterialsProvider);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('تم إنشاء المواد الخام بنجاح'), backgroundColor: Colors.green),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('تم إنشاء المواد الخام بنجاح'),
+            backgroundColor: Colors.green));
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطأ: $e'), backgroundColor: Colors.red),
-        );
+            SnackBar(content: Text('خطأ: $e'), backgroundColor: Colors.red));
       }
     }
     setState(() => _isSeeding = false);
@@ -162,13 +417,18 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('إضافة عامل'),
-        content: TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'الاسم *')),
+        content: TextField(
+            controller: nameCtrl,
+            decoration: const InputDecoration(labelText: 'الاسم *')),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
           ElevatedButton(
             onPressed: () async {
               if (nameCtrl.text.trim().isEmpty) return;
-              await ref.read(dataSourceProvider).upsertWorker({'name': nameCtrl.text.trim(), 'is_active': true});
+              await ref
+                  .read(dataSourceProvider)
+                  .upsertWorker({'name': nameCtrl.text.trim(), 'is_active': true});
               ref.invalidate(workersProvider);
               if (ctx.mounted) Navigator.pop(ctx);
             },
@@ -185,13 +445,18 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('إضافة ماكينة'),
-        content: TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'اسم الماكينة *')),
+        content: TextField(
+            controller: nameCtrl,
+            decoration: const InputDecoration(labelText: 'اسم الماكينة *')),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
           ElevatedButton(
             onPressed: () async {
               if (nameCtrl.text.trim().isEmpty) return;
-              await ref.read(dataSourceProvider).upsertMachine({'name': nameCtrl.text.trim(), 'is_active': true});
+              await ref
+                  .read(dataSourceProvider)
+                  .upsertMachine({'name': nameCtrl.text.trim(), 'is_active': true});
               ref.invalidate(machinesProvider);
               if (ctx.mounted) Navigator.pop(ctx);
             },
@@ -208,13 +473,18 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('إضافة خلاط'),
-        content: TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'اسم الخلاط *')),
+        content: TextField(
+            controller: nameCtrl,
+            decoration: const InputDecoration(labelText: 'اسم الخلاط *')),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
           ElevatedButton(
             onPressed: () async {
               if (nameCtrl.text.trim().isEmpty) return;
-              await ref.read(dataSourceProvider).upsertMixer({'name': nameCtrl.text.trim(), 'is_active': true});
+              await ref
+                  .read(dataSourceProvider)
+                  .upsertMixer({'name': nameCtrl.text.trim(), 'is_active': true});
               ref.invalidate(mixersProvider);
               if (ctx.mounted) Navigator.pop(ctx);
             },
@@ -231,13 +501,18 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('إضافة نوع خلطة'),
-        content: TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'اسم الخلطة *')),
+        content: TextField(
+            controller: nameCtrl,
+            decoration: const InputDecoration(labelText: 'اسم الخلطة *')),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
           ElevatedButton(
             onPressed: () async {
               if (nameCtrl.text.trim().isEmpty) return;
-              await ref.read(dataSourceProvider).upsertMixtureType({'name': nameCtrl.text.trim(), 'is_active': true});
+              await ref
+                  .read(dataSourceProvider)
+                  .upsertMixtureType({'name': nameCtrl.text.trim(), 'is_active': true});
               ref.invalidate(mixtureTypesProvider);
               if (ctx.mounted) Navigator.pop(ctx);
             },
@@ -254,13 +529,18 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('إضافة منتج'),
-        content: TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'اسم المنتج *')),
+        content: TextField(
+            controller: nameCtrl,
+            decoration: const InputDecoration(labelText: 'اسم المنتج *')),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
           ElevatedButton(
             onPressed: () async {
               if (nameCtrl.text.trim().isEmpty) return;
-              await ref.read(dataSourceProvider).upsertProduct({'name': nameCtrl.text.trim(), 'is_active': true});
+              await ref
+                  .read(dataSourceProvider)
+                  .upsertProduct({'name': nameCtrl.text.trim(), 'is_active': true});
               ref.invalidate(productsProvider);
               if (ctx.mounted) Navigator.pop(ctx);
             },
@@ -272,6 +552,212 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   }
 }
 
+// ══════════════════════════════════════════════════════
+// SMS Settings Card
+// ══════════════════════════════════════════════════════
+class _SmsSettingsCard extends ConsumerStatefulWidget {
+  final Map<String, dynamic> settings;
+  final VoidCallback onSaved;
+  const _SmsSettingsCard({required this.settings, required this.onSaved});
+
+  @override
+  ConsumerState<_SmsSettingsCard> createState() => _SmsSettingsCardState();
+}
+
+class _SmsSettingsCardState extends ConsumerState<_SmsSettingsCard> {
+  late bool _enabled;
+  late TextEditingController _apiKeyCtrl;
+  late TextEditingController _phonesCtrl;
+  late TextEditingController _deviceCtrl;
+  bool _saving = false;
+  bool _testing = false;
+  bool _obscureKey = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _enabled = widget.settings['sms_enabled'] == 'true';
+    _apiKeyCtrl =
+        TextEditingController(text: widget.settings['sms_api_key'] ?? '');
+    _phonesCtrl =
+        TextEditingController(text: widget.settings['sms_phone_numbers'] ?? '');
+    _deviceCtrl =
+        TextEditingController(text: widget.settings['sms_device_id'] ?? '0');
+  }
+
+  @override
+  void dispose() {
+    _apiKeyCtrl.dispose();
+    _phonesCtrl.dispose();
+    _deviceCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    setState(() => _saving = true);
+    try {
+      final ds = ref.read(dataSourceProvider);
+      await ds.updateSmsSettings({
+        'sms_enabled': _enabled ? 'true' : 'false',
+        'sms_api_key': _apiKeyCtrl.text.trim(),
+        'sms_phone_numbers': _phonesCtrl.text.trim(),
+        'sms_device_id': _deviceCtrl.text.trim().isEmpty
+            ? '0'
+            : _deviceCtrl.text.trim(),
+      });
+      widget.onSaved();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('تم حفظ إعدادات SMS'),
+            backgroundColor: Colors.green));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('خطأ: $e'), backgroundColor: Colors.red));
+      }
+    }
+    setState(() => _saving = false);
+  }
+
+  Future<void> _testSms() async {
+    if (_apiKeyCtrl.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('أدخل مفتاح API أولاً'),
+          backgroundColor: Colors.orange));
+      return;
+    }
+    if (_phonesCtrl.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('أدخل رقم هاتف أولاً'),
+          backgroundColor: Colors.orange));
+      return;
+    }
+    setState(() => _testing = true);
+    try {
+      await _save();
+      final ds = ref.read(dataSourceProvider);
+      final result = await ds.sendTestSms('اختبار النظام');
+      if (mounted) {
+        final sent = result['sent'] as int? ?? 0;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content:
+                Text(sent > 0 ? '✅ تم إرسال الرسالة بنجاح' : '❌ فشل إرسال الرسالة'),
+            backgroundColor: sent > 0 ? Colors.green : Colors.red));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('خطأ: $e'), backgroundColor: Colors.red));
+      }
+    }
+    setState(() => _testing = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.sms_outlined, color: Colors.green),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('إشعارات SMS',
+                          style: TextStyle(fontWeight: FontWeight.bold)),
+                      Text('إرسال تنبيهات عبر sms-gateway.app',
+                          style: TextStyle(fontSize: 12, color: Colors.grey)),
+                    ],
+                  ),
+                ),
+                Switch(
+                  value: _enabled,
+                  onChanged: (v) => setState(() => _enabled = v),
+                ),
+              ],
+            ),
+            const Divider(),
+            TextField(
+              controller: _apiKeyCtrl,
+              obscureText: _obscureKey,
+              decoration: InputDecoration(
+                labelText: 'مفتاح API',
+                prefixIcon: const Icon(Icons.key_outlined),
+                suffixIcon: IconButton(
+                  icon: Icon(_obscureKey
+                      ? Icons.visibility_outlined
+                      : Icons.visibility_off_outlined),
+                  onPressed: () => setState(() => _obscureKey = !_obscureKey),
+                ),
+                helperText: 'مفتاح API من لوحة تحكم sms-gateway.app',
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _phonesCtrl,
+              keyboardType: TextInputType.phone,
+              decoration: const InputDecoration(
+                labelText: 'أرقام الهواتف',
+                prefixIcon: Icon(Icons.phone_outlined),
+                helperText: 'أرقام مفصولة بفاصلة  مثال: +9665XXXXXXXX,+9665XXXXXXXX',
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _deviceCtrl,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'معرّف الجهاز (Device ID)',
+                prefixIcon: Icon(Icons.phone_android_outlined),
+                helperText: 'رقم الجهاز في SMS Gateway (افتراضي: 0)',
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _testing ? null : _testSms,
+                    icon: _testing
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2))
+                        : const Icon(Icons.send_outlined),
+                    label: const Text('إرسال اختباري'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: _saving ? null : _save,
+                    icon: _saving
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: Colors.white))
+                        : const Icon(Icons.save_outlined),
+                    label: const Text('حفظ الإعدادات'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════
 class _SectionTitle extends StatelessWidget {
   final String title;
   const _SectionTitle(this.title);
