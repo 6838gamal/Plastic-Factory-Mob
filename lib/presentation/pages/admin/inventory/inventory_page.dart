@@ -265,11 +265,6 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
                 if (qty == null || qty <= 0 || selected == null) return;
                 final ds = ref.read(dataSourceProvider);
                 try {
-                  final currentInv = await ds.getMaterialInventory(selected!.materialId, warehouse);
-                  final currentBalance = currentInv?.balance ?? 0;
-                  final effectiveQty = (positiveOnly || isPositive) ? qty : -qty;
-                  final newBalance = currentBalance + effectiveQty;
-
                   await ds.addInventoryTransaction(InventoryTransactionModel(
                     id: '',
                     materialId: selected!.materialId,
@@ -280,7 +275,6 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
                     notes: notesCtrl.text.trim().isEmpty ? null : notesCtrl.text.trim(),
                     createdAt: DateTime.now(),
                   ));
-                  await ds.updateInventoryBalance(selected!.materialId, warehouse, newBalance);
 
                   ref.invalidate(_summaryProvider);
                   ref.invalidate(_txProvider(''));

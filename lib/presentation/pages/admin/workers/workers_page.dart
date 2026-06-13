@@ -118,8 +118,25 @@ class _WorkerCard extends ConsumerWidget {
                 );
               }
             } else if (v == 'delete') {
-              await ds.deleteWorker(worker.id);
-              ref.invalidate(workersProvider);
+              final confirmed = await showDialog<bool>(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  title: const Text('حذف عامل'),
+                  content: Text('هل تريد حذف العامل "${worker.name}"؟\nلا يمكن التراجع عن هذا الإجراء.'),
+                  actions: [
+                    TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('إلغاء')),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                      onPressed: () => Navigator.pop(ctx, true),
+                      child: const Text('حذف', style: TextStyle(color: Colors.white)),
+                    ),
+                  ],
+                ),
+              );
+              if (confirmed == true) {
+                await ds.deleteWorker(worker.id);
+                ref.invalidate(workersProvider);
+              }
             }
           },
         ),

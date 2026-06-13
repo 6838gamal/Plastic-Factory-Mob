@@ -117,16 +117,34 @@ async def create_opening_balance(body: OpeningBalanceCreate):
 @router.put("/{ob_id}")
 async def update_opening_balance(ob_id: str, body: OpeningBalanceCreate):
     pool = await get_pool()
+    balance_date = _parse_date(body.balance_date)
     row = await pool.fetchrow(
         """UPDATE opening_balances
            SET material_id=$1, warehouse_type=$2, balance=$3,
-               balance_date=COALESCE($4::date, CURRENT_DATE), reason=$5, created_by=$6
+               balance_date=COALESCE($4, CURRENT_DATE), reason=$5, created_by=$6
            WHERE id=$7 RETURNING *""",
         body.material_id, body.warehouse_type, body.balance,
-        body.balance_date, body.reason, body.created_by, ob_id,
+        balance_date, body.reason, body.created_by, ob_id,
     )
     if not row:
         raise HTTPException(status_code=404, detail="Not found")
+
+    # ── Sync inventory if no movements have occurred ──────────
+    has_movements = await pool.fetchval(
+        """SELECT COUNT(*) FROM inventory_transactions
+           WHERE material_id=$1 AND warehouse_type=$2
+             AND transaction_type NOT IN ('adjustment')""",
+        body.material_id, body.warehouse_type,
+    )
+    if has_movements == 0:
+        await pool.execute(
+            """INSERT INTO inventory (id, material_id, warehouse_type, balance, updated_at)
+               VALUES (gen_random_uuid(), $1, $2, $3, NOW())
+               ON CONFLICT (material_id, warehouse_type)
+               DO UPDATE SET balance=$3, updated_at=NOW()""",
+            body.material_id, body.warehouse_type, body.balance,
+        )
+
     return dict(row)
 
 

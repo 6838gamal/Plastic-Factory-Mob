@@ -479,17 +479,82 @@ CREATE VIEW inventory_summary AS
   SELECT
     i.id,
     i.material_id,
-    rm.name AS material_name,
+    rm.name   AS material_name,
     rm.category,
     rm.unit,
     rm.min_stock,
+    COALESCE(rm.code, '')          AS code,
     i.warehouse_type,
+    i.balance                      AS current_balance,
     i.balance,
     i.updated_at,
-    COALESCE(rm.cost_per_unit, 0) AS cost_per_unit,
-    CASE WHEN i.balance <= 0 THEN 'out_of_stock'
-         WHEN rm.min_stock > 0 AND i.balance <= rm.min_stock THEN 'low'
+    COALESCE(rm.cost_per_unit, 0)  AS cost_per_unit,
+
+    -- ── الرصيد الافتتاحي: آخر سجل لهذه المادة والمخزن ──────────
+    COALESCE((
+      SELECT ob.balance
+      FROM   opening_balances ob
+      WHERE  ob.material_id::text = i.material_id::text
+        AND  ob.warehouse_type    = i.warehouse_type
+      ORDER  BY ob.balance_date DESC, ob.created_at DESC
+      LIMIT  1
+    ), 0) AS opening_balance,
+
+    -- ── إجمالي الوارد (in) ──────────────────────────────────────
+    COALESCE((
+      SELECT SUM(it.quantity)
+      FROM   inventory_transactions it
+      WHERE  it.material_id::text = i.material_id::text
+        AND  it.warehouse_type    = i.warehouse_type
+        AND  it.transaction_type  = 'in'
+    ), 0) AS total_in,
+
+    -- ── إجمالي الصادر (out) ─────────────────────────────────────
+    COALESCE((
+      SELECT SUM(it.quantity)
+      FROM   inventory_transactions it
+      WHERE  it.material_id::text = i.material_id::text
+        AND  it.warehouse_type    = i.warehouse_type
+        AND  it.transaction_type  = 'out'
+    ), 0) AS total_out,
+
+    -- ── صافي التحويلات ──────────────────────────────────────────
+    COALESCE((
+      SELECT SUM(
+        CASE WHEN it.transaction_type = 'transfer_in'  THEN  it.quantity
+             WHEN it.transaction_type = 'transfer_out' THEN -it.quantity
+             ELSE 0 END
+      )
+      FROM   inventory_transactions it
+      WHERE  it.material_id::text = i.material_id::text
+        AND  it.warehouse_type    = i.warehouse_type
+        AND  it.transaction_type IN ('transfer_in','transfer_out')
+    ), 0) AS total_transfers,
+
+    -- ── تسويات موجبة (رصيد ارتفع) ───────────────────────────────
+    COALESCE((
+      SELECT SUM(it.quantity)
+      FROM   inventory_transactions it
+      WHERE  it.material_id::text = i.material_id::text
+        AND  it.warehouse_type    = i.warehouse_type
+        AND  it.transaction_type  = 'adjustment'
+        AND  COALESCE(it.balance_after, 0) >= COALESCE(it.balance_before, 0)
+    ), 0) AS total_adjustments_pos,
+
+    -- ── تسويات سالبة (رصيد انخفض) ───────────────────────────────
+    COALESCE((
+      SELECT SUM(it.quantity)
+      FROM   inventory_transactions it
+      WHERE  it.material_id::text = i.material_id::text
+        AND  it.warehouse_type    = i.warehouse_type
+        AND  it.transaction_type  = 'adjustment'
+        AND  COALESCE(it.balance_after, 0) < COALESCE(it.balance_before, 0)
+    ), 0) AS total_adjustments_neg,
+
+    CASE WHEN i.balance <= 0                                   THEN 'out_of_stock'
+         WHEN rm.min_stock > 0 AND i.balance <= rm.min_stock   THEN 'low'
          ELSE 'normal'
     END AS stock_status
+
   FROM inventory i
   JOIN raw_materials rm ON rm.id = i.material_id;

@@ -32,9 +32,26 @@ class MachinesPage extends ConsumerWidget {
                     emptyMessage: 'لا توجد ماكينات',
                     onAdd: () => _showMachineDialog(context, ref),
                     onEdit: (item) => _showMachineDialog(context, ref, id: item.id, name: item.name, desc: item.sub),
-                    onDelete: (id) async {
-                      await ref.read(dataSourceProvider).upsertMachine({'id': id, 'is_active': false});
-                      ref.invalidate(machinesProvider);
+                    onDelete: (id, name) async {
+                      final confirmed = await showDialog<bool>(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          title: const Text('حذف ماكينة'),
+                          content: Text('هل تريد حذف الماكينة "$name"؟'),
+                          actions: [
+                            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('إلغاء')),
+                            ElevatedButton(
+                              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                              onPressed: () => Navigator.pop(ctx, true),
+                              child: const Text('حذف', style: TextStyle(color: Colors.white)),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (confirmed == true) {
+                        await ref.read(dataSourceProvider).upsertMachine({'id': id, 'is_active': false});
+                        ref.invalidate(machinesProvider);
+                      }
                     },
                   ),
                   loading: () => const ShimmerList(),
@@ -50,9 +67,26 @@ class MachinesPage extends ConsumerWidget {
                     emptyMessage: 'لا توجد خلاطات',
                     onAdd: () => _showMixerDialog(context, ref),
                     onEdit: (item) => _showMixerDialog(context, ref, id: item.id, name: item.name),
-                    onDelete: (id) async {
-                      await ref.read(dataSourceProvider).upsertMixer({'id': id, 'is_active': false});
-                      ref.invalidate(mixersProvider);
+                    onDelete: (id, name) async {
+                      final confirmed = await showDialog<bool>(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          title: const Text('حذف خلاط'),
+                          content: Text('هل تريد حذف الخلاط "$name"؟'),
+                          actions: [
+                            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('إلغاء')),
+                            ElevatedButton(
+                              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                              onPressed: () => Navigator.pop(ctx, true),
+                              child: const Text('حذف', style: TextStyle(color: Colors.white)),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (confirmed == true) {
+                        await ref.read(dataSourceProvider).upsertMixer({'id': id, 'is_active': false});
+                        ref.invalidate(mixersProvider);
+                      }
                     },
                   ),
                   loading: () => const ShimmerList(),
@@ -154,7 +188,7 @@ class _ReferenceList extends StatelessWidget {
   final String emptyMessage;
   final VoidCallback onAdd;
   final void Function(_Item) onEdit;
-  final void Function(String) onDelete;
+  final void Function(String id, String name) onDelete;
 
   const _ReferenceList({
     required this.items,
@@ -187,7 +221,7 @@ class _ReferenceList extends StatelessWidget {
                       ],
                       onSelected: (v) {
                         if (v == 'edit') onEdit(item);
-                        if (v == 'delete') onDelete(item.id);
+                        if (v == 'delete') onDelete(item.id, item.name);
                       },
                     ),
                   ),
