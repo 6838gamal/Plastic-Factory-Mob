@@ -8,6 +8,7 @@ import '../../../core/constants/app_strings.dart';
 import '../../widgets/common/offline_banner.dart';
 import 'batch_entry_page.dart';
 import 'machine_entry_page.dart';
+import 'shift_handover_page.dart';
 
 class WorkerHomePage extends ConsumerStatefulWidget {
   const WorkerHomePage({super.key});
@@ -22,6 +23,7 @@ class _WorkerHomePageState extends ConsumerState<WorkerHomePage> {
   final List<Widget> _pages = const [
     BatchEntryPage(),
     MachineEntryPage(),
+    ShiftHandoverPage(),
     _AppInfoPage(),
   ];
 
@@ -58,6 +60,11 @@ class _WorkerHomePageState extends ConsumerState<WorkerHomePage> {
             icon: Icon(Icons.precision_manufacturing_outlined),
             selectedIcon: Icon(Icons.precision_manufacturing),
             label: AppStrings.machineEntry,
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.swap_horiz_outlined),
+            selectedIcon: Icon(Icons.swap_horiz),
+            label: 'تسليم الوردية',
           ),
           NavigationDestination(
             icon: Icon(Icons.info_outlined),

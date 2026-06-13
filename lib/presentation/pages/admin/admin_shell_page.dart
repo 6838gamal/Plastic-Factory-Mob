@@ -174,6 +174,13 @@ class _AdminDrawer extends ConsumerWidget {
                   route: '/admin/recipes',
                   currentRoute: currentRoute,
                 ),
+                _DrawerItem(
+                  icon: Icons.swap_horiz_outlined,
+                  selectedIcon: Icons.swap_horiz,
+                  title: 'تسليم الورديات',
+                  route: '/admin/shift-handover',
+                  currentRoute: currentRoute,
+                ),
                 const Divider(),
                 _DrawerItem(
                   icon: Icons.warning_amber_outlined,

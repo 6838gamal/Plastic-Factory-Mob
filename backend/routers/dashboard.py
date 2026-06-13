@@ -82,6 +82,25 @@ async def get_stats():
            WHERE r.min_stock > 0 AND i.balance <= r.min_stock"""
     )
 
+    # ── Custody debts (pending) ────────────────────────────────
+    custody_debts_count = await pool.fetchval(
+        "SELECT COUNT(*) FROM custody_debts WHERE status='pending'"
+    )
+    custody_debts_total_kg = await pool.fetchval(
+        "SELECT COALESCE(SUM(deficit_kg), 0) FROM custody_debts WHERE status='pending'"
+    )
+
+    # ── Scrap warehouse balance ────────────────────────────────
+    scrap_balance_kg = await pool.fetchval(
+        "SELECT COALESCE(SUM(balance), 0) FROM inventory WHERE warehouse_type='scrap'"
+    )
+
+    # ── Today's shift handovers ────────────────────────────────
+    frozen_shifts_today = await pool.fetchval(
+        "SELECT COUNT(*) FROM shift_handovers WHERE handover_date=$1 AND status='frozen'",
+        today,
+    )
+
     return {
         "batches_today":    int(batches_count),
         "production_today": round(total_produced, 2),
@@ -96,4 +115,8 @@ async def get_stats():
         "deviation_pct":    deviation_pct,
         "cost_today":       round(cost_today, 2),
         "cost_per_kg":      cost_per_kg,
+        "custody_debts_count": int(custody_debts_count),
+        "custody_debts_total_kg": round(float(custody_debts_total_kg), 3),
+        "scrap_balance_kg": round(float(scrap_balance_kg), 3),
+        "frozen_shifts_today": int(frozen_shifts_today),
     }

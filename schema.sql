@@ -421,6 +421,56 @@ ALTER TABLE daily_reports ADD COLUMN IF NOT EXISTS snapshot JSONB DEFAULT '{}';
 ALTER TABLE daily_reports ADD COLUMN IF NOT EXISTS locked_at TIMESTAMPTZ;
 
 -- =============================================================
+-- جدول تسليم الورديات - Shift Handovers
+-- =============================================================
+CREATE TABLE IF NOT EXISTS shift_handovers (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  shift_name VARCHAR(100) NOT NULL,
+  supervisor_name VARCHAR(200) NOT NULL,
+  handover_date DATE NOT NULL DEFAULT CURRENT_DATE,
+  opening_stock_kg DECIMAL(12,3) NOT NULL DEFAULT 0,
+  received_from_main_kg DECIMAL(12,3) NOT NULL DEFAULT 0,
+  total_batch_inputs_kg DECIMAL(12,3) NOT NULL DEFAULT 0,
+  expected_stock_kg DECIMAL(12,3) NOT NULL DEFAULT 0,
+  actual_stock_kg DECIMAL(12,3),
+  flashing_kg DECIMAL(12,3) NOT NULL DEFAULT 0,
+  rejected_kg DECIMAL(12,3) NOT NULL DEFAULT 0,
+  waste_kg DECIMAL(12,3) NOT NULL DEFAULT 0,
+  scrap_added_kg DECIMAL(12,3) NOT NULL DEFAULT 0,
+  deficit_kg DECIMAL(12,3) NOT NULL DEFAULT 0,
+  status VARCHAR(20) NOT NULL DEFAULT 'open',
+  notes TEXT,
+  next_supervisor_name VARCHAR(200),
+  confirmed_at TIMESTAMPTZ,
+  frozen_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_shift_handovers_date ON shift_handovers(handover_date);
+CREATE INDEX IF NOT EXISTS idx_shift_handovers_status ON shift_handovers(status);
+
+-- =============================================================
+-- جدول مديونيات العهد - Custody Debts
+-- =============================================================
+CREATE TABLE IF NOT EXISTS custody_debts (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  handover_id UUID NOT NULL REFERENCES shift_handovers(id),
+  supervisor_name VARCHAR(200) NOT NULL,
+  shift_name VARCHAR(100),
+  deficit_kg DECIMAL(12,3) NOT NULL,
+  handover_date DATE NOT NULL,
+  status VARCHAR(20) NOT NULL DEFAULT 'pending',
+  notes TEXT,
+  resolved_at TIMESTAMPTZ,
+  resolved_by VARCHAR(200),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_custody_debts_status ON custody_debts(status);
+CREATE INDEX IF NOT EXISTS idx_custody_debts_supervisor ON custody_debts(supervisor_name);
+
+-- =============================================================
 -- عرض ملخص المخزون - Inventory Summary View
 -- (DROP + CREATE to handle column changes idempotently)
 -- =============================================================

@@ -552,6 +552,47 @@ async def create_batch(body: BatchCreate):
         )
         result["deduction"] = deduct_result
 
+    # ── Deduct scrap qty from scrap warehouse ─────────────────
+    if (body.scrap_qty or 0) > 0 and body.transaction_id:
+        scrap_tx_id = f"scrap_{body.transaction_id}"
+        existing_scrap_deduct = await pool.fetchrow(
+            "SELECT id FROM deduction_log WHERE transaction_id=$1 AND reversed_at IS NULL",
+            scrap_tx_id,
+        )
+        if not existing_scrap_deduct:
+            scrap_setting = await pool.fetchrow(
+                "SELECT value FROM settings WHERE key='scrap_material_id'"
+            )
+            scrap_mat_id = (scrap_setting["value"].strip() if scrap_setting else "")
+            if scrap_mat_id:
+                inv = await pool.fetchrow(
+                    "SELECT balance FROM inventory WHERE material_id=$1 AND warehouse_type='scrap'",
+                    scrap_mat_id,
+                )
+                bal_before = float(inv["balance"]) if inv else 0.0
+                bal_after  = bal_before - body.scrap_qty
+                await pool.execute(
+                    """INSERT INTO inventory (id, material_id, warehouse_type, balance, updated_at)
+                       VALUES (gen_random_uuid(), $1, 'scrap', -$2::decimal, NOW())
+                       ON CONFLICT (material_id, warehouse_type)
+                       DO UPDATE SET balance = inventory.balance - $2::decimal, updated_at = NOW()""",
+                    scrap_mat_id, body.scrap_qty,
+                )
+                await pool.execute(
+                    """INSERT INTO inventory_transactions
+                       (id, material_id, warehouse_type, transaction_type, quantity,
+                        batch_id, transaction_ref, created_by, balance_before, balance_after, notes)
+                       VALUES (gen_random_uuid(),$1,'scrap','out',$2,$3,$4,$5,$6,$7,$8)""",
+                    scrap_mat_id, body.scrap_qty,
+                    batch_id, scrap_tx_id, body.created_by,
+                    bal_before, bal_after,
+                    f"سحب سكراب لطبخة {body.batch_number}",
+                )
+                await pool.execute(
+                    "INSERT INTO deduction_log (id, transaction_id, batch_id, applied_at) VALUES (gen_random_uuid(),$1,$2,NOW())",
+                    scrap_tx_id, batch_id,
+                )
+
     result.update(_calc_batch_stats(result))
 
     # ── Auto 5: Refresh daily report in background ────────────

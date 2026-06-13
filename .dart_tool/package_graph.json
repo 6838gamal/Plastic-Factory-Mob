@@ -36,7 +36,6 @@
         "path_provider",
         "pdf",
         "permission_handler",
-        "printing",
         "riverpod_annotation",
         "share_plus",
         "shared_preferences",
@@ -417,22 +416,6 @@
         "path_provider_linux",
         "path_provider_platform_interface",
         "path_provider_windows"
-      ]
-    },
-    {
-      "name": "printing",
-      "version": "5.13.1",
-      "dependencies": [
-        "ffi",
-        "flutter",
-        "flutter_web_plugins",
-        "http",
-        "image",
-        "meta",
-        "pdf",
-        "pdf_widget_wrapper",
-        "plugin_platform_interface",
-        "web"
       ]
     },
     {
@@ -1481,18 +1464,11 @@
       ]
     },
     {
-      "name": "plugin_platform_interface",
-      "version": "2.1.8",
+      "name": "path_parsing",
+      "version": "1.1.0",
       "dependencies": [
-        "meta"
-      ]
-    },
-    {
-      "name": "pdf_widget_wrapper",
-      "version": "1.0.4",
-      "dependencies": [
-        "flutter",
-        "pdf"
+        "meta",
+        "vector_math"
       ]
     },
     {
@@ -1502,14 +1478,6 @@
         "archive",
         "meta",
         "xml"
-      ]
-    },
-    {
-      "name": "path_parsing",
-      "version": "1.1.0",
-      "dependencies": [
-        "meta",
-        "vector_math"
       ]
     },
     {
@@ -1767,6 +1735,13 @@
       "name": "built_collection",
       "version": "5.1.1",
       "dependencies": []
+    },
+    {
+      "name": "plugin_platform_interface",
+      "version": "2.1.8",
+      "dependencies": [
+        "meta"
+      ]
     },
     {
       "name": "flutter_plugin_android_lifecycle",

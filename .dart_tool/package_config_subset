@@ -470,10 +470,6 @@ pdf
 2.19
 file:///home/runner/.pub-cache/hosted/pub.dev/pdf-3.11.3/
 file:///home/runner/.pub-cache/hosted/pub.dev/pdf-3.11.3/lib/
-pdf_widget_wrapper
-2.18
-file:///home/runner/.pub-cache/hosted/pub.dev/pdf_widget_wrapper-1.0.4/
-file:///home/runner/.pub-cache/hosted/pub.dev/pdf_widget_wrapper-1.0.4/lib/
 permission_handler
 3.5
 file:///home/runner/.pub-cache/hosted/pub.dev/permission_handler-11.4.0/
@@ -514,10 +510,6 @@ pool
 3.4
 file:///home/runner/.pub-cache/hosted/pub.dev/pool-1.5.2/
 file:///home/runner/.pub-cache/hosted/pub.dev/pool-1.5.2/lib/
-printing
-3.3
-file:///home/runner/.pub-cache/hosted/pub.dev/printing-5.13.1/
-file:///home/runner/.pub-cache/hosted/pub.dev/printing-5.13.1/lib/
 pub_semver
 3.4
 file:///home/runner/.pub-cache/hosted/pub.dev/pub_semver-2.2.0/

@@ -110,6 +110,14 @@ class ApiDataSource {
     }
   }
 
+  // ==================== GENERIC RAW CALLS ====================
+  Future<dynamic> getRaw(String path, {Map<String, String?>? query}) =>
+      _get(path, query: query);
+  Future<dynamic> postRaw(String path, Map<String, dynamic> data) =>
+      _post(path, data);
+  Future<dynamic> putRaw(String path, Map<String, dynamic> data) =>
+      _put(path, data);
+
   // ==================== HEALTH ====================
   Future<void> checkHealth() async {
     final uri = Uri.parse('$_baseUrl/api/health');
