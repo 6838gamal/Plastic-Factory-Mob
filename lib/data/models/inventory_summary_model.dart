@@ -12,6 +12,7 @@ class InventorySummaryModel {
   final double totalAdjustmentsPos;
   final double totalAdjustmentsNeg;
   final String stockStatus;
+  final String warehouseType;
 
   const InventorySummaryModel({
     required this.materialId,
@@ -27,10 +28,12 @@ class InventorySummaryModel {
     required this.totalAdjustmentsPos,
     required this.totalAdjustmentsNeg,
     required this.stockStatus,
+    required this.warehouseType,
   });
 
   bool get isLow => stockStatus == 'low';
   bool get isCritical => minStock > 0 && currentBalance <= minStock * 0.5;
+  bool get isOutOfStock => stockStatus == 'out_of_stock';
   double get netAdjustments => totalAdjustmentsPos - totalAdjustmentsNeg;
 
   factory InventorySummaryModel.fromJson(Map<String, dynamic> json) =>
@@ -45,8 +48,11 @@ class InventorySummaryModel {
         totalIn: (json['total_in'] as num?)?.toDouble() ?? 0,
         totalOut: (json['total_out'] as num?)?.toDouble() ?? 0,
         totalTransfers: (json['total_transfers'] as num?)?.toDouble() ?? 0,
-        totalAdjustmentsPos: (json['total_adjustments_pos'] as num?)?.toDouble() ?? 0,
-        totalAdjustmentsNeg: (json['total_adjustments_neg'] as num?)?.toDouble() ?? 0,
+        totalAdjustmentsPos:
+            (json['total_adjustments_pos'] as num?)?.toDouble() ?? 0,
+        totalAdjustmentsNeg:
+            (json['total_adjustments_neg'] as num?)?.toDouble() ?? 0,
         stockStatus: json['stock_status'] as String? ?? 'normal',
+        warehouseType: json['warehouse_type'] as String? ?? 'main',
       );
 }
