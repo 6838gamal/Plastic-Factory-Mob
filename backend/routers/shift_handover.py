@@ -276,6 +276,7 @@ async def close_shift(body: ShiftHandoverClose):
     status      = "frozen" if has_deficit else "closed"
 
     # ── 3. أنشئ سجل تسليم الوردية ─────────────────────────────
+    frozen_at = datetime.utcnow() if status == "frozen" else None
     row = await pool.fetchrow(
         """INSERT INTO shift_handovers
            (id, shift_name, supervisor_name, handover_date,
@@ -286,13 +287,12 @@ async def close_shift(body: ShiftHandoverClose):
            VALUES (gen_random_uuid(), $1, $2, $3,
                    $4, $5, $6, $7, $8,
                    $9, $10, $11, $12,
-                   $13, $14, $15, $16,
-                   CASE WHEN $15='frozen' THEN NOW() ELSE NULL END)
+                   $13, $14, $15, $16, $17)
            RETURNING *""",
         body.shift_name, body.supervisor_name, target_date,
         opening_kg, received_kg, consumed_kg, expected_kg, actual_kg,
         body.flashing_kg, body.rejected_kg, body.waste_kg, scrap_total,
-        deficit_kg, unknown_waste_kg, status, body.notes,
+        deficit_kg, unknown_waste_kg, status, body.notes, frozen_at,
     )
     handover_id = str(row["id"])
 
