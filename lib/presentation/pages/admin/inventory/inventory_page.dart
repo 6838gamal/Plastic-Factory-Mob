@@ -10,12 +10,12 @@ import '../../../../core/utils/helpers.dart';
 
 // ── Providers ────────────────────────────────────────────────────────────────
 
-final _summaryProvider = FutureProvider<List<InventorySummaryModel>>((ref) async {
+final _summaryProvider = FutureProvider.autoDispose<List<InventorySummaryModel>>((ref) async {
   final ds = ref.read(dataSourceProvider);
   return ds.getInventorySummary();
 });
 
-final _txProvider = FutureProvider.family<List<InventoryTransactionModel>, String>(
+final _txProvider = FutureProvider.autoDispose.family<List<InventoryTransactionModel>, String>(
   (ref, materialId) async {
     final ds = ref.read(dataSourceProvider);
     return ds.getInventoryTransactions(
