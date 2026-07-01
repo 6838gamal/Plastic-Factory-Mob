@@ -49,5 +49,8 @@ publicDir = "build/web"
 [userenv.shared]
 ENVIRONMENT = "development"
 ADMIN_EMAIL = "admin@factory.com"
+RENDER_DATABASE_URL = "postgresql://gamalalmaqtary:tqL6D95VvkoCR9f1gE1fZykYakFU9sXb@dpg-d8j5350jo6nc73duopqg-a.virginia-postgres.render.com/plastic_factory_db"
+JWT_SECRET = "plastic_factory_jwt_secret_2024_replit_secure"
+ADMIN_PASSWORD = "admin123"
 
 [userenv.development]
