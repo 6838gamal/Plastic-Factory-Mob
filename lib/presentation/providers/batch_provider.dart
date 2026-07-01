@@ -68,7 +68,7 @@ class AlertFilters {
 
 // ── Providers ─────────────────────────────────────────────────────────────────
 
-final batchesProvider = FutureProvider.family<List<BatchModel>, BatchFilters>(
+final batchesProvider = FutureProvider.autoDispose.family<List<BatchModel>, BatchFilters>(
   (ref, filters) async {
     final ds = ref.read(dataSourceProvider);
     return ds.getBatches(
@@ -80,7 +80,7 @@ final batchesProvider = FutureProvider.family<List<BatchModel>, BatchFilters>(
 );
 
 final machineProductionsProvider =
-    FutureProvider.family<List<MachineProductionModel>, ProductionFilters>(
+    FutureProvider.autoDispose.family<List<MachineProductionModel>, ProductionFilters>(
   (ref, filters) async {
     final ds = ref.read(dataSourceProvider);
     return ds.getMachineProductions(

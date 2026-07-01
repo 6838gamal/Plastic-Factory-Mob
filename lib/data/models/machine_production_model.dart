@@ -45,7 +45,7 @@ class MachineProductionModel {
 
   factory MachineProductionModel.fromJson(Map<String, dynamic> json) => MachineProductionModel(
         id: json['id'] as String,
-        batchNumber: json['batch_number'] as String,
+        batchNumber: json['batch_number'] as String? ?? '',
         batchId: json['batch_id'] as String?,
         machineId: json['machine_id'] as String? ?? '',
         machineName: json['machine_name'] as String? ?? '',

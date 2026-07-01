@@ -7,7 +7,7 @@ import '../../../widgets/common/loading_widget.dart';
 import '../../../../core/utils/helpers.dart';
 import '../../../../core/constants/app_constants.dart';
 
-final auditLogProvider = FutureProvider<List<AuditLogModel>>((ref) async {
+final auditLogProvider = FutureProvider.autoDispose<List<AuditLogModel>>((ref) async {
   final ds = ref.read(dataSourceProvider);
   return ds.getAuditLogs();
 });

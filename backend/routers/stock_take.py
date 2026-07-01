@@ -109,7 +109,7 @@ async def list_sessions():
                COUNT(si.id) FILTER (WHERE si.actual_qty IS NOT NULL
                                       AND ABS(si.actual_qty - si.system_qty) > 0.01) AS diff_items
         FROM stock_take_sessions s
-        LEFT JOIN stock_take_items si ON si.session_id = s.id
+        LEFT JOIN stock_take_items si ON si.session_id::text = s.id::text
         GROUP BY s.id
         ORDER BY s.created_at DESC
     """)

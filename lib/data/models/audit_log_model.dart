@@ -1,3 +1,5 @@
+import 'dart:convert' show jsonDecode;
+
 class AuditLogModel {
   final String id;
   final String action;
@@ -25,17 +27,25 @@ class AuditLogModel {
     required this.createdAt,
   });
 
+  static Map<String, dynamic>? _parseField(dynamic value) {
+    if (value == null) return null;
+    if (value is Map) return Map<String, dynamic>.from(value);
+    if (value is String && value.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(value);
+        if (decoded is Map) return Map<String, dynamic>.from(decoded);
+      } catch (_) {}
+    }
+    return null;
+  }
+
   factory AuditLogModel.fromJson(Map<String, dynamic> json) => AuditLogModel(
         id: json['id'] as String,
         action: json['action'] as String,
         tableName: json['table_name'] as String,
         recordId: json['record_id'] as String?,
-        oldValues: json['old_values'] != null
-            ? Map<String, dynamic>.from(json['old_values'] as Map)
-            : null,
-        newValues: json['new_values'] != null
-            ? Map<String, dynamic>.from(json['new_values'] as Map)
-            : null,
+        oldValues: _parseField(json['old_values']),
+        newValues: _parseField(json['new_values']),
         userId: json['user_id'] as String? ?? '',
         userEmail: json['user_email'] as String?,
         transactionId: json['transaction_id'] as String?,
