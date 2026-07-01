@@ -98,10 +98,24 @@ def _extract_materials(batch: BatchCreate) -> list:
     by name via _resolve_names_to_ids() before deduction.
 
     Quantities are automatically converted to KG (gram units ÷ 1000).
+
+    De-duplication strategy:
+    - Flutter sends pigments/additives in BOTH the 'materials' list AND the
+      dedicated 'pigments'/'additives' lists.
+    - If 'materials' is non-empty we process only 'materials' (it already
+      contains everything including pigments and additives).
+    - If 'materials' is empty we fall back to 'pigments' + 'additives'.
+    - This prevents double-deduction of pigments and additives.
     """
+    materials_raw = _parse_json(getattr(batch, "materials", None))
+    if materials_raw:
+        fields_to_process = ("materials",)
+    else:
+        fields_to_process = ("pigments", "additives")
+
     items = []
     seen = {}
-    for field in ("materials", "pigments", "additives"):
+    for field in fields_to_process:
         raw = _parse_json(getattr(batch, field, None))
         for item in raw:
             if not isinstance(item, dict):
@@ -116,7 +130,7 @@ def _extract_materials(batch: BatchCreate) -> list:
                 continue
             if not mid and not name:
                 continue
-            # Aggregate duplicates — key is material_id if known, else name
+            # Aggregate duplicates within the same list only
             key = str(mid) if mid else name.lower()
             if key in seen:
                 seen[key]["quantity"] += qty_kg

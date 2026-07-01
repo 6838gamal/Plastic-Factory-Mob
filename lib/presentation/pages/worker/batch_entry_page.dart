@@ -278,7 +278,7 @@ class _BatchEntryPageState extends ConsumerState<BatchEntryPage> {
     addKg('شمع باودر عبوة 25 كيلو', _waxCtrl);
     addKg('مثبت استبليزر باودر عبوة 25 كيلو', _stabilizerCtrl);
     addKg('تيتانيوم', _titaniumCtrl);
-    addKg('سيتريك اسيد - ملح الليمون - 490 عبوة 25 كجم', _citricAcidCtrl);
+    addKg('سيتريك اسيد (ملح الليمون) 490 عبوة 25 كجم', _citricAcidCtrl);
     addKg('بيكربونات اصفر محلي', _bicarYellowCtrl);
     addKg('بيكربونات ابيض محلي', _bicarWhiteCtrl);
 
@@ -301,6 +301,9 @@ class _BatchEntryPageState extends ConsumerState<BatchEntryPage> {
         materials.add({'material_name': name, 'quantity': val, 'unit': unit});
       }
     }
+    // ملاحظة: الأصباغ والإضافات مضافة إلى قائمة materials أعلاه
+    // والـ backend يعتمد فقط على materials إذا كانت غير فارغة
+    // (لمنع الخصم المزدوج من pigments+additives+materials معاً)
 
     final batchData = {
       'batch_number':      _batchNumberCtrl.text.trim(),
