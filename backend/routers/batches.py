@@ -11,11 +11,14 @@ Rules:
 """
 import asyncio
 import json
+import logging
 from datetime import date as DateType
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 from typing import Optional, List, Any
 from database import get_pool
+
+logger = logging.getLogger("plastic_factory.batches")
 
 router = APIRouter(prefix="/api/batches", tags=["batches"])
 
@@ -89,7 +92,10 @@ def _to_kg(qty: float, unit: str) -> float:
 
 def _extract_materials(batch: BatchCreate) -> list:
     """Return a flat list of {material_id, name, quantity_kg, unit} for ALL
-    materials in the batch that have a valid material_id and qty > 0.
+    materials in the batch that have qty > 0.
+
+    Items without material_id will have material_id=None and will be resolved
+    by name via _resolve_names_to_ids() before deduction.
 
     Quantities are automatically converted to KG (gram units ÷ 1000).
     """
@@ -100,27 +106,73 @@ def _extract_materials(batch: BatchCreate) -> list:
         for item in raw:
             if not isinstance(item, dict):
                 continue
-            mid = item.get("material_id") or item.get("id")
+            mid = item.get("material_id") or item.get("id") or None
+            # Accept both 'name' and 'material_name' keys (Flutter sends material_name)
+            name = (item.get("name") or item.get("material_name") or "").strip()
             qty_raw = float(item.get("quantity", 0) or 0)
             unit = item.get("unit", "كجم")
             qty_kg = _to_kg(qty_raw, unit)
-            if not mid or qty_kg <= 0:
+            if qty_kg <= 0:
                 continue
-            # Aggregate duplicates
-            if mid in seen:
-                seen[mid]["quantity"] += qty_kg
-                seen[mid]["quantity_original"] += qty_raw
+            if not mid and not name:
+                continue
+            # Aggregate duplicates — key is material_id if known, else name
+            key = str(mid) if mid else name.lower()
+            if key in seen:
+                seen[key]["quantity"] += qty_kg
+                seen[key]["quantity_original"] += qty_raw
             else:
                 entry = {
-                    "material_id": str(mid),
-                    "name": item.get("name", ""),
+                    "material_id": str(mid) if mid else None,
+                    "name": name,
                     "quantity": qty_kg,          # always KG for deduction
                     "quantity_original": qty_raw,
                     "unit": unit,
                 }
-                seen[mid] = entry
+                seen[key] = entry
                 items.append(entry)
     return items
+
+
+async def _resolve_names_to_ids(pool, materials: list) -> list:
+    """For items that have no material_id, look up the id by name in raw_materials.
+
+    Resolution order (most specific first):
+      1. Exact match (case-insensitive, trimmed)
+      2. DB name is a prefix of the Flutter name  (e.g. 'كالسيوم باودر' ⊂ 'كالسيوم باودر عبوة 25 كيلو')
+      3. Flutter name is a prefix of the DB name  (reverse prefix)
+
+    Items that cannot be resolved are kept with material_id=None and will be
+    skipped by _apply_deductions (no crash, no silent data loss).
+    """
+    if not materials:
+        return materials
+    resolved = []
+    for item in materials:
+        if item.get("material_id"):
+            resolved.append(item)
+            continue
+        name = item.get("name", "").strip()
+        if not name:
+            continue
+        row = await pool.fetchrow(
+            """SELECT id::text FROM raw_materials
+               WHERE LOWER(TRIM(name)) = LOWER(TRIM($1))
+                  OR LOWER(TRIM($1)) LIKE (LOWER(TRIM(name)) || '%')
+                  OR LOWER(TRIM(name)) LIKE (LOWER(TRIM($1)) || '%')
+               ORDER BY
+                 CASE WHEN LOWER(TRIM(name)) = LOWER(TRIM($1)) THEN 1
+                      WHEN LOWER(TRIM($1)) LIKE (LOWER(TRIM(name)) || '%') THEN 2
+                      ELSE 3 END
+               LIMIT 1""",
+            name,
+        )
+        if row:
+            resolved.append({**item, "material_id": row["id"]})
+        else:
+            logger.warning(f"[resolve_names] لم يُعثر على مادة في DB بالاسم: '{name}'")
+            resolved.append(item)
+    return resolved
 
 
 async def _apply_deductions(pool, batch_id: str, batch_number: str,
@@ -545,12 +597,19 @@ async def create_batch(body: BatchCreate):
 
     # ── Deduct inventory ──────────────────────────────────────
     materials = _extract_materials(body)
-    if materials and body.transaction_id:
+    materials = await _resolve_names_to_ids(pool, materials)
+    # Filter to only items with a resolved material_id
+    deductible = [m for m in materials if m.get("material_id")]
+    if deductible and body.transaction_id:
         deduct_result = await _apply_deductions(
             pool, batch_id, body.batch_number,
-            body.transaction_id, materials, body.created_by,
+            body.transaction_id, deductible, body.created_by,
         )
         result["deduction"] = deduct_result
+    else:
+        unresolved = [m["name"] for m in materials if not m.get("material_id")]
+        if unresolved:
+            logger.warning(f"[create_batch] لم يُعثر على مواد في قاعدة البيانات: {unresolved}")
 
     # ── Deduct scrap qty from scrap warehouse ─────────────────
     if (body.scrap_qty or 0) > 0 and body.transaction_id:
@@ -657,10 +716,12 @@ async def update_batch(batch_id: str, body: BatchUpdate):
 
     # ── Apply new deductions ──────────────────────────────────
     materials = _extract_materials(body)
-    if materials and body.transaction_id:
+    materials = await _resolve_names_to_ids(pool, materials)
+    deductible = [m for m in materials if m.get("material_id")]
+    if deductible and body.transaction_id:
         deduct_result = await _apply_deductions(
             pool, batch_id, body.batch_number,
-            body.transaction_id, materials, body.created_by,
+            body.transaction_id, deductible, body.created_by,
         )
         result["deduction"] = deduct_result
 
