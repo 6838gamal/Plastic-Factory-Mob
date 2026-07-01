@@ -240,7 +240,8 @@ class BatchOperationsNotifier extends Notifier<AsyncValue<void>> {
         'description': 'فشل حفظ الطبخة: $e',
       });
       state = AsyncValue.error(e, StackTrace.current);
-      return BatchSaveResult(success: false, error: 'فشل الحفظ: $e');
+      final errMsg = e.toString().replaceFirst('Exception: ', '');
+      return BatchSaveResult(success: false, error: errMsg);
     }
   }
 

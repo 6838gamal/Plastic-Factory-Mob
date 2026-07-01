@@ -207,6 +207,13 @@ async def _apply_deductions(pool, batch_id: str, batch_number: str,
     if prevent_neg:
         insufficient = []
         for item in materials:
+            # Skip materials that could not be resolved to a DB id
+            if not item.get("material_id"):
+                logger.warning(
+                    f"[deduct] تجاوز المادة غير المعروفة: '{item.get('name')}' — لا يوجد material_id"
+                )
+                continue
+
             inv = await pool.fetchrow(
                 """SELECT i.balance, rm.min_stock
                    FROM inventory i
@@ -216,11 +223,25 @@ async def _apply_deductions(pool, batch_id: str, batch_number: str,
             )
             available = float(inv["balance"]) if inv else 0.0
             if available < item["quantity"]:
-                insufficient.append({**item, "available": available})
+                # Check main warehouse balance to give a helpful hint
+                main_inv = await pool.fetchrow(
+                    """SELECT balance FROM inventory
+                       WHERE material_id=$1 AND warehouse_type='main'""",
+                    item["material_id"],
+                )
+                main_balance = float(main_inv["balance"]) if main_inv else 0.0
+                insufficient.append({
+                    **item,
+                    "available": available,
+                    "main_balance": main_balance,
+                })
 
         if insufficient:
             for it in insufficient:
                 alert_tx_id = f"{transaction_id}_{it['material_id']}" if transaction_id else None
+                hint = ""
+                if it.get("main_balance", 0) > 0:
+                    hint = f" (في المخزن الرئيسي: {it['main_balance']:.3f} كجم — يُرجى التحويل أولاً)"
                 await pool.execute(
                     """INSERT INTO alerts
                        (id, alert_type, severity, material_id, material_name,
@@ -229,7 +250,7 @@ async def _apply_deductions(pool, batch_id: str, batch_number: str,
                                $1,$2,$3,$4,'pending',$5)
                        ON CONFLICT (transaction_id) WHERE transaction_id IS NOT NULL DO NOTHING""",
                     it["material_id"], it["name"], batch_number,
-                    f"مخزون غير كافٍ: {it['name']} — مطلوب {it['quantity']:.3f}، متاح {it['available']:.3f} كجم",
+                    f"مخزون غير كافٍ: {it['name']} — مطلوب {it['quantity']:.3f}، متاح {it['available']:.3f} كجم{hint}",
                     alert_tx_id,
                 )
             await pool.execute(
@@ -239,17 +260,40 @@ async def _apply_deductions(pool, batch_id: str, batch_number: str,
                 batch_id, transaction_id, created_by,
                 f"رُفض حفظ طبخة {batch_number}: مخزون غير كافٍ",
             )
+            items_summary = "; ".join([
+                f"{it['name']}: متاح {it['available']:.1f} كجم في الخلاط"
+                + (
+                    f" (الرئيسي: {it['main_balance']:.1f} كجم — حوِّل للخلاط أولاً)"
+                    if it.get("main_balance", 0) > 0
+                    else " (لا يوجد رصيد كافٍ)"
+                )
+                for it in insufficient
+            ])
             raise HTTPException(
                 status_code=400,
                 detail={
                     "error": "insufficient_stock",
-                    "message": "المخزون غير كافٍ لإتمام الطبخة",
-                    "items": insufficient,
+                    "message": f"مخزون الخلاط غير كافٍ — {items_summary}",
+                    "items": [
+                        {
+                            **it,
+                            "hint": (
+                                f"يوجد {it['main_balance']:.1f} كجم في المخزن الرئيسي — حوِّل الكمية المطلوبة للخلاط أولاً"
+                                if it.get("main_balance", 0) > 0
+                                else "لا يوجد رصيد كافٍ في الخلاط ولا في المخزن الرئيسي"
+                            ),
+                        }
+                        for it in insufficient
+                    ],
                 },
             )
 
     # ── 4. Deduct each material ───────────────────────────────
     for item in materials:
+        # Skip materials that could not be resolved to a DB id
+        if not item.get("material_id"):
+            continue
+
         inv = await pool.fetchrow(
             """SELECT i.balance, rm.min_stock
                FROM inventory i
