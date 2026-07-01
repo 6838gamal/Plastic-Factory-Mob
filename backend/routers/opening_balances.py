@@ -99,13 +99,13 @@ async def create_opening_balance(body: OpeningBalanceCreate):
             body.material_id, body.warehouse_type, body.balance,
         )
 
-        # Log opening balance as an 'in' transaction for traceability
+        # Log opening balance as 'opening' transaction (separate from regular 'in' receipts)
         old_bal = current or 0.0
         await pool.execute(
             """INSERT INTO inventory_transactions
                (id, material_id, warehouse_type, transaction_type, quantity,
                 created_by, notes, balance_before, balance_after)
-               VALUES (gen_random_uuid(), $1, $2, 'in', $3, $4, $5, $6, $7)""",
+               VALUES (gen_random_uuid(), $1, $2, 'opening', $3, $4, $5, $6, $7)""",
             body.material_id, body.warehouse_type, body.balance,
             body.created_by, body.reason or "رصيد افتتاحي",
             old_bal, body.balance,

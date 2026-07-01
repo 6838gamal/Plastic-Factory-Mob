@@ -490,7 +490,7 @@ CREATE VIEW inventory_summary AS
     i.updated_at,
     COALESCE(rm.cost_per_unit, 0)  AS cost_per_unit,
 
-    -- ── الرصيد الافتتاحي: آخر سجل لهذه المادة والمخزن ──────────
+    -- ── الرصيد الافتتاحي: آخر سجل في جدول opening_balances ──────
     COALESCE((
       SELECT ob.balance
       FROM   opening_balances ob
@@ -500,16 +500,17 @@ CREATE VIEW inventory_summary AS
       LIMIT  1
     ), 0) AS opening_balance,
 
-    -- ── إجمالي الوارد (in) ──────────────────────────────────────
+    -- ── إجمالي الوارد: استلام حقيقي (in) + مرتجعات (return) ─────
+    -- يستثني حركات الرصيد الافتتاحي (opening) والتحويلات
     COALESCE((
       SELECT SUM(it.quantity)
       FROM   inventory_transactions it
       WHERE  it.material_id::text = i.material_id::text
         AND  it.warehouse_type    = i.warehouse_type
-        AND  it.transaction_type  = 'in'
+        AND  it.transaction_type IN ('in', 'return')
     ), 0) AS total_in,
 
-    -- ── إجمالي الصادر (out) ─────────────────────────────────────
+    -- ── إجمالي المنصرف: طبخات (out) ─────────────────────────────
     COALESCE((
       SELECT SUM(it.quantity)
       FROM   inventory_transactions it
@@ -518,7 +519,7 @@ CREATE VIEW inventory_summary AS
         AND  it.transaction_type  = 'out'
     ), 0) AS total_out,
 
-    -- ── صافي التحويلات ──────────────────────────────────────────
+    -- ── صافي التحويلات (transfer_in − transfer_out) ──────────────
     COALESCE((
       SELECT SUM(
         CASE WHEN it.transaction_type = 'transfer_in'  THEN  it.quantity
