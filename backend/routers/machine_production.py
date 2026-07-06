@@ -69,7 +69,7 @@ async def _add_scrap_to_inventory(pool, production_id: str, batch_number: str,
         return
 
     inv = await pool.fetchrow(
-        "SELECT balance FROM inventory WHERE material_id=$1 AND warehouse_type='mixer'",
+        "SELECT balance FROM inventory WHERE material_id=$1::uuid AND warehouse_type='mixer'",
         scrap_mid,
     )
     balance_before = float(inv["balance"]) if inv else 0.0
@@ -77,7 +77,7 @@ async def _add_scrap_to_inventory(pool, production_id: str, batch_number: str,
 
     await pool.execute(
         """INSERT INTO inventory (id, material_id, warehouse_type, balance, updated_at)
-           VALUES (gen_random_uuid(), $1, 'mixer', $2, NOW())
+           VALUES (gen_random_uuid(), $1::uuid, 'mixer', $2, NOW())
            ON CONFLICT (material_id, warehouse_type)
            DO UPDATE SET balance = inventory.balance + $2, updated_at = NOW()""",
         scrap_mid, scrap_qty,
@@ -87,7 +87,7 @@ async def _add_scrap_to_inventory(pool, production_id: str, batch_number: str,
         """INSERT INTO inventory_transactions
            (id, material_id, warehouse_type, transaction_type, quantity,
             production_id, transaction_ref, created_by, notes, balance_before, balance_after)
-           VALUES (gen_random_uuid(), $1, 'mixer', 'in', $2, $3, $4, $5,
+           VALUES (gen_random_uuid(), $1::uuid, 'mixer', 'in', $2, $3, $4, $5,
                    'راجع من الإنتاج', $6, $7)""",
         scrap_mid, scrap_qty, production_id,
         f"scrap_{transaction_id}", created_by, balance_before, balance_after,
@@ -102,7 +102,7 @@ async def _remove_scrap_from_inventory(pool, production_id: str, scrap_qty: floa
     await pool.execute(
         """UPDATE inventory
            SET balance = GREATEST(balance - $1, 0), updated_at = NOW()
-           WHERE material_id = $2 AND warehouse_type = 'mixer'""",
+           WHERE material_id = $2::uuid AND warehouse_type = 'mixer'""",
         scrap_qty, scrap_mid,
     )
     await pool.execute(

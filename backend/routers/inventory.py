@@ -121,7 +121,7 @@ async def get_material_inventory(material_id: str, warehouse_type: str = Query(.
                        WHEN r.min_stock > 0 AND i.balance <= r.min_stock THEN 'low'
                        ELSE 'normal' END AS stock_status
            FROM inventory i JOIN raw_materials r ON r.id::text=i.material_id::text
-           WHERE i.material_id=$1 AND i.warehouse_type=$2""",
+           WHERE i.material_id=$1::uuid AND i.warehouse_type=$2""",
         material_id, warehouse_type,
     )
     return dict(row) if row else None
@@ -140,7 +140,7 @@ async def get_transactions(
     params = []
     i = 1
     if material_id:
-        conditions.append(f"it.material_id=${i}"); params.append(material_id); i += 1
+        conditions.append(f"it.material_id=${i}::uuid"); params.append(material_id); i += 1
     if warehouse_type:
         conditions.append(f"it.warehouse_type=${i}"); params.append(warehouse_type); i += 1
     if from_:
@@ -182,14 +182,14 @@ async def update_balance(body: BalanceUpdate):
     pool = await get_pool()
 
     inv = await pool.fetchrow(
-        "SELECT balance FROM inventory WHERE material_id=$1 AND warehouse_type=$2",
+        "SELECT balance FROM inventory WHERE material_id=$1::uuid AND warehouse_type=$2",
         body.material_id, body.warehouse_type,
     )
     balance_before = float(inv["balance"]) if inv else 0.0
 
     row = await pool.fetchrow(
         """INSERT INTO inventory (id, material_id, warehouse_type, balance, updated_at)
-           VALUES (gen_random_uuid(), $1, $2, $3, NOW())
+           VALUES (gen_random_uuid(), $1::uuid, $2, $3, NOW())
            ON CONFLICT (material_id, warehouse_type)
            DO UPDATE SET balance=$3, updated_at=NOW()
            RETURNING *""",
@@ -204,7 +204,7 @@ async def update_balance(body: BalanceUpdate):
             """INSERT INTO inventory_transactions
                (id, material_id, warehouse_type, transaction_type, quantity,
                 created_by, notes, balance_before, balance_after)
-               VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8)""",
+               VALUES (gen_random_uuid(), $1::uuid, $2, $3, $4, $5, $6, $7, $8)""",
             body.material_id, body.warehouse_type, tx_type, abs(diff),
             body.created_by, body.reason or "تعديل رصيد يدوي",
             balance_before, body.balance,
@@ -225,18 +225,18 @@ async def reset_material(body: ResetMaterialRequest):
     pool = await get_pool()
 
     inv = await pool.fetchrow(
-        "SELECT balance FROM inventory WHERE material_id=$1 AND warehouse_type=$2",
+        "SELECT balance FROM inventory WHERE material_id=$1::uuid AND warehouse_type=$2",
         body.material_id, body.warehouse_type,
     )
     balance_before = float(inv["balance"]) if inv else 0.0
 
-    rm = await pool.fetchrow("SELECT name FROM raw_materials WHERE id::text=$1", body.material_id)
+    rm = await pool.fetchrow("SELECT name FROM raw_materials WHERE id=$1::uuid", body.material_id)
     material_name = rm["name"] if rm else body.material_id
 
     deleted_tx = await pool.fetchval(
         """WITH deleted AS (
              DELETE FROM inventory_transactions
-             WHERE material_id::text=$1 AND warehouse_type=$2
+             WHERE material_id=$1::uuid AND warehouse_type=$2
              RETURNING id
            ) SELECT COUNT(*) FROM deleted""",
         body.material_id, body.warehouse_type,
@@ -245,7 +245,7 @@ async def reset_material(body: ResetMaterialRequest):
     deleted_ob = await pool.fetchval(
         """WITH deleted AS (
              DELETE FROM opening_balances
-             WHERE material_id::text=$1 AND warehouse_type=$2
+             WHERE material_id=$1::uuid AND warehouse_type=$2
              RETURNING id
            ) SELECT COUNT(*) FROM deleted""",
         body.material_id, body.warehouse_type,
@@ -253,7 +253,7 @@ async def reset_material(body: ResetMaterialRequest):
 
     row = await pool.fetchrow(
         """INSERT INTO inventory (id, material_id, warehouse_type, balance, updated_at)
-           VALUES (gen_random_uuid(), $1, $2, 0, NOW())
+           VALUES (gen_random_uuid(), $1::uuid, $2, 0, NOW())
            ON CONFLICT (material_id, warehouse_type)
            DO UPDATE SET balance=0, updated_at=NOW()
            RETURNING *""",
@@ -299,7 +299,7 @@ async def reset_material_both(body: ResetMaterialBothWarehousesRequest):
     pool = await get_pool()
     warehouses = ("main", "mixer")
 
-    rm = await pool.fetchrow("SELECT name FROM raw_materials WHERE id::text=$1", body.material_id)
+    rm = await pool.fetchrow("SELECT name FROM raw_materials WHERE id=$1::uuid", body.material_id)
     material_name = rm["name"] if rm else body.material_id
 
     async with pool.acquire() as conn:
@@ -307,24 +307,24 @@ async def reset_material_both(body: ResetMaterialBothWarehousesRequest):
             results = {}
             for wh in warehouses:
                 inv = await conn.fetchrow(
-                    "SELECT balance FROM inventory WHERE material_id=$1 AND warehouse_type=$2",
+                    "SELECT balance FROM inventory WHERE material_id=$1::uuid AND warehouse_type=$2",
                     body.material_id, wh,
                 )
                 balance_before = float(inv["balance"]) if inv else 0.0
 
                 await conn.execute(
                     """DELETE FROM inventory_transactions
-                       WHERE material_id::text=$1 AND warehouse_type=$2""",
+                       WHERE material_id=$1::uuid AND warehouse_type=$2""",
                     body.material_id, wh,
                 )
                 await conn.execute(
                     """DELETE FROM opening_balances
-                       WHERE material_id::text=$1 AND warehouse_type=$2""",
+                       WHERE material_id=$1::uuid AND warehouse_type=$2""",
                     body.material_id, wh,
                 )
                 row = await conn.fetchrow(
                     """INSERT INTO inventory (id, material_id, warehouse_type, balance, updated_at)
-                       VALUES (gen_random_uuid(), $1, $2, 0, NOW())
+                       VALUES (gen_random_uuid(), $1::uuid, $2, 0, NOW())
                        ON CONFLICT (material_id, warehouse_type)
                        DO UPDATE SET balance=0, updated_at=NOW()
                        RETURNING *""",
@@ -369,7 +369,7 @@ async def transfer_inventory(body: TransferRequest):
 
     # Check source balance
     src = await pool.fetchrow(
-        "SELECT balance FROM inventory WHERE material_id=$1 AND warehouse_type=$2",
+        "SELECT balance FROM inventory WHERE material_id=$1::uuid AND warehouse_type=$2",
         body.material_id, from_wh,
     )
     src_balance = float(src["balance"]) if src else 0.0
@@ -391,7 +391,7 @@ async def transfer_inventory(body: TransferRequest):
     new_src = src_balance - body.quantity
     await pool.execute(
         """INSERT INTO inventory (id, material_id, warehouse_type, balance, updated_at)
-           VALUES (gen_random_uuid(), $1, $2, $3, NOW())
+           VALUES (gen_random_uuid(), $1::uuid, $2, $3, NOW())
            ON CONFLICT (material_id, warehouse_type)
            DO UPDATE SET balance = inventory.balance - $4, updated_at = NOW()""",
         body.material_id, from_wh, new_src, body.quantity,
@@ -399,7 +399,7 @@ async def transfer_inventory(body: TransferRequest):
 
     # Add to destination
     dst = await pool.fetchrow(
-        "SELECT balance FROM inventory WHERE material_id=$1 AND warehouse_type=$2",
+        "SELECT balance FROM inventory WHERE material_id=$1::uuid AND warehouse_type=$2",
         body.material_id, to_wh,
     )
     dst_balance = float(dst["balance"]) if dst else 0.0
@@ -407,7 +407,7 @@ async def transfer_inventory(body: TransferRequest):
 
     await pool.execute(
         """INSERT INTO inventory (id, material_id, warehouse_type, balance, updated_at)
-           VALUES (gen_random_uuid(), $1, $2, $3, NOW())
+           VALUES (gen_random_uuid(), $1::uuid, $2, $3, NOW())
            ON CONFLICT (material_id, warehouse_type)
            DO UPDATE SET balance = inventory.balance + $4, updated_at = NOW()""",
         body.material_id, to_wh, new_dst, body.quantity,
@@ -421,7 +421,7 @@ async def transfer_inventory(body: TransferRequest):
         """INSERT INTO inventory_transactions
            (id, material_id, warehouse_type, transaction_type, quantity,
             transaction_ref, created_by, notes, balance_before, balance_after)
-           VALUES (gen_random_uuid(), $1, $2, 'transfer_out', $3, $4, $5, $6, $7, $8)""",
+           VALUES (gen_random_uuid(), $1::uuid, $2, 'transfer_out', $3, $4, $5, $6, $7, $8)""",
         body.material_id, from_wh, body.quantity, tx_ref,
         body.created_by, body.notes or f"تحويل من {from_wh} إلى {to_wh}",
         src_balance, new_src,
@@ -432,7 +432,7 @@ async def transfer_inventory(body: TransferRequest):
         """INSERT INTO inventory_transactions
            (id, material_id, warehouse_type, transaction_type, quantity,
             transaction_ref, created_by, notes, balance_before, balance_after)
-           VALUES (gen_random_uuid(), $1, $2, 'transfer_in', $3, $4, $5, $6, $7, $8)""",
+           VALUES (gen_random_uuid(), $1::uuid, $2, 'transfer_in', $3, $4, $5, $6, $7, $8)""",
         body.material_id, to_wh, body.quantity, tx_ref,
         body.created_by, body.notes or f"تحويل من {from_wh} إلى {to_wh}",
         dst_balance, new_dst,
@@ -445,7 +445,7 @@ async def transfer_inventory(body: TransferRequest):
         f"تحويل {body.quantity} كجم من {from_wh} إلى {to_wh}",
     )
 
-    rm = await pool.fetchrow("SELECT name, unit FROM raw_materials WHERE id=$1", body.material_id)
+    rm = await pool.fetchrow("SELECT name, unit FROM raw_materials WHERE id=$1::uuid", body.material_id)
     return {
         "success": True,
         "material_name": rm["name"] if rm else "",
@@ -464,7 +464,7 @@ async def add_transaction(body: TransactionCreate):
     pool = await get_pool()
 
     inv = await pool.fetchrow(
-        "SELECT balance FROM inventory WHERE material_id=$1 AND warehouse_type=$2",
+        "SELECT balance FROM inventory WHERE material_id=$1::uuid AND warehouse_type=$2",
         body.material_id, body.warehouse_type,
     )
     balance_before = float(inv["balance"]) if inv else 0.0
@@ -474,7 +474,7 @@ async def add_transaction(body: TransactionCreate):
 
     await pool.execute(
         """INSERT INTO inventory (id, material_id, warehouse_type, balance, updated_at)
-           VALUES (gen_random_uuid(), $1, $2, $3, NOW())
+           VALUES (gen_random_uuid(), $1::uuid, $2, $3, NOW())
            ON CONFLICT (material_id, warehouse_type)
            DO UPDATE SET balance = inventory.balance + $4, updated_at = NOW()""",
         body.material_id, body.warehouse_type, balance_after, qty_signed,
@@ -485,7 +485,7 @@ async def add_transaction(body: TransactionCreate):
            (id, material_id, warehouse_type, transaction_type, quantity,
             batch_id, production_id, transaction_ref, created_by, notes,
             balance_before, balance_after)
-           VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+           VALUES (gen_random_uuid(), $1::uuid, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
            RETURNING *""",
         body.material_id, body.warehouse_type, body.transaction_type, body.quantity,
         body.batch_id, body.production_id, body.transaction_ref, body.created_by,

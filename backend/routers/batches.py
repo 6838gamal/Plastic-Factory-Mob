@@ -232,7 +232,7 @@ async def _apply_deductions(pool, batch_id: str, batch_number: str,
                 """SELECT i.balance, rm.min_stock
                    FROM inventory i
                    JOIN raw_materials rm ON rm.id::text = i.material_id::text
-                   WHERE i.material_id=$1 AND i.warehouse_type='mixer'""",
+                   WHERE i.material_id=$1::uuid AND i.warehouse_type='mixer'""",
                 item["material_id"],
             )
             available = float(inv["balance"]) if inv else 0.0
@@ -240,7 +240,7 @@ async def _apply_deductions(pool, batch_id: str, batch_number: str,
                 # Check main warehouse balance to give a helpful hint
                 main_inv = await pool.fetchrow(
                     """SELECT balance FROM inventory
-                       WHERE material_id=$1 AND warehouse_type='main'""",
+                       WHERE material_id=$1::uuid AND warehouse_type='main'""",
                     item["material_id"],
                 )
                 main_balance = float(main_inv["balance"]) if main_inv else 0.0
@@ -312,7 +312,7 @@ async def _apply_deductions(pool, batch_id: str, batch_number: str,
             """SELECT i.balance, rm.min_stock
                FROM inventory i
                JOIN raw_materials rm ON rm.id::text = i.material_id::text
-               WHERE i.material_id=$1 AND i.warehouse_type='mixer'""",
+               WHERE i.material_id=$1::uuid AND i.warehouse_type='mixer'""",
             item["material_id"],
         )
         balance_before = float(inv["balance"]) if inv else 0.0
@@ -322,7 +322,7 @@ async def _apply_deductions(pool, batch_id: str, batch_number: str,
         # Upsert inventory row, subtracting qty
         await pool.execute(
             """INSERT INTO inventory (id, material_id, warehouse_type, balance, updated_at)
-               VALUES (gen_random_uuid(), $1, 'mixer', -$2::decimal, NOW())
+               VALUES (gen_random_uuid(), $1::uuid, 'mixer', -$2::decimal, NOW())
                ON CONFLICT (material_id, warehouse_type)
                DO UPDATE SET balance = inventory.balance - $2::decimal, updated_at = NOW()""",
             item["material_id"], item["quantity"],
@@ -333,7 +333,7 @@ async def _apply_deductions(pool, batch_id: str, batch_number: str,
             """INSERT INTO inventory_transactions
                (id, material_id, warehouse_type, transaction_type, quantity,
                 batch_id, transaction_ref, created_by, balance_before, balance_after)
-               VALUES (gen_random_uuid(),$1,'mixer','out',$2,$3,$4,$5,$6,$7)""",
+               VALUES (gen_random_uuid(),$1::uuid,'mixer','out',$2,$3,$4,$5,$6,$7)""",
             item["material_id"], item["quantity"],
             batch_id, transaction_id, created_by,
             balance_before, balance_after,
@@ -403,7 +403,7 @@ async def _reverse_deductions(pool, transaction_id: str,
         await pool.execute(
             """UPDATE inventory
                SET balance = balance + $1, updated_at = NOW()
-               WHERE material_id = $2 AND warehouse_type = $3""",
+               WHERE material_id = $2::uuid AND warehouse_type = $3""",
             txn["quantity"], txn["material_id"], txn["warehouse_type"],
         )
         # Return transaction record
@@ -411,7 +411,7 @@ async def _reverse_deductions(pool, transaction_id: str,
             """INSERT INTO inventory_transactions
                (id, material_id, warehouse_type, transaction_type, quantity,
                 transaction_ref, created_by, notes)
-               VALUES (gen_random_uuid(),$1,$2,'return',$3,$4,$5,$6)""",
+               VALUES (gen_random_uuid(),$1::uuid,$2,'return',$3,$4,$5,$6)""",
             txn["material_id"], txn["warehouse_type"], txn["quantity"],
             f"reverse_{transaction_id}", reversed_by, reason,
         )
@@ -683,14 +683,14 @@ async def create_batch(body: BatchCreate):
             scrap_mat_id = (scrap_setting["value"].strip() if scrap_setting else "")
             if scrap_mat_id:
                 inv = await pool.fetchrow(
-                    "SELECT balance FROM inventory WHERE material_id=$1 AND warehouse_type='scrap'",
+                    "SELECT balance FROM inventory WHERE material_id=$1::uuid AND warehouse_type='scrap'",
                     scrap_mat_id,
                 )
                 bal_before = float(inv["balance"]) if inv else 0.0
                 bal_after  = bal_before - body.scrap_qty
                 await pool.execute(
                     """INSERT INTO inventory (id, material_id, warehouse_type, balance, updated_at)
-                       VALUES (gen_random_uuid(), $1, 'scrap', -$2::decimal, NOW())
+                       VALUES (gen_random_uuid(), $1::uuid, 'scrap', -$2::decimal, NOW())
                        ON CONFLICT (material_id, warehouse_type)
                        DO UPDATE SET balance = inventory.balance - $2::decimal, updated_at = NOW()""",
                     scrap_mat_id, body.scrap_qty,
@@ -699,7 +699,7 @@ async def create_batch(body: BatchCreate):
                     """INSERT INTO inventory_transactions
                        (id, material_id, warehouse_type, transaction_type, quantity,
                         batch_id, transaction_ref, created_by, balance_before, balance_after, notes)
-                       VALUES (gen_random_uuid(),$1,'scrap','out',$2,$3,$4,$5,$6,$7,$8)""",
+                       VALUES (gen_random_uuid(),$1::uuid,'scrap','out',$2,$3,$4,$5,$6,$7,$8)""",
                     scrap_mat_id, body.scrap_qty,
                     batch_id, scrap_tx_id, body.created_by,
                     bal_before, bal_after,

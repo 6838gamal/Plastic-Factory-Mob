@@ -64,7 +64,7 @@ async def _add_to_scrap_warehouse(pool, material_id: str, qty_kg: float,
                                    ref: str, notes: str = "") -> float:
     """Add qty_kg to the scrap warehouse. Returns new balance."""
     inv = await pool.fetchrow(
-        "SELECT balance FROM inventory WHERE material_id=$1 AND warehouse_type='scrap'",
+        "SELECT balance FROM inventory WHERE material_id=$1::uuid AND warehouse_type='scrap'",
         material_id,
     )
     balance_before = float(inv["balance"]) if inv else 0.0
@@ -72,7 +72,7 @@ async def _add_to_scrap_warehouse(pool, material_id: str, qty_kg: float,
 
     await pool.execute(
         """INSERT INTO inventory (id, material_id, warehouse_type, balance, updated_at)
-           VALUES (gen_random_uuid(), $1, 'scrap', $2, NOW())
+           VALUES (gen_random_uuid(), $1::uuid, 'scrap', $2, NOW())
            ON CONFLICT (material_id, warehouse_type)
            DO UPDATE SET balance = inventory.balance + $2, updated_at = NOW()""",
         material_id, qty_kg,
@@ -81,7 +81,7 @@ async def _add_to_scrap_warehouse(pool, material_id: str, qty_kg: float,
         """INSERT INTO inventory_transactions
            (id, material_id, warehouse_type, transaction_type, quantity,
             transaction_ref, notes, balance_before, balance_after)
-           VALUES (gen_random_uuid(), $1, 'scrap', 'in', $2, $3, $4, $5, $6)""",
+           VALUES (gen_random_uuid(), $1::uuid, 'scrap', 'in', $2, $3, $4, $5, $6)""",
         material_id, qty_kg, ref, notes, balance_before, balance_after,
     )
     return balance_after

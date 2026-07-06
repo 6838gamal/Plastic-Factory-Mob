@@ -77,7 +77,7 @@ async def create_opening_balance(body: OpeningBalanceCreate):
 
     # ── Sync inventory balance ────────────────────────────────
     inv = await pool.fetchrow(
-        "SELECT balance FROM inventory WHERE material_id=$1 AND warehouse_type=$2",
+        "SELECT balance FROM inventory WHERE material_id=$1::uuid AND warehouse_type=$2",
         body.material_id, body.warehouse_type,
     )
     current = float(inv["balance"]) if inv else None
@@ -85,7 +85,7 @@ async def create_opening_balance(body: OpeningBalanceCreate):
     # Only override if no movements exist yet (inventory is untouched or zero)
     has_movements = await pool.fetchval(
         """SELECT COUNT(*) FROM inventory_transactions
-           WHERE material_id=$1 AND warehouse_type=$2
+           WHERE material_id=$1::uuid AND warehouse_type=$2
              AND transaction_type NOT IN ('adjustment')""",
         body.material_id, body.warehouse_type,
     )
@@ -93,7 +93,7 @@ async def create_opening_balance(body: OpeningBalanceCreate):
     if has_movements == 0 or current is None:
         await pool.execute(
             """INSERT INTO inventory (id, material_id, warehouse_type, balance, updated_at)
-               VALUES (gen_random_uuid(), $1, $2, $3, NOW())
+               VALUES (gen_random_uuid(), $1::uuid, $2, $3, NOW())
                ON CONFLICT (material_id, warehouse_type)
                DO UPDATE SET balance=$3, updated_at=NOW()""",
             body.material_id, body.warehouse_type, body.balance,
@@ -105,7 +105,7 @@ async def create_opening_balance(body: OpeningBalanceCreate):
             """INSERT INTO inventory_transactions
                (id, material_id, warehouse_type, transaction_type, quantity,
                 created_by, notes, balance_before, balance_after)
-               VALUES (gen_random_uuid(), $1, $2, 'opening', $3, $4, $5, $6, $7)""",
+               VALUES (gen_random_uuid(), $1::uuid, $2, 'opening', $3, $4, $5, $6, $7)""",
             body.material_id, body.warehouse_type, body.balance,
             body.created_by, body.reason or "رصيد افتتاحي",
             old_bal, body.balance,
@@ -132,14 +132,14 @@ async def update_opening_balance(ob_id: str, body: OpeningBalanceCreate):
     # ── Sync inventory if no movements have occurred ──────────
     has_movements = await pool.fetchval(
         """SELECT COUNT(*) FROM inventory_transactions
-           WHERE material_id=$1 AND warehouse_type=$2
+           WHERE material_id=$1::uuid AND warehouse_type=$2
              AND transaction_type NOT IN ('adjustment')""",
         body.material_id, body.warehouse_type,
     )
     if has_movements == 0:
         await pool.execute(
             """INSERT INTO inventory (id, material_id, warehouse_type, balance, updated_at)
-               VALUES (gen_random_uuid(), $1, $2, $3, NOW())
+               VALUES (gen_random_uuid(), $1::uuid, $2, $3, NOW())
                ON CONFLICT (material_id, warehouse_type)
                DO UPDATE SET balance=$3, updated_at=NOW()""",
             body.material_id, body.warehouse_type, body.balance,
