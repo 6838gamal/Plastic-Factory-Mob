@@ -233,8 +233,25 @@ async def post_receipt_voucher(voucher_id: str, performed_by: str = "admin"):
 
     for item in items:
         mat_id = item["material_id"]
+
+        # Fallback: look up by name when ID is missing
         if not mat_id:
-            continue
+            found = await pool.fetchrow(
+                "SELECT id FROM raw_materials WHERE LOWER(name) = LOWER($1)",
+                item["material_name"],
+            )
+            if found:
+                mat_id = str(found["id"])
+                await pool.execute(
+                    "UPDATE receipt_voucher_items SET material_id=$1::uuid WHERE id=$2",
+                    mat_id, item["id"],
+                )
+            else:
+                logger.warning(
+                    f"[post_receipt] No raw_material found for name='{item['material_name']}' — skipping"
+                )
+                continue
+
         qty = float(item["quantity"])
 
         # Add to main warehouse inventory
@@ -427,10 +444,30 @@ async def confirm_transfer_voucher(voucher_id: str, body: ConfirmTransferRequest
             override_map[oi.material_name] = oi.confirmed_qty or oi.requested_qty
 
     processed = 0
+    skipped = 0
     for item in items_db:
         mat_id = item["material_id"]
+
+        # Fallback: look up material by name if ID is missing
         if not mat_id:
-            continue
+            found = await pool.fetchrow(
+                "SELECT id FROM raw_materials WHERE LOWER(name) = LOWER($1)",
+                item["material_name"],
+            )
+            if found:
+                mat_id = str(found["id"])
+                # Update the item row so future operations use the correct ID
+                await pool.execute(
+                    "UPDATE transfer_voucher_items SET material_id=$1::uuid WHERE id=$2",
+                    mat_id, item["id"],
+                )
+            else:
+                logger.warning(
+                    f"[confirm_transfer] No raw_material found for name='{item['material_name']}' — skipping"
+                )
+                skipped += 1
+                continue
+
         confirmed_qty = override_map.get(item["material_name"], float(item["requested_qty"]))
         if confirmed_qty <= 0:
             continue
@@ -501,8 +538,8 @@ async def confirm_transfer_voucher(voucher_id: str, body: ConfirmTransferRequest
     )
     await _write_audit(pool, "confirm", "transfer_voucher", voucher_id,
                        body.confirmed_by or "مشرف الخلطات",
-                       {"voucher_number": v["voucher_number"], "items_processed": processed})
-    return {"status": "confirmed", "items_processed": processed}
+                       {"voucher_number": v["voucher_number"], "items_processed": processed, "items_skipped": skipped})
+    return {"status": "confirmed", "items_processed": processed, "items_skipped": skipped}
 
 
 @router.post("/transfer/{voucher_id}/cancel")

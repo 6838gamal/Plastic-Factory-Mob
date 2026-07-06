@@ -1073,79 +1073,111 @@ class _ItemRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hasId = entry.materialId != null && entry.materialId!.isNotEmpty;
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            flex: 3,
-            child: Autocomplete<InventorySummaryModel>(
-              optionsBuilder: (TextEditingValue textEditingValue) {
-                if (textEditingValue.text.isEmpty) return materials;
-                return materials
-                    .where((m) => m.materialName.contains(textEditingValue.text))
-                    .toList();
-              },
-              displayStringForOption: (m) => m.materialName,
-              fieldViewBuilder: (ctx, ctrl, fn, onSubmit) {
-                if (entry.name.isNotEmpty && ctrl.text.isEmpty) ctrl.text = entry.name;
-                return TextFormField(
-                  controller: ctrl,
-                  focusNode: fn,
-                  decoration: const InputDecoration(
-                    labelText: 'اسم المادة',
+          Row(
+            children: [
+              Expanded(
+                flex: 3,
+                child: Autocomplete<InventorySummaryModel>(
+                  optionsBuilder: (TextEditingValue textEditingValue) {
+                    if (textEditingValue.text.isEmpty) return materials;
+                    return materials
+                        .where((m) => m.materialName.toLowerCase().contains(textEditingValue.text.toLowerCase()))
+                        .toList();
+                  },
+                  displayStringForOption: (m) => m.materialName,
+                  fieldViewBuilder: (ctx, ctrl, fn, onSubmit) {
+                    if (entry.name.isNotEmpty && ctrl.text.isEmpty) ctrl.text = entry.name;
+                    return TextFormField(
+                      controller: ctrl,
+                      focusNode: fn,
+                      decoration: InputDecoration(
+                        labelText: 'اسم المادة',
+                        isDense: true,
+                        suffixIcon: entry.name.isNotEmpty
+                            ? Icon(
+                                hasId ? Icons.check_circle : Icons.warning_amber,
+                                size: 16,
+                                color: hasId ? Colors.green : Colors.orange,
+                              )
+                            : null,
+                      ),
+                      onChanged: (v) {
+                        entry.name = v;
+                        // Clear materialId when user types freely (not via dropdown selection)
+                        if (entry.materialId != null) {
+                          final matched = materials.any((m) => m.materialName == v);
+                          if (!matched) entry.materialId = null;
+                        }
+                        onChanged();
+                      },
+                    );
+                  },
+                  onSelected: (m) {
+                    entry.name = m.materialName;
+                    entry.unit = m.unit;
+                    entry.materialId = m.materialId;
+                    onChanged();
+                  },
+                ),
+              ),
+              const SizedBox(width: 8),
+              SizedBox(
+                width: 80,
+                child: TextFormField(
+                  initialValue: entry.qty > 0 ? entry.qty.toString() : '',
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: InputDecoration(
+                    labelText: 'الكمية',
+                    suffixText: entry.unit,
                     isDense: true,
                   ),
                   onChanged: (v) {
-                    entry.name = v;
+                    entry.qty = double.tryParse(v) ?? 0;
                     onChanged();
                   },
-                );
-              },
-              onSelected: (m) {
-                entry.name = m.materialName;
-                entry.unit = m.unit;
-                entry.materialId = m.materialId;
-                onChanged();
-              },
-            ),
-          ),
-          const SizedBox(width: 8),
-          SizedBox(
-            width: 80,
-            child: TextFormField(
-              initialValue: entry.qty > 0 ? entry.qty.toString() : '',
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: InputDecoration(
-                labelText: 'الكمية',
-                suffixText: entry.unit,
-                isDense: true,
+                ),
               ),
-              onChanged: (v) {
-                entry.qty = double.tryParse(v) ?? 0;
-                onChanged();
-              },
+              const SizedBox(width: 4),
+              SizedBox(
+                width: 72,
+                child: DropdownButtonFormField<String>(
+                  value: entry.unit,
+                  decoration: const InputDecoration(isDense: true, labelText: 'وحدة'),
+                  items: AppConstants.units
+                      .map((u) => DropdownMenuItem(value: u, child: Text(u, style: const TextStyle(fontSize: 12))))
+                      .toList(),
+                  onChanged: (v) {
+                    if (v != null) entry.unit = v;
+                    onChanged();
+                  },
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.remove_circle_outline, color: Colors.red, size: 20),
+                onPressed: onRemove,
+              ),
+            ],
+          ),
+          if (!hasId && entry.name.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(right: 8, top: 2, bottom: 2),
+              child: Row(
+                children: const [
+                  Icon(Icons.warning_amber_outlined, color: Colors.orange, size: 13),
+                  SizedBox(width: 4),
+                  Text(
+                    'اختر المادة من القائمة لضمان تحديث المخزون',
+                    style: TextStyle(color: Colors.orange, fontSize: 11),
+                  ),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(width: 4),
-          SizedBox(
-            width: 72,
-            child: DropdownButtonFormField<String>(
-              value: entry.unit,
-              decoration: const InputDecoration(isDense: true, labelText: 'وحدة'),
-              items: AppConstants.units
-                  .map((u) => DropdownMenuItem(value: u, child: Text(u, style: const TextStyle(fontSize: 12))))
-                  .toList(),
-              onChanged: (v) {
-                if (v != null) entry.unit = v;
-                onChanged();
-              },
-            ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.remove_circle_outline, color: Colors.red, size: 20),
-            onPressed: onRemove,
-          ),
         ],
       ),
     );
