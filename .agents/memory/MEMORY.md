@@ -23,3 +23,4 @@
 - [BatchModel null-safe fromJson](batch-model-null-safety.md) — shift/quantity fields nullable in DB; Dart non-nullable cast throws TypeError; always use `as Type? ?? default`.
 - [audit/inventory date asyncpg fix](audit-date-asyncpg-fix.md) — audit.py and inventory.py passed raw strings for TIMESTAMPTZ params; fixed with _parse_dt() helper returning timezone-aware datetime.
 - [Voucher item silent-drop bug](voucher-item-silent-drop.md) — never silently `.where()`-filter incomplete rows before save; validate explicitly and tell user which row index is incomplete.
+- [Inventory full reset](inventory-full-reset.md) — summary columns are computed from transactions/opening_balances, not stored; must delete rows to truly zero them, not just set balance=0.

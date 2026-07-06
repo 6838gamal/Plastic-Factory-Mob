@@ -305,6 +305,20 @@ class ApiDataSource {
     });
   }
 
+  Future<void> resetMaterialFull(
+    String materialId,
+    String warehouseType, {
+    String? reason,
+    String? createdBy,
+  }) async {
+    await _post('/api/inventory/reset-material', {
+      'material_id': materialId,
+      'warehouse_type': warehouseType,
+      'reason': reason,
+      'created_by': createdBy,
+    });
+  }
+
   Future<void> addInventoryTransaction(InventoryTransactionModel tx) async {
     await _post('/api/inventory/transactions', tx.toJson());
   }

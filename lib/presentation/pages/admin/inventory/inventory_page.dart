@@ -250,8 +250,8 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
               leading: CircleAvatar(
                   backgroundColor: Colors.red.shade700,
                   child: const Icon(Icons.exposure_zero, color: Colors.white)),
-              title: const Text('تصفير الرصيد'),
-              subtitle: const Text('إعادة رصيد مادة إلى صفر'),
+              title: const Text('تصفير بيانات مادة'),
+              subtitle: const Text('إعادة كل تفاصيل المادة (الرصيد، الوارد، المنصرف، التحويلات، الرصيد الافتتاحي) إلى صفر'),
               onTap: () {
                 Navigator.pop(context);
                 _showResetBalanceDialog(context, defaultWarehouse: _activeWarehouse);
@@ -288,7 +288,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
           title: Row(children: [
             Icon(Icons.exposure_zero, color: Colors.red.shade700),
             const SizedBox(width: 8),
-            const Text('تصفير الرصيد'),
+            const Text('تصفير بيانات مادة'),
           ]),
           content: Column(
             mainAxisSize: MainAxisSize.min,
@@ -310,13 +310,13 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
                   color: Colors.red.shade50,
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Row(
+                child: const Row(
                   children: [
-                    Icon(Icons.warning_amber_rounded, color: Colors.red.shade700, size: 18),
-                    const SizedBox(width: 8),
-                    const Expanded(
+                    Icon(Icons.warning_amber_rounded, color: Colors.red, size: 18),
+                    SizedBox(width: 8),
+                    Expanded(
                       child: Text(
-                        'سيُعاد الرصيد إلى صفر. هذا الإجراء لا يمكن التراجع عنه.',
+                        'سيتم تصفير كل تفاصيل هذه المادة في هذا المخزن إلى صفر: الرصيد الحالي، إجمالي الوارد، إجمالي المنصرف، التحويلات، التسويات، والرصيد الافتتاحي. هذا الإجراء لا يمكن التراجع عنه.',
                         style: TextStyle(fontSize: 12, color: Colors.red),
                       ),
                     ),
@@ -326,7 +326,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
               const SizedBox(height: 8),
               CheckboxListTile(
                 value: confirmed,
-                title: const Text('أؤكد تصفير رصيد هذه المادة', style: TextStyle(fontSize: 13)),
+                title: const Text('أؤكد تصفير كل بيانات هذه المادة', style: TextStyle(fontSize: 13)),
                 onChanged: (v) => ss(() => confirmed = v ?? false),
                 contentPadding: EdgeInsets.zero,
               ),
@@ -342,17 +342,18 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
               onPressed: !confirmed || selected == null ? null : () async {
                 try {
                   final ds = ref.read(dataSourceProvider);
-                  await ds.updateInventoryBalance(
+                  final authState = ref.read(authProvider);
+                  await ds.resetMaterialFull(
                     selected!.materialId,
                     defaultWarehouse,
-                    0,
+                    createdBy: authState.user?.email ?? 'admin',
                   );
                   ref.invalidate(_summaryProvider);
                   ref.invalidate(_txProvider(''));
                   if (ctx.mounted) {
                     Navigator.pop(ctx);
                     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                        content: Text('تم تصفير رصيد ${selected!.materialName}'),
+                        content: Text('تم تصفير كل بيانات ${selected!.materialName}'),
                         backgroundColor: Colors.red.shade700));
                   }
                 } catch (e) {

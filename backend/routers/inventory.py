@@ -26,6 +26,13 @@ class BalanceUpdate(BaseModel):
     created_by: Optional[str] = None
 
 
+class ResetMaterialRequest(BaseModel):
+    material_id: str
+    warehouse_type: str
+    reason: Optional[str] = None
+    created_by: Optional[str] = None
+
+
 class TransferRequest(BaseModel):
     material_id: str
     quantity: float
@@ -198,6 +205,84 @@ async def update_balance(body: BalanceUpdate):
         )
 
     return dict(row)
+
+
+@router.post("/reset-material")
+async def reset_material(body: ResetMaterialRequest):
+    """Admin full reset: zero out ALL details for a material in a warehouse.
+
+    Clears current balance, total in/out, transfers and adjustments (by
+    deleting the underlying inventory_transactions rows) and the opening
+    balance (by deleting opening_balances rows), so every column shown in
+    inventory_summary for this material+warehouse becomes 0. Irreversible.
+    """
+    pool = await get_pool()
+
+    inv = await pool.fetchrow(
+        "SELECT balance FROM inventory WHERE material_id=$1 AND warehouse_type=$2",
+        body.material_id, body.warehouse_type,
+    )
+    balance_before = float(inv["balance"]) if inv else 0.0
+
+    rm = await pool.fetchrow("SELECT name FROM raw_materials WHERE id::text=$1", body.material_id)
+    material_name = rm["name"] if rm else body.material_id
+
+    deleted_tx = await pool.fetchval(
+        """WITH deleted AS (
+             DELETE FROM inventory_transactions
+             WHERE material_id::text=$1 AND warehouse_type=$2
+             RETURNING id
+           ) SELECT COUNT(*) FROM deleted""",
+        body.material_id, body.warehouse_type,
+    )
+
+    deleted_ob = await pool.fetchval(
+        """WITH deleted AS (
+             DELETE FROM opening_balances
+             WHERE material_id::text=$1 AND warehouse_type=$2
+             RETURNING id
+           ) SELECT COUNT(*) FROM deleted""",
+        body.material_id, body.warehouse_type,
+    )
+
+    row = await pool.fetchrow(
+        """INSERT INTO inventory (id, material_id, warehouse_type, balance, updated_at)
+           VALUES (gen_random_uuid(), $1, $2, 0, NOW())
+           ON CONFLICT (material_id, warehouse_type)
+           DO UPDATE SET balance=0, updated_at=NOW()
+           RETURNING *""",
+        body.material_id, body.warehouse_type,
+    )
+
+    import json as _json
+    await pool.execute(
+        """INSERT INTO audit_log
+           (id, action, table_name, record_id, old_values, new_values,
+            user_email, description)
+           VALUES (gen_random_uuid(), 'reset', 'inventory', NULL, $1, $2, $3, $4)""",
+        _json.dumps({
+            "balance": balance_before,
+            "material_id": body.material_id,
+            "warehouse_type": body.warehouse_type,
+        }),
+        _json.dumps({
+            "balance": 0, "total_in": 0, "total_out": 0,
+            "total_transfers": 0, "opening_balance": 0,
+        }),
+        body.created_by,
+        body.reason or f"تصفير كامل لبيانات مادة {material_name} في مخزن {body.warehouse_type}",
+    )
+
+    return {
+        "success": True,
+        "material_id": body.material_id,
+        "material_name": material_name,
+        "warehouse_type": body.warehouse_type,
+        "balance_before": balance_before,
+        "deleted_transactions": deleted_tx,
+        "deleted_opening_balances": deleted_ob,
+        "inventory": dict(row),
+    }
 
 
 @router.post("/transfer")
