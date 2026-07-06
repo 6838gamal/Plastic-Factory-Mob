@@ -511,6 +511,97 @@ class ApiDataSource {
     await _post('/api/dashboard/reset/$counter', {});
   }
 
+  // ==================== VOUCHERS ====================
+
+  // Receipt vouchers
+  Future<List<Map<String, dynamic>>> getReceiptVouchers({String? status}) async {
+    final res = await _get('/api/vouchers/receipt',
+        query: status != null ? {'status': status} : null);
+    return List<Map<String, dynamic>>.from((res as List).map((e) => Map<String, dynamic>.from(e as Map)));
+  }
+
+  Future<Map<String, dynamic>> getReceiptVoucher(String id) async {
+    final res = await _get('/api/vouchers/receipt/$id');
+    return Map<String, dynamic>.from(res as Map);
+  }
+
+  Future<Map<String, dynamic>> createReceiptVoucher(Map<String, dynamic> data) async {
+    final res = await _post('/api/vouchers/receipt', data);
+    return Map<String, dynamic>.from(res as Map);
+  }
+
+  Future<Map<String, dynamic>> updateReceiptVoucher(String id, Map<String, dynamic> data) async {
+    final uri = Uri.parse('$_baseUrl/api/vouchers/receipt/$id');
+    final res = await http.patch(uri, headers: _headers, body: jsonEncode(data));
+    if (res.statusCode >= 400) throw Exception(jsonDecode(res.body)['detail'] ?? 'Request failed');
+    return Map<String, dynamic>.from(jsonDecode(res.body) as Map);
+  }
+
+  Future<Map<String, dynamic>> postReceiptVoucher(String id) async {
+    final res = await _post('/api/vouchers/receipt/$id/post', {});
+    return Map<String, dynamic>.from(res as Map);
+  }
+
+  // Transfer vouchers
+  Future<List<Map<String, dynamic>>> getTransferVouchers({String? status}) async {
+    final res = await _get('/api/vouchers/transfer',
+        query: status != null ? {'status': status} : null);
+    return List<Map<String, dynamic>>.from((res as List).map((e) => Map<String, dynamic>.from(e as Map)));
+  }
+
+  Future<List<Map<String, dynamic>>> getPendingTransfers() async {
+    final res = await _get('/api/vouchers/transfer/pending');
+    return List<Map<String, dynamic>>.from((res as List).map((e) => Map<String, dynamic>.from(e as Map)));
+  }
+
+  Future<Map<String, dynamic>> getTransferVoucher(String id) async {
+    final res = await _get('/api/vouchers/transfer/$id');
+    return Map<String, dynamic>.from(res as Map);
+  }
+
+  Future<Map<String, dynamic>> createTransferVoucher(Map<String, dynamic> data) async {
+    final res = await _post('/api/vouchers/transfer', data);
+    return Map<String, dynamic>.from(res as Map);
+  }
+
+  Future<Map<String, dynamic>> updateTransferVoucher(String id, Map<String, dynamic> data) async {
+    final uri = Uri.parse('$_baseUrl/api/vouchers/transfer/$id');
+    final res = await http.patch(uri, headers: _headers, body: jsonEncode(data));
+    if (res.statusCode >= 400) throw Exception(jsonDecode(res.body)['detail'] ?? 'Request failed');
+    return Map<String, dynamic>.from(jsonDecode(res.body) as Map);
+  }
+
+  Future<Map<String, dynamic>> submitTransferVoucher(String id) async {
+    final res = await _post('/api/vouchers/transfer/$id/submit', {});
+    return Map<String, dynamic>.from(res as Map);
+  }
+
+  Future<Map<String, dynamic>> confirmTransferVoucher(String id, Map<String, dynamic> data) async {
+    final res = await _post('/api/vouchers/transfer/$id/confirm', data);
+    return Map<String, dynamic>.from(res as Map);
+  }
+
+  Future<Map<String, dynamic>> cancelTransferVoucher(String id) async {
+    final res = await _post('/api/vouchers/transfer/$id/cancel', {});
+    return Map<String, dynamic>.from(res as Map);
+  }
+
+  // Return vouchers
+  Future<List<Map<String, dynamic>>> getReturnVouchers() async {
+    final res = await _get('/api/vouchers/return');
+    return List<Map<String, dynamic>>.from((res as List).map((e) => Map<String, dynamic>.from(e as Map)));
+  }
+
+  Future<Map<String, dynamic>> createReturnVoucher(Map<String, dynamic> data) async {
+    final res = await _post('/api/vouchers/return', data);
+    return Map<String, dynamic>.from(res as Map);
+  }
+
+  Future<Map<String, dynamic>> postReturnVoucher(String id) async {
+    final res = await _post('/api/vouchers/return/$id/post', {});
+    return Map<String, dynamic>.from(res as Map);
+  }
+
   // ==================== HEALTH ====================
   Future<bool> isHealthy() async {
     try {

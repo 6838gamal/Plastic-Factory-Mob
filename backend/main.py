@@ -110,6 +110,82 @@ async def _init_db():
         except Exception as exc:
             logger.warning(f"[init_db] Shift handover migration skipped: {exc}")
 
+    # ── Vouchers tables (سندات الاستلام والتحويل والمرتجع) ─────────────────
+    for _v_stmt in [
+        """CREATE TABLE IF NOT EXISTS receipt_vouchers (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          voucher_number VARCHAR(50) NOT NULL,
+          supplier_name VARCHAR(200),
+          date DATE NOT NULL DEFAULT CURRENT_DATE,
+          status VARCHAR(20) NOT NULL DEFAULT 'draft',
+          notes TEXT,
+          created_by VARCHAR(200) DEFAULT 'admin',
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )""",
+        """CREATE TABLE IF NOT EXISTS receipt_voucher_items (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          voucher_id UUID NOT NULL REFERENCES receipt_vouchers(id) ON DELETE CASCADE,
+          material_id TEXT,
+          material_name VARCHAR(300) NOT NULL,
+          unit VARCHAR(20) NOT NULL DEFAULT 'كجم',
+          quantity DECIMAL(12,3) NOT NULL DEFAULT 0,
+          notes TEXT,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )""",
+        """CREATE TABLE IF NOT EXISTS transfer_vouchers (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          voucher_number VARCHAR(50) NOT NULL,
+          status VARCHAR(20) NOT NULL DEFAULT 'draft',
+          warehouse_from VARCHAR(20) NOT NULL DEFAULT 'main',
+          warehouse_to VARCHAR(20) NOT NULL DEFAULT 'mixer',
+          notes TEXT,
+          created_by VARCHAR(200) DEFAULT 'admin',
+          confirmed_by VARCHAR(200),
+          confirmed_at TIMESTAMPTZ,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )""",
+        """CREATE TABLE IF NOT EXISTS transfer_voucher_items (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          voucher_id UUID NOT NULL REFERENCES transfer_vouchers(id) ON DELETE CASCADE,
+          material_id TEXT,
+          material_name VARCHAR(300) NOT NULL,
+          unit VARCHAR(20) NOT NULL DEFAULT 'كجم',
+          requested_qty DECIMAL(12,3) NOT NULL DEFAULT 0,
+          confirmed_qty DECIMAL(12,3),
+          notes TEXT,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )""",
+        """CREATE TABLE IF NOT EXISTS return_vouchers (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          voucher_number VARCHAR(50) NOT NULL,
+          original_voucher_id UUID REFERENCES transfer_vouchers(id),
+          reason TEXT,
+          status VARCHAR(20) NOT NULL DEFAULT 'draft',
+          created_by VARCHAR(200) DEFAULT 'admin',
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )""",
+        """CREATE TABLE IF NOT EXISTS return_voucher_items (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          voucher_id UUID NOT NULL REFERENCES return_vouchers(id) ON DELETE CASCADE,
+          material_id TEXT,
+          material_name VARCHAR(300) NOT NULL,
+          unit VARCHAR(20) NOT NULL DEFAULT 'كجم',
+          quantity DECIMAL(12,3) NOT NULL DEFAULT 0,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )""",
+        "CREATE INDEX IF NOT EXISTS idx_receipt_vouchers_status ON receipt_vouchers(status)",
+        "CREATE INDEX IF NOT EXISTS idx_transfer_vouchers_status ON transfer_vouchers(status)",
+        "CREATE INDEX IF NOT EXISTS idx_transfer_vouchers_created ON transfer_vouchers(created_at DESC)",
+        "CREATE INDEX IF NOT EXISTS idx_return_vouchers_original ON return_vouchers(original_voucher_id)",
+    ]:
+        try:
+            await pool.execute(_v_stmt)
+        except Exception as exc:
+            logger.warning(f"[init_db] Voucher table migration skipped: {exc}")
+
     # ── Counter resets table ───────────────────────────────────────────────
     await pool.execute("""
         CREATE TABLE IF NOT EXISTS counter_resets (
@@ -357,6 +433,7 @@ from routers import (
     shifts, opening_balances, reports, settings, day,
 )
 from routers import stock_take, recipes, shift_handover, sms
+from routers import vouchers
 
 
 @asynccontextmanager
@@ -457,6 +534,7 @@ app.include_router(day.router)
 app.include_router(recipes.router)
 app.include_router(shift_handover.router)
 app.include_router(sms.router)
+app.include_router(vouchers.router)
 
 
 # ─── Health & System Info ─────────────────────────────────────────────────────
