@@ -157,6 +157,20 @@ class ApiDataSource {
     return res as Map<String, dynamic>;
   }
 
+  Future<Map<String, dynamic>> getWarehouseAccount() async {
+    final res = await _get('/api/auth/warehouse-account');
+    return res as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> upsertWarehouseAccount(
+      String email, String password) async {
+    final res = await _put('/api/auth/warehouse-account', {
+      'email': email,
+      'password': password,
+    });
+    return res as Map<String, dynamic>;
+  }
+
   Future<Map<String, dynamic>> forgotPassword(
       String email, String newPassword) async {
     final res = await _post('/api/auth/forgot-password', {

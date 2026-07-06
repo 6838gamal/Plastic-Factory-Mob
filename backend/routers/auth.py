@@ -203,6 +203,59 @@ async def change_email(body: ChangeEmailRequest):
     }
 
 
+# ── Warehouse Manager Account (admin-controlled) ──────────────────────────────
+
+class WarehouseAccountRequest(BaseModel):
+    email: str
+    password: str
+
+
+@router.get("/warehouse-account")
+async def get_warehouse_account():
+    """Return the warehouse manager account email (or null if not yet created)."""
+    pool = await get_pool()
+    row = await pool.fetchrow(
+        "SELECT id, email FROM admin_users WHERE role='warehouse_manager' LIMIT 1"
+    )
+    if row:
+        return {"exists": True, "email": row["email"]}
+    return {"exists": False, "email": None}
+
+
+@router.put("/warehouse-account")
+async def upsert_warehouse_account(body: WarehouseAccountRequest):
+    """Admin creates or updates the warehouse manager credentials (no old-password required)."""
+    pool = await get_pool()
+    if not body.email or not body.password:
+        raise HTTPException(status_code=400, detail="البريد وكلمة المرور مطلوبان")
+    if len(body.password) < 6:
+        raise HTTPException(status_code=400, detail="كلمة المرور يجب أن تكون 6 أحرف على الأقل")
+
+    # Check if email used by a non-warehouse account
+    conflict = await pool.fetchrow(
+        "SELECT id FROM admin_users WHERE email=$1 AND role!='warehouse_manager'", body.email
+    )
+    if conflict:
+        raise HTTPException(status_code=400, detail="هذا البريد مستخدم من قِبَل حساب إداري آخر")
+
+    hashed = bcrypt.hashpw(body.password.encode(), bcrypt.gensalt()).decode()
+    existing = await pool.fetchrow(
+        "SELECT id FROM admin_users WHERE role='warehouse_manager' LIMIT 1"
+    )
+    if existing:
+        await pool.execute(
+            "UPDATE admin_users SET email=$1, password_hash=$2 WHERE id=$3",
+            body.email, hashed, existing["id"],
+        )
+    else:
+        await pool.execute(
+            "INSERT INTO admin_users (id, email, password_hash, role) "
+            "VALUES (gen_random_uuid(), $1, $2, 'warehouse_manager')",
+            body.email, hashed,
+        )
+    return {"success": True, "message": "تم حفظ بيانات أمين المخزن بنجاح"}
+
+
 # ── OTP / Forgot-password flow ────────────────────────────────────────────────
 
 @router.post("/send-otp")

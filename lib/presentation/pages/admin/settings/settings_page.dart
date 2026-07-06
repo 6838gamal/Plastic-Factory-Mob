@@ -12,6 +12,11 @@ final _smsSettingsProvider = FutureProvider<Map<String, dynamic>>((ref) async {
   return ds.getSmsSettings();
 });
 
+final _warehouseAccountProvider = FutureProvider<Map<String, dynamic>>((ref) async {
+  final ds = ref.read(dataSourceProvider);
+  return ds.getWarehouseAccount();
+});
+
 class SettingsPage extends ConsumerStatefulWidget {
   const SettingsPage({super.key});
 
@@ -68,6 +73,80 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 onTap: () => _showChangePasswordDialog(context),
               ),
             ],
+          ),
+        ),
+
+        const SizedBox(height: 16),
+
+        // ── حساب أمين المخزن ────────────────────────────────────
+        _SectionTitle('حساب أمين المخزن'),
+        ref.watch(_warehouseAccountProvider).when(
+          data: (info) {
+            final exists = info['exists'] as bool? ?? false;
+            final email = info['email'] as String?;
+            return Card(
+              child: Column(
+                children: [
+                  ListTile(
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.teal.withOpacity(0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.warehouse, color: Colors.teal),
+                    ),
+                    title: const Text('أمين المخزن الرئيسي'),
+                    subtitle: exists
+                        ? Text(email ?? '—',
+                            style: const TextStyle(
+                                fontSize: 12, color: Colors.teal))
+                        : const Text('لم يُنشأ الحساب بعد',
+                            style: TextStyle(
+                                fontSize: 12, color: Colors.orange)),
+                    trailing: exists
+                        ? const Icon(Icons.verified_user,
+                            color: Colors.teal, size: 18)
+                        : const Icon(Icons.warning_amber,
+                            color: Colors.orange, size: 18),
+                  ),
+                  const Divider(height: 0),
+                  ListTile(
+                    leading: const Icon(Icons.edit, color: Colors.blue, size: 20),
+                    title: Text(exists ? 'تعديل البريد الإلكتروني' : 'إنشاء الحساب'),
+                    subtitle: const Text('تغيير بريد أمين المخزن'),
+                    trailing: const Icon(Icons.arrow_forward_ios, size: 14),
+                    onTap: () => _showWarehouseEmailDialog(context, email ?? ''),
+                  ),
+                  const Divider(height: 0),
+                  ListTile(
+                    leading: const Icon(Icons.lock_reset,
+                        color: Colors.orange, size: 20),
+                    title: const Text('تغيير كلمة المرور'),
+                    subtitle: const Text('تعيين كلمة مرور جديدة لأمين المخزن'),
+                    trailing: const Icon(Icons.arrow_forward_ios, size: 14),
+                    onTap: () =>
+                        _showWarehousePasswordDialog(context, email ?? ''),
+                  ),
+                ],
+              ),
+            );
+          },
+          loading: () => const Card(
+            child: Padding(
+              padding: EdgeInsets.all(24),
+              child: Center(child: CircularProgressIndicator()),
+            ),
+          ),
+          error: (e, _) => Card(
+            child: ListTile(
+              leading: const Icon(Icons.error_outline, color: Colors.red),
+              title: Text('خطأ في تحميل حساب أمين المخزن: $e'),
+              trailing: ElevatedButton(
+                onPressed: () => ref.invalidate(_warehouseAccountProvider),
+                child: const Text('إعادة'),
+              ),
+            ),
           ),
         ),
 
@@ -381,6 +460,250 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 }
               },
               child: const Text('حفظ'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── حساب أمين المخزن — تعديل البريد ──────────────────────────
+  void _showWarehouseEmailDialog(BuildContext context, String currentEmail) {
+    final emailCtrl = TextEditingController(text: currentEmail);
+    final passCtrl = TextEditingController();
+    bool obscure = true;
+    String? errorMsg;
+    bool loading = false;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, ss) => AlertDialog(
+          title: const Row(children: [
+            Icon(Icons.warehouse, color: Colors.teal),
+            SizedBox(width: 8),
+            Text('بيانات أمين المخزن'),
+          ]),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: emailCtrl,
+                keyboardType: TextInputType.emailAddress,
+                textDirection: TextDirection.ltr,
+                decoration: const InputDecoration(
+                  labelText: 'البريد الإلكتروني',
+                  prefixIcon: Icon(Icons.email_outlined),
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: passCtrl,
+                obscureText: obscure,
+                decoration: InputDecoration(
+                  labelText: 'كلمة المرور الجديدة',
+                  prefixIcon: const Icon(Icons.lock_outlined),
+                  border: const OutlineInputBorder(),
+                  suffixIcon: IconButton(
+                    icon: Icon(obscure
+                        ? Icons.visibility_outlined
+                        : Icons.visibility_off_outlined),
+                    onPressed: () => ss(() => obscure = !obscure),
+                  ),
+                ),
+              ),
+              if (errorMsg != null) ...[
+                const SizedBox(height: 8),
+                Text(errorMsg!,
+                    style: const TextStyle(color: Colors.red, fontSize: 13)),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(
+                onPressed: loading ? null : () => Navigator.pop(ctx),
+                child: const Text('إلغاء')),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.teal, foregroundColor: Colors.white),
+              onPressed: loading
+                  ? null
+                  : () async {
+                      final email = emailCtrl.text.trim();
+                      final pass = passCtrl.text;
+                      if (email.isEmpty || pass.isEmpty) {
+                        ss(() => errorMsg = 'يرجى ملء جميع الحقول');
+                        return;
+                      }
+                      if (pass.length < 6) {
+                        ss(() => errorMsg =
+                            'كلمة المرور يجب أن تكون 6 أحرف على الأقل');
+                        return;
+                      }
+                      ss(() { loading = true; errorMsg = null; });
+                      try {
+                        await ref
+                            .read(dataSourceProvider)
+                            .upsertWarehouseAccount(email, pass);
+                        ref.invalidate(_warehouseAccountProvider);
+                        if (ctx.mounted) Navigator.pop(ctx);
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                  content: Text(
+                                      'تم حفظ بيانات أمين المخزن بنجاح'),
+                                  backgroundColor: Colors.green));
+                        }
+                      } catch (e) {
+                        ss(() {
+                          loading = false;
+                          errorMsg = e
+                              .toString()
+                              .replaceFirst('Exception: ', '');
+                        });
+                      }
+                    },
+              child: loading
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white))
+                  : const Text('حفظ'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── حساب أمين المخزن — تغيير كلمة المرور فقط ─────────────────
+  void _showWarehousePasswordDialog(BuildContext context, String currentEmail) {
+    if (currentEmail.isEmpty) {
+      _showWarehouseEmailDialog(context, '');
+      return;
+    }
+    final passCtrl = TextEditingController();
+    final confirmCtrl = TextEditingController();
+    bool obscure = true;
+    String? errorMsg;
+    bool loading = false;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, ss) => AlertDialog(
+          title: const Row(children: [
+            Icon(Icons.lock_reset, color: Colors.orange),
+            SizedBox(width: 8),
+            Text('تغيير كلمة مرور أمين المخزن'),
+          ]),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.teal.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(children: [
+                  const Icon(Icons.person_outline,
+                      color: Colors.teal, size: 16),
+                  const SizedBox(width: 6),
+                  Text(currentEmail,
+                      style: const TextStyle(
+                          fontSize: 13, color: Colors.teal)),
+                ]),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: passCtrl,
+                obscureText: obscure,
+                decoration: InputDecoration(
+                  labelText: 'كلمة المرور الجديدة',
+                  prefixIcon: const Icon(Icons.lock_open_outlined),
+                  border: const OutlineInputBorder(),
+                  suffixIcon: IconButton(
+                    icon: Icon(obscure
+                        ? Icons.visibility_outlined
+                        : Icons.visibility_off_outlined),
+                    onPressed: () => ss(() => obscure = !obscure),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: confirmCtrl,
+                obscureText: true,
+                decoration: const InputDecoration(
+                  labelText: 'تأكيد كلمة المرور',
+                  prefixIcon: Icon(Icons.check_circle_outline),
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              if (errorMsg != null) ...[
+                const SizedBox(height: 8),
+                Text(errorMsg!,
+                    style: const TextStyle(color: Colors.red, fontSize: 13)),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(
+                onPressed: loading ? null : () => Navigator.pop(ctx),
+                child: const Text('إلغاء')),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.orange,
+                  foregroundColor: Colors.white),
+              onPressed: loading
+                  ? null
+                  : () async {
+                      final pass = passCtrl.text;
+                      final confirm = confirmCtrl.text;
+                      if (pass.isEmpty || confirm.isEmpty) {
+                        ss(() => errorMsg = 'يرجى ملء جميع الحقول');
+                        return;
+                      }
+                      if (pass.length < 6) {
+                        ss(() => errorMsg =
+                            'كلمة المرور يجب أن تكون 6 أحرف على الأقل');
+                        return;
+                      }
+                      if (pass != confirm) {
+                        ss(() => errorMsg = 'كلمة المرور غير متطابقة');
+                        return;
+                      }
+                      ss(() { loading = true; errorMsg = null; });
+                      try {
+                        await ref
+                            .read(dataSourceProvider)
+                            .upsertWarehouseAccount(currentEmail, pass);
+                        if (ctx.mounted) Navigator.pop(ctx);
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                  content: Text('تم تغيير كلمة المرور بنجاح'),
+                                  backgroundColor: Colors.green));
+                        }
+                      } catch (e) {
+                        ss(() {
+                          loading = false;
+                          errorMsg = e
+                              .toString()
+                              .replaceFirst('Exception: ', '');
+                        });
+                      }
+                    },
+              child: loading
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white))
+                  : const Text('حفظ'),
             ),
           ],
         ),
