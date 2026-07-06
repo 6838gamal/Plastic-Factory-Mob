@@ -48,6 +48,7 @@ class InventoryModel {
 class InventoryTransactionModel {
   final String id;
   final String materialId;
+  final String materialName;
   final String warehouseType;
   final String transactionType; // 'in', 'out', 'transfer'
   final double quantity;
@@ -61,6 +62,7 @@ class InventoryTransactionModel {
   const InventoryTransactionModel({
     required this.id,
     required this.materialId,
+    this.materialName = '',
     required this.warehouseType,
     required this.transactionType,
     required this.quantity,
@@ -76,6 +78,7 @@ class InventoryTransactionModel {
       InventoryTransactionModel(
         id: json['id'] as String,
         materialId: json['material_id'] as String,
+        materialName: json['material_name'] as String? ?? '',
         warehouseType: json['warehouse_type'] as String,
         transactionType: json['transaction_type'] as String,
         quantity: (json['quantity'] as num).toDouble(),

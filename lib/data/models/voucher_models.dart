@@ -53,6 +53,7 @@ class ReceiptVoucherModel {
   final String? createdAt;
   final int itemCount;
   final List<VoucherItemModel> items;
+  final List<String> itemNames;
 
   const ReceiptVoucherModel({
     this.id,
@@ -68,6 +69,7 @@ class ReceiptVoucherModel {
     this.createdAt,
     this.itemCount = 0,
     this.items = const [],
+    this.itemNames = const [],
   });
 
   factory ReceiptVoucherModel.fromJson(Map<String, dynamic> json) => ReceiptVoucherModel(
@@ -87,6 +89,11 @@ class ReceiptVoucherModel {
                 ?.map((e) => VoucherItemModel.fromJson(e as Map<String, dynamic>))
                 .toList() ??
             [],
+        itemNames: (json['item_names'] as List<dynamic>?)
+                ?.map((e) => e as String? ?? '')
+                .where((s) => s.isNotEmpty)
+                .toList() ??
+            [],
       );
 }
 
@@ -103,6 +110,7 @@ class TransferVoucherModel {
   final String? confirmedAt;
   final int itemCount;
   final List<VoucherItemModel> items;
+  final List<String> itemNames;
 
   const TransferVoucherModel({
     this.id,
@@ -115,6 +123,7 @@ class TransferVoucherModel {
     this.confirmedAt,
     this.itemCount = 0,
     this.items = const [],
+    this.itemNames = const [],
   });
 
   bool get isDraft => status == 'draft';
@@ -138,6 +147,11 @@ class TransferVoucherModel {
                 ?.map((e) => VoucherItemModel.fromJson(e as Map<String, dynamic>))
                 .toList() ??
             [],
+        itemNames: (json['item_names'] as List<dynamic>?)
+                ?.map((e) => e as String? ?? '')
+                .where((s) => s.isNotEmpty)
+                .toList() ??
+            [],
       );
 }
 
@@ -154,6 +168,7 @@ class ReturnVoucherModel {
   final String? createdAt;
   final int itemCount;
   final List<VoucherItemModel> items;
+  final List<String> itemNames;
 
   const ReturnVoucherModel({
     this.id,
@@ -166,6 +181,7 @@ class ReturnVoucherModel {
     this.createdAt,
     this.itemCount = 0,
     this.items = const [],
+    this.itemNames = const [],
   });
 
   factory ReturnVoucherModel.fromJson(Map<String, dynamic> json) => ReturnVoucherModel(
@@ -180,6 +196,11 @@ class ReturnVoucherModel {
         itemCount: (json['item_count'] as num? ?? 0).toInt(),
         items: (json['items'] as List<dynamic>?)
                 ?.map((e) => VoucherItemModel.fromJson(e as Map<String, dynamic>))
+                .toList() ??
+            [],
+        itemNames: (json['item_names'] as List<dynamic>?)
+                ?.map((e) => e as String? ?? '')
+                .where((s) => s.isNotEmpty)
                 .toList() ??
             [],
       );
@@ -197,6 +218,7 @@ class WithdrawalVoucherModel {
   final String? createdAt;
   final int itemCount;
   final List<VoucherItemModel> items;
+  final List<String> itemNames;
 
   const WithdrawalVoucherModel({
     this.id,
@@ -208,6 +230,7 @@ class WithdrawalVoucherModel {
     this.createdAt,
     this.itemCount = 0,
     this.items = const [],
+    this.itemNames = const [],
   });
 
   bool get isDraft => status == 'draft';
@@ -227,6 +250,11 @@ class WithdrawalVoucherModel {
         itemCount: (json['item_count'] as num? ?? 0).toInt(),
         items: (json['items'] as List<dynamic>?)
                 ?.map((e) => VoucherItemModel.fromJson(e as Map<String, dynamic>))
+                .toList() ??
+            [],
+        itemNames: (json['item_names'] as List<dynamic>?)
+                ?.map((e) => e as String? ?? '')
+                .where((s) => s.isNotEmpty)
                 .toList() ??
             [],
       );

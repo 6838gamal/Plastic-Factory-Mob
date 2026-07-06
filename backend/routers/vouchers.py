@@ -127,7 +127,9 @@ def _row_to_dict(row) -> dict:
 async def list_receipt_vouchers(status: Optional[str] = Query(None)):
     pool = await get_pool()
     rows = await pool.fetch(
-        """SELECT rv.*, COUNT(ri.id)::int AS item_count
+        """SELECT rv.*, COUNT(ri.id)::int AS item_count,
+                  COALESCE(array_agg(ri.material_name ORDER BY ri.created_at)
+                           FILTER (WHERE ri.id IS NOT NULL), ARRAY[]::text[]) AS item_names
            FROM receipt_vouchers rv
            LEFT JOIN receipt_voucher_items ri ON ri.voucher_id = rv.id
            WHERE ($1::text IS NULL OR rv.status = $1)
@@ -433,7 +435,9 @@ async def post_receipt_voucher(voucher_id: str, performed_by: str = "admin"):
 async def list_transfer_vouchers(status: Optional[str] = Query(None)):
     pool = await get_pool()
     rows = await pool.fetch(
-        """SELECT tv.*, COUNT(ti.id)::int AS item_count
+        """SELECT tv.*, COUNT(ti.id)::int AS item_count,
+                  COALESCE(array_agg(ti.material_name ORDER BY ti.created_at)
+                           FILTER (WHERE ti.id IS NOT NULL), ARRAY[]::text[]) AS item_names
            FROM transfer_vouchers tv
            LEFT JOIN transfer_voucher_items ti ON ti.voucher_id = tv.id
            WHERE ($1::text IS NULL OR tv.status = $1)
@@ -448,7 +452,9 @@ async def list_transfer_vouchers(status: Optional[str] = Query(None)):
 async def list_pending_transfers():
     pool = await get_pool()
     rows = await pool.fetch(
-        """SELECT tv.*, COUNT(ti.id)::int AS item_count
+        """SELECT tv.*, COUNT(ti.id)::int AS item_count,
+                  COALESCE(array_agg(ti.material_name ORDER BY ti.created_at)
+                           FILTER (WHERE ti.id IS NOT NULL), ARRAY[]::text[]) AS item_names
            FROM transfer_vouchers tv
            LEFT JOIN transfer_voucher_items ti ON ti.voucher_id = tv.id
            WHERE tv.status = 'pending'
@@ -698,7 +704,9 @@ async def list_return_vouchers():
     pool = await get_pool()
     rows = await pool.fetch(
         """SELECT rv.*, tv.voucher_number AS original_voucher_number,
-                  COUNT(ri.id)::int AS item_count
+                  COUNT(ri.id)::int AS item_count,
+                  COALESCE(array_agg(ri.material_name ORDER BY ri.created_at)
+                           FILTER (WHERE ri.id IS NOT NULL), ARRAY[]::text[]) AS item_names
            FROM return_vouchers rv
            LEFT JOIN transfer_vouchers tv ON tv.id = rv.original_voucher_id
            LEFT JOIN return_voucher_items ri ON ri.voucher_id = rv.id
@@ -860,7 +868,9 @@ async def _next_withdrawal_number(pool) -> str:
 async def list_withdrawal_vouchers(status: Optional[str] = Query(None)):
     pool = await get_pool()
     rows = await pool.fetch(
-        """SELECT wv.*, COUNT(wi.id)::int AS item_count
+        """SELECT wv.*, COUNT(wi.id)::int AS item_count,
+                  COALESCE(array_agg(wi.material_name ORDER BY wi.created_at)
+                           FILTER (WHERE wi.id IS NOT NULL), ARRAY[]::text[]) AS item_names
            FROM withdrawal_vouchers wv
            LEFT JOIN withdrawal_voucher_items wi ON wi.voucher_id = wv.id
            WHERE ($1::text IS NULL OR wv.status = $1)

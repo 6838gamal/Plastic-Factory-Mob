@@ -1474,6 +1474,12 @@ class _TxCard extends StatelessWidget {
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (tx.materialName.isNotEmpty)
+              Text(
+                tx.materialName,
+                style: const TextStyle(
+                    fontSize: 12, fontWeight: FontWeight.w600),
+              ),
             Text(
               '${tx.createdAt.toLocal().toString().substring(0, 16)}  •  ${tx.createdBy}',
               style: const TextStyle(fontSize: 11),
@@ -1499,7 +1505,7 @@ class _TxCard extends StatelessWidget {
             ),
           ],
         ),
-        isThreeLine: tx.notes != null && tx.notes!.isNotEmpty,
+        isThreeLine: tx.materialName.isNotEmpty || (tx.notes != null && tx.notes!.isNotEmpty),
       ),
     );
   }

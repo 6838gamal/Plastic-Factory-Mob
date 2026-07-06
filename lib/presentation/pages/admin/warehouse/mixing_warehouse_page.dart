@@ -300,6 +300,30 @@ class _ReturnVoucherCard extends ConsumerWidget {
                   style: TextStyle(color: Colors.grey[700], fontSize: 12),
                 ),
               ]),
+            if (voucher.itemNames.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 4,
+                runSpacing: 4,
+                children: voucher.itemNames
+                    .map((name) => Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: Colors.deepOrange.shade50,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                                color: Colors.deepOrange.shade200,
+                                width: 0.8),
+                          ),
+                          child: Text(name,
+                              style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.deepOrange.shade800)),
+                        ))
+                    .toList(),
+              ),
+            ],
             if (voucher.reason?.isNotEmpty == true) ...[
               const SizedBox(height: 4),
               Text(

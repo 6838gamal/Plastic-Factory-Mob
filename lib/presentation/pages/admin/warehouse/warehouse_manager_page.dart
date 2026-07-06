@@ -295,6 +295,31 @@ class _ReceiptVoucherCard extends ConsumerWidget {
               ]),
             ],
 
+            // ── Material names chips ─────────────────────────────
+            if (voucher.itemNames.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 4,
+                runSpacing: 4,
+                children: voucher.itemNames
+                    .map((name) => Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: Colors.teal.shade50,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                                color: Colors.teal.shade200, width: 0.8),
+                          ),
+                          child: Text(name,
+                              style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.teal.shade800)),
+                        ))
+                    .toList(),
+              ),
+            ],
+
             // ── Date / count ─────────────────────────────────────
             const SizedBox(height: 4),
             Row(
@@ -640,6 +665,29 @@ class TransferVoucherCard extends ConsumerWidget {
                 Text('${voucher.itemCount} صنف', style: TextStyle(color: Colors.grey[600], fontSize: 12)),
               ],
             ),
+            if (voucher.itemNames.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 4,
+                runSpacing: 4,
+                children: voucher.itemNames
+                    .map((name) => Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.shade50,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                                color: Colors.blue.shade200, width: 0.8),
+                          ),
+                          child: Text(name,
+                              style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.blue.shade800)),
+                        ))
+                    .toList(),
+              ),
+            ],
             if (voucher.notes?.isNotEmpty == true) ...[
               const SizedBox(height: 4),
               Text(voucher.notes!, style: TextStyle(color: Colors.grey[700], fontSize: 12)),
@@ -1580,6 +1628,30 @@ class _WithdrawalVoucherCard extends ConsumerWidget {
                   Expanded(child: Text(voucher.purpose!, style: const TextStyle(fontSize: 13))),
                 ]),
               ),
+            if (voucher.itemNames.isNotEmpty) ...[
+              Wrap(
+                spacing: 4,
+                runSpacing: 4,
+                children: voucher.itemNames
+                    .map((name) => Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: Colors.deepOrange.shade50,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                                color: Colors.deepOrange.shade200,
+                                width: 0.8),
+                          ),
+                          child: Text(name,
+                              style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.deepOrange.shade800)),
+                        ))
+                    .toList(),
+              ),
+              const SizedBox(height: 6),
+            ],
             Row(
               children: [
                 const Icon(Icons.list_alt, size: 14, color: Colors.grey),
