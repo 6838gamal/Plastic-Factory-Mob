@@ -957,6 +957,21 @@ class _ReceiptVoucherDialogState extends ConsumerState<_ReceiptVoucherDialog> {
       );
       return;
     }
+    final incompleteIndexes = <int>[
+      for (var i = 0; i < _items.length; i++)
+        if (_items[i].name.isEmpty || _items[i].qty <= 0) i + 1,
+    ];
+    if (incompleteIndexes.isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'أكمل بيانات البند رقم ${incompleteIndexes.join('، ')} (اختر المادة وأدخل كمية أكبر من صفر) قبل الحفظ',
+          ),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
     setState(() => _loading = true);
     try {
       final ds = ref.read(dataSourceProvider);
@@ -969,7 +984,6 @@ class _ReceiptVoucherDialogState extends ConsumerState<_ReceiptVoucherDialog> {
         'created_by': keeperName,
         'received_by': keeperName,
         'items': _items
-            .where((e) => e.name.isNotEmpty && e.qty > 0)
             .map((e) => {
                   'material_name': e.name,
                   'unit': e.unit,
@@ -1207,11 +1221,25 @@ class _TransferVoucherDialogState extends ConsumerState<_TransferVoucherDialog> 
       );
       return;
     }
+    final incompleteIndexes = <int>[
+      for (var i = 0; i < _items.length; i++)
+        if (_items[i].name.isEmpty || _items[i].qty <= 0) i + 1,
+    ];
+    if (incompleteIndexes.isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'أكمل بيانات البند رقم ${incompleteIndexes.join('، ')} (اختر المادة وأدخل كمية أكبر من صفر) قبل الحفظ',
+          ),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
     setState(() => _loading = true);
     try {
       final ds = ref.read(dataSourceProvider);
       final itemsList = _items
-          .where((e) => e.name.isNotEmpty && e.qty > 0)
           .map((e) => {
                 'material_name': e.name,
                 'unit': e.unit,
@@ -1824,6 +1852,21 @@ class _WithdrawalVoucherDialogState extends ConsumerState<_WithdrawalVoucherDial
       );
       return;
     }
+    final incompleteIndexes = <int>[
+      for (var i = 0; i < _items.length; i++)
+        if (_items[i].name.isEmpty || _items[i].qty <= 0) i + 1,
+    ];
+    if (incompleteIndexes.isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'أكمل بيانات البند رقم ${incompleteIndexes.join('، ')} (اختر المادة وأدخل كمية أكبر من صفر) قبل الحفظ',
+          ),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
     setState(() => _loading = true);
     try {
       final ds = ref.read(dataSourceProvider);
@@ -1833,7 +1876,6 @@ class _WithdrawalVoucherDialogState extends ConsumerState<_WithdrawalVoucherDial
         'notes': _notesCtrl.text.trim(),
         'created_by': keeperName,
         'items': _items
-            .where((e) => e.name.isNotEmpty && e.qty > 0)
             .map((e) => {
                   'material_name': e.name,
                   'unit': e.unit,

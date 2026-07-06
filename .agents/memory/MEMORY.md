@@ -22,3 +22,4 @@
 - [Shift handover formula](shift-handover-formula.md) — Expected = opening_from_last_shift + received_from_main - batch_inputs; opening_stock comes from last confirmed/frozen handover's actual_stock_kg (NOT from mixer_balance); unknown_waste = max(0, deficit - scrap_declared).
 - [BatchModel null-safe fromJson](batch-model-null-safety.md) — shift/quantity fields nullable in DB; Dart non-nullable cast throws TypeError; always use `as Type? ?? default`.
 - [audit/inventory date asyncpg fix](audit-date-asyncpg-fix.md) — audit.py and inventory.py passed raw strings for TIMESTAMPTZ params; fixed with _parse_dt() helper returning timezone-aware datetime.
+- [Voucher item silent-drop bug](voucher-item-silent-drop.md) — never silently `.where()`-filter incomplete rows before save; validate explicitly and tell user which row index is incomplete.
