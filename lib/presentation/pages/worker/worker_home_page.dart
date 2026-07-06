@@ -44,6 +44,11 @@ class _WorkerHomePageState extends ConsumerState<WorkerHomePage> {
         ],
       ),
       drawer: _WorkerDrawer(
+        selectedIndex: _selectedIndex,
+        onNavigate: (index) {
+          Navigator.pop(context); // أغلق الدرج أولاً
+          setState(() => _selectedIndex = index);
+        },
         onAdminAccess: () => _showAdminLogin(),
       ),
       body: OfflineBannerWrapper(child: _pages[_selectedIndex]),
@@ -92,14 +97,22 @@ class _WorkerHomePageState extends ConsumerState<WorkerHomePage> {
 }
 
 class _WorkerDrawer extends ConsumerWidget {
+  final int selectedIndex;
+  final ValueChanged<int> onNavigate;
   final VoidCallback onAdminAccess;
-  const _WorkerDrawer({required this.onAdminAccess});
+
+  const _WorkerDrawer({
+    required this.selectedIndex,
+    required this.onNavigate,
+    required this.onAdminAccess,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Drawer(
       child: Column(
         children: [
+          // ── رأس الدرج ─────────────────────────────────────────
           DrawerHeader(
             decoration: const BoxDecoration(
               gradient: LinearGradient(
@@ -132,23 +145,38 @@ class _WorkerDrawer extends ConsumerWidget {
               ],
             ),
           ),
-          ListTile(
-            leading: const Icon(Icons.blender),
-            title: const Text(AppStrings.batchEntry),
-            onTap: () => Navigator.pop(context),
+          // ── عناصر التنقل ──────────────────────────────────────
+          _DrawerItem(
+            icon: Icons.blender_outlined,
+            selectedIcon: Icons.blender,
+            label: AppStrings.batchEntry,
+            selected: selectedIndex == 0,
+            onTap: () => onNavigate(0),
           ),
-          ListTile(
-            leading: const Icon(Icons.precision_manufacturing),
-            title: const Text(AppStrings.machineEntry),
-            onTap: () => Navigator.pop(context),
+          _DrawerItem(
+            icon: Icons.precision_manufacturing_outlined,
+            selectedIcon: Icons.precision_manufacturing,
+            label: AppStrings.machineEntry,
+            selected: selectedIndex == 1,
+            onTap: () => onNavigate(1),
           ),
-          ListTile(
-            leading: const Icon(Icons.info_outline),
-            title: const Text(AppStrings.appInfo),
-            onTap: () => Navigator.pop(context),
+          _DrawerItem(
+            icon: Icons.swap_horiz_outlined,
+            selectedIcon: Icons.swap_horiz,
+            label: 'تسليم الوردية',
+            selected: selectedIndex == 2,
+            onTap: () => onNavigate(2),
+          ),
+          _DrawerItem(
+            icon: Icons.info_outline,
+            selectedIcon: Icons.info,
+            label: AppStrings.appInfo,
+            selected: selectedIndex == 3,
+            onTap: () => onNavigate(3),
           ),
           const Spacer(),
           const Divider(),
+          // ── لوحة الإدارة ──────────────────────────────────────
           ListTile(
             leading: Container(
               padding: const EdgeInsets.all(6),
@@ -171,6 +199,18 @@ class _WorkerDrawer extends ConsumerWidget {
               onAdminAccess();
             },
           ),
+          // ── تسجيل الخروج ──────────────────────────────────────
+          ListTile(
+            leading: const Icon(Icons.logout, color: Colors.red),
+            title: const Text(
+              'تسجيل الخروج',
+              style: TextStyle(color: Colors.red, fontWeight: FontWeight.w600),
+            ),
+            onTap: () async {
+              Navigator.pop(context);
+              await ref.read(authProvider.notifier).signOut();
+            },
+          ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Text(
@@ -180,6 +220,45 @@ class _WorkerDrawer extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+// ── عنصر درج مع تمييز المحدد ──────────────────────────────────────────────
+class _DrawerItem extends StatelessWidget {
+  final IconData icon;
+  final IconData selectedIcon;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _DrawerItem({
+    required this.icon,
+    required this.selectedIcon,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = selected
+        ? Theme.of(context).colorScheme.primary
+        : null;
+    return ListTile(
+      leading: Icon(selected ? selectedIcon : icon, color: color),
+      title: Text(
+        label,
+        style: TextStyle(
+          fontWeight: selected ? FontWeight.w700 : FontWeight.normal,
+          color: color,
+        ),
+      ),
+      selected: selected,
+      selectedTileColor:
+          Theme.of(context).colorScheme.primary.withOpacity(0.08),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      onTap: onTap,
     );
   }
 }

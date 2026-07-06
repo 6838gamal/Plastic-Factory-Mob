@@ -12,15 +12,21 @@ import '../../../data/models/inventory_summary_model.dart';
 import '../../../data/datasources/api_datasource.dart';
 import '../../providers/auth_provider.dart';
 
-// ── رصيد مخزن الخلاط: اسم المادة (lowercase) → الرصيد الحالي ────────────────
+// ── نوع رصيد مادة: الرصيد + الوحدة الأصلية من المخزن ───────────────────────
+typedef _BalInfo = ({double balance, String unit});
+
+// ── رصيد مخزن الخلاط: اسم المادة (lowercase) → رصيد + وحدة ────────────────
 final _mixerBalanceProvider =
-    FutureProvider.autoDispose<Map<String, double>>((ref) async {
+    FutureProvider.autoDispose<Map<String, _BalInfo>>((ref) async {
   final ds = ref.read(dataSourceProvider);
   final items = await ds.getInventorySummary();
   return {
     for (final item in items)
       if (item.warehouseType == AppConstants.warehouseMixer)
-        item.materialName.toLowerCase().trim(): item.currentBalance,
+        item.materialName.toLowerCase().trim(): (
+          balance: item.currentBalance,
+          unit: item.unit,
+        ),
   };
 });
 
@@ -396,9 +402,9 @@ class _BatchEntryPageState extends ConsumerState<BatchEntryPage> {
     final mixtureTypes = ref.watch(mixtureTypesProvider);
     final opsState = ref.watch(batchOperationsProvider);
 
-    // رصيد مخزن الخلاط — Map<اسم المادة (lowercase), رصيد كجم>
+    // رصيد مخزن الخلاط — Map<اسم المادة (lowercase), (balance, unit)>
     final mixerBal = ref.watch(_mixerBalanceProvider).value ?? {};
-    double? _bal(String label) => mixerBal[label.toLowerCase().trim()];
+    _BalInfo? _bal(String label) => mixerBal[label.toLowerCase().trim()];
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -757,8 +763,8 @@ class _MatRow extends StatelessWidget {
   final TextEditingController ctrl;
   final String unit;
 
-  /// رصيد مخزن الخلاط بالكجم — null تعني المادة غير موجودة في مخزن الخلاط
-  final double? balance;
+  /// رصيد مخزن الخلاط — null تعني المادة غير موجودة في مخزن الخلاط
+  final _BalInfo? balance;
 
   const _MatRow({
     required this.label,
@@ -767,13 +773,40 @@ class _MatRow extends StatelessWidget {
     this.balance,
   });
 
+  // ── تنسيق رقم (يحذف الكسر إذا كان صفراً) ──────────────────────────────
+  static String _fmt(double v) =>
+      v % 1 == 0 ? v.toInt().toString() : v.toStringAsFixed(2);
+
+  // ── بناء نص العرض للرصيد ────────────────────────────────────────────────
+  //
+  // القواعد:
+  //  كيلو / كجم  → "X كجم"                 (نفس الوحدة، يكفي)
+  //  جرام        → "X جرام  (≈ Y كجم)"      (تحويل ÷ 1000)
+  //  لتر         → "X لتر"                  (لا يوجد كثافة ثابتة)
+  //  قطعة        → "X قطعة"                 (لا تحويل)
+  //  غير ذلك     → "X [وحدة]"
+  String _buildBalText(double bal, String rawUnit) {
+    final u = rawUnit.trim();
+    switch (u) {
+      case 'كيلو':
+      case 'كجم':
+        return 'متاح: ${_fmt(bal)} كجم';
+      case 'جرام':
+        final kg = bal / 1000;
+        return 'متاح: ${_fmt(bal)} جرام  (≈ ${_fmt(kg)} كجم)';
+      default:
+        // لتر، قطعة، وأي وحدة أخرى — نعرضها كما هي
+        return 'متاح: ${_fmt(bal)} $u';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final hasBalance = balance != null;
-    final isEmpty = hasBalance && balance! <= 0;
-    final balColor = isEmpty
-        ? Colors.red.shade600
-        : Colors.teal.shade700;
+    final info = balance;
+    final hasBalance = info != null;
+    final isEmpty = hasBalance && info.balance <= 0;
+    final balColor =
+        isEmpty ? Colors.red.shade600 : Colors.teal.shade700;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
@@ -791,7 +824,7 @@ class _MatRow extends StatelessWidget {
                     style: const TextStyle(
                         fontWeight: FontWeight.w500, fontSize: 13)),
                 if (hasBalance) ...[
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 3),
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -803,12 +836,14 @@ class _MatRow extends StatelessWidget {
                         color: balColor,
                       ),
                       const SizedBox(width: 3),
-                      Text(
-                        'متاح: ${balance! % 1 == 0 ? balance!.toInt() : balance!.toStringAsFixed(2)} كجم',
-                        style: TextStyle(
-                            fontSize: 11,
-                            color: balColor,
-                            fontWeight: FontWeight.w500),
+                      Flexible(
+                        child: Text(
+                          _buildBalText(info.balance, info.unit),
+                          style: TextStyle(
+                              fontSize: 11,
+                              color: balColor,
+                              fontWeight: FontWeight.w500),
+                        ),
                       ),
                     ],
                   ),
