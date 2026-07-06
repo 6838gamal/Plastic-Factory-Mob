@@ -8,6 +8,7 @@ import '../../widgets/common/offline_banner.dart';
 import 'batch_entry_page.dart';
 import 'machine_entry_page.dart';
 import 'shift_handover_page.dart';
+import '../admin/warehouse/warehouse_manager_page.dart';
 
 class WorkerHomePage extends ConsumerStatefulWidget {
   const WorkerHomePage({super.key});
@@ -174,6 +175,39 @@ class _WorkerDrawer extends ConsumerWidget {
             onTap: () => onNavigate(3),
           ),
           const Spacer(),
+          const Divider(),
+          // ── أمين المخزن ────────────────────────────────────────
+          ListTile(
+            leading: Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: Colors.teal.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.warehouse, color: Colors.teal, size: 22),
+            ),
+            title: const Text(
+              'لوحة أمين المخزن',
+              style: TextStyle(fontWeight: FontWeight.w600, color: Colors.teal),
+            ),
+            subtitle: const Text('سندات الاستلام والتحويل', style: TextStyle(fontSize: 11)),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => Scaffold(
+                    appBar: AppBar(
+                      title: const Text('المخزن الرئيسي — أمين المخزن'),
+                      backgroundColor: Colors.teal,
+                      foregroundColor: Colors.white,
+                    ),
+                    body: const WarehouseManagerPage(),
+                  ),
+                ),
+              );
+            },
+          ),
           const Divider(),
           // ── لوحة الإدارة ──────────────────────────────────────
           ListTile(
