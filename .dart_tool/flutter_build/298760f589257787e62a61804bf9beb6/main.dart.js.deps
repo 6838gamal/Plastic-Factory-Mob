@@ -832,6 +832,7 @@ file:///home/runner/workspace/lib/presentation/widgets/common/loading_widget.dar
 file:///home/runner/workspace/lib/presentation/widgets/common/offline_banner.dart
 file:///home/runner/workspace/lib/presentation/widgets/common/severity_chip.dart
 file:///home/runner/workspace/lib/presentation/widgets/common/stat_card.dart
+file:///home/runner/workspace/lib/presentation/widgets/warehouse/warehouse_login_dialog.dart
 file:///nix/store/i07crp4mg1rimd97s1byrq4gasg7dsk5-flutter-wrapped-3.32.0-sdk-links/bin/cache/flutter_web_sdk/kernel/dart2js_platform.dill
 file:///nix/store/i07crp4mg1rimd97s1byrq4gasg7dsk5-flutter-wrapped-3.32.0-sdk-links/packages/flutter/lib/animation.dart
 file:///nix/store/i07crp4mg1rimd97s1byrq4gasg7dsk5-flutter-wrapped-3.32.0-sdk-links/packages/flutter/lib/cupertino.dart
