@@ -48,9 +48,12 @@ class VoucherItem(BaseModel):
 
 class ReceiptVoucherCreate(BaseModel):
     supplier_name: Optional[str] = None
+    supplier_phone: Optional[str] = None
+    supplier_ref: Optional[str] = None
     date: Optional[DateType] = None
     notes: Optional[str] = None
     created_by: Optional[str] = "admin"
+    received_by: Optional[str] = None
     items: List[VoucherItem] = []
 
 
@@ -73,6 +76,10 @@ class ConfirmTransferRequest(BaseModel):
 
 
 class ItemsUpdate(BaseModel):
+    supplier_name: Optional[str] = None
+    supplier_phone: Optional[str] = None
+    supplier_ref: Optional[str] = None
+    received_by: Optional[str] = None
     notes: Optional[str] = None
     items: List[VoucherItem] = []
 
@@ -154,9 +161,10 @@ async def create_receipt_voucher(body: ReceiptVoucherCreate):
 
     vid = await pool.fetchval(
         """INSERT INTO receipt_vouchers
-             (voucher_number, supplier_name, date, notes, created_by)
-           VALUES ($1,$2,$3,$4,$5) RETURNING id""",
-        voucher_no, body.supplier_name, voucher_date, body.notes, body.created_by
+             (voucher_number, supplier_name, supplier_phone, supplier_ref, date, notes, created_by, received_by)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id""",
+        voucher_no, body.supplier_name, body.supplier_phone, body.supplier_ref,
+        voucher_date, body.notes, body.created_by, body.received_by
     )
 
     for item in body.items:
@@ -183,8 +191,16 @@ async def update_receipt_voucher(voucher_id: str, body: ItemsUpdate):
         raise HTTPException(400, "لا يمكن تعديل سند مُرحَّل")
 
     await pool.execute(
-        "UPDATE receipt_vouchers SET notes=$1, updated_at=NOW() WHERE id=$2::uuid",
-        body.notes, voucher_id
+        """UPDATE receipt_vouchers
+           SET supplier_name=COALESCE($1, supplier_name),
+               supplier_phone=COALESCE($2, supplier_phone),
+               supplier_ref=COALESCE($3, supplier_ref),
+               received_by=COALESCE($4, received_by),
+               notes=$5,
+               updated_at=NOW()
+           WHERE id=$6::uuid""",
+        body.supplier_name, body.supplier_phone, body.supplier_ref,
+        body.received_by, body.notes, voucher_id
     )
     await pool.execute("DELETE FROM receipt_voucher_items WHERE voucher_id=$1::uuid", voucher_id)
     for item in body.items:

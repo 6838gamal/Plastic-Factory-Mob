@@ -65,7 +65,7 @@ class _MixingWarehousePageState extends ConsumerState<MixingWarehousePage>
                   children: [
                     const Icon(Icons.inbox_outlined, size: 18),
                     const SizedBox(width: 6),
-                    const Text('تأكيد الاستلام'),
+                    const Text('استلام وارد'),
                     if (pendingCount > 0) ...[
                       const SizedBox(width: 6),
                       Container(
@@ -153,20 +153,45 @@ class _PendingTransfersTab extends ConsumerWidget {
               ),
             );
           }
-          return ListView.builder(
-            padding: const EdgeInsets.all(12),
-            itemCount: list.length,
-            itemBuilder: (_, i) {
-              final v = TransferVoucherModel.fromJson(list[i]);
-              return TransferVoucherCard(
-                voucher: v,
-                onAction: () {
-                  ref.invalidate(_pendingTransfersProvider);
-                  ref.invalidate(_allTransfersProvider);
-                },
-                role: 'mixer',
-              );
-            },
+          return Column(
+            children: [
+              // ── لافتة المصدر ──────────────────────────────────
+              Container(
+                width: double.infinity,
+                margin: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.teal.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.teal.withOpacity(0.3)),
+                ),
+                child: const Row(children: [
+                  Icon(Icons.warehouse_outlined, color: Colors.teal, size: 16),
+                  SizedBox(width: 8),
+                  Text(
+                    'مصدر الوارد: المخزن الرئيسي فقط',
+                    style: TextStyle(color: Colors.teal, fontSize: 13, fontWeight: FontWeight.w600),
+                  ),
+                ]),
+              ),
+              Expanded(
+                child: ListView.builder(
+                  padding: const EdgeInsets.all(12),
+                  itemCount: list.length,
+                  itemBuilder: (_, i) {
+                    final v = TransferVoucherModel.fromJson(list[i]);
+                    return TransferVoucherCard(
+                      voucher: v,
+                      onAction: () {
+                        ref.invalidate(_pendingTransfersProvider);
+                        ref.invalidate(_allTransfersProvider);
+                      },
+                      role: 'mixer',
+                    );
+                  },
+                ),
+              ),
+            ],
           );
         },
         loading: () => const Center(child: CircularProgressIndicator()),

@@ -27,7 +27,8 @@ final _summaryProvider = FutureProvider.autoDispose<List<InventorySummaryModel>>
 // ── Page ─────────────────────────────────────────────────────────
 
 class WarehouseManagerPage extends ConsumerStatefulWidget {
-  const WarehouseManagerPage({super.key});
+  final String? keeperName;
+  const WarehouseManagerPage({super.key, this.keeperName});
 
   @override
   ConsumerState<WarehouseManagerPage> createState() => _WarehouseManagerPageState();
@@ -86,6 +87,7 @@ class _WarehouseManagerPageState extends ConsumerState<WarehouseManagerPage>
     showDialog(
       context: context,
       builder: (_) => _ReceiptVoucherDialog(
+        keeperName: widget.keeperName,
         onSaved: () {
           ref.invalidate(_receiptVouchersProvider);
         },
@@ -98,6 +100,7 @@ class _WarehouseManagerPageState extends ConsumerState<WarehouseManagerPage>
       context: context,
       useSafeArea: false,
       builder: (_) => _TransferVoucherDialog(
+        keeperName: widget.keeperName,
         onSaved: () {
           ref.invalidate(_transferVouchersProvider);
         },
@@ -183,10 +186,37 @@ class _ReceiptVoucherCard extends ConsumerWidget {
             const SizedBox(height: 6),
             if (voucher.supplierName?.isNotEmpty == true)
               Row(children: [
-                const Icon(Icons.business_outlined, size: 14, color: Colors.grey),
+                const Icon(Icons.business_outlined, size: 14, color: Colors.teal),
                 const SizedBox(width: 4),
-                Text(voucher.supplierName!, style: TextStyle(color: Colors.grey[700], fontSize: 13)),
+                Text(
+                  'المورد: ${voucher.supplierName!}',
+                  style: TextStyle(color: Colors.grey[800], fontSize: 13, fontWeight: FontWeight.w500),
+                ),
               ]),
+            if (voucher.supplierPhone?.isNotEmpty == true) ...[
+              const SizedBox(height: 2),
+              Row(children: [
+                const Icon(Icons.phone_outlined, size: 13, color: Colors.grey),
+                const SizedBox(width: 4),
+                Text(voucher.supplierPhone!, style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+              ]),
+            ],
+            if (voucher.supplierRef?.isNotEmpty == true) ...[
+              const SizedBox(height: 2),
+              Row(children: [
+                const Icon(Icons.receipt_outlined, size: 13, color: Colors.grey),
+                const SizedBox(width: 4),
+                Text('رقم الفاتورة: ${voucher.supplierRef!}', style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+              ]),
+            ],
+            if (voucher.receivedBy?.isNotEmpty == true) ...[
+              const SizedBox(height: 2),
+              Row(children: [
+                const Icon(Icons.person_pin_outlined, size: 13, color: Colors.indigo),
+                const SizedBox(width: 4),
+                Text('استلمه: ${voucher.receivedBy!}', style: const TextStyle(color: Colors.indigo, fontSize: 12)),
+              ]),
+            ],
             const SizedBox(height: 4),
             Row(
               children: [
@@ -614,8 +644,9 @@ class TransferVoucherCard extends ConsumerWidget {
 
 class _ReceiptVoucherDialog extends ConsumerStatefulWidget {
   final String? voucherId;
+  final String? keeperName;
   final VoidCallback onSaved;
-  const _ReceiptVoucherDialog({this.voucherId, required this.onSaved});
+  const _ReceiptVoucherDialog({this.voucherId, this.keeperName, required this.onSaved});
 
   @override
   ConsumerState<_ReceiptVoucherDialog> createState() => _ReceiptVoucherDialogState();
@@ -623,26 +654,57 @@ class _ReceiptVoucherDialog extends ConsumerStatefulWidget {
 
 class _ReceiptVoucherDialogState extends ConsumerState<_ReceiptVoucherDialog> {
   final _supplierCtrl = TextEditingController();
+  final _supplierPhoneCtrl = TextEditingController();
+  final _supplierRefCtrl = TextEditingController();
   final _notesCtrl = TextEditingController();
   final _items = <_ItemEntry>[];
   bool _loading = false;
 
   @override
+  void initState() {
+    super.initState();
+    if (widget.voucherId != null) _loadExisting();
+  }
+
+  Future<void> _loadExisting() async {
+    try {
+      final ds = ref.read(dataSourceProvider);
+      final data = await ds.getReceiptVoucher(widget.voucherId!);
+      final v = ReceiptVoucherModel.fromJson(data);
+      _supplierCtrl.text = v.supplierName ?? '';
+      _supplierPhoneCtrl.text = v.supplierPhone ?? '';
+      _supplierRefCtrl.text = v.supplierRef ?? '';
+      _notesCtrl.text = v.notes ?? '';
+      for (final item in v.items) {
+        _items.add(_ItemEntry()
+          ..name = item.materialName
+          ..qty = item.requestedQty
+          ..unit = item.unit
+          ..materialId = item.materialId);
+      }
+      if (mounted) setState(() {});
+    } catch (_) {}
+  }
+
+  @override
   void dispose() {
     _supplierCtrl.dispose();
+    _supplierPhoneCtrl.dispose();
+    _supplierRefCtrl.dispose();
     _notesCtrl.dispose();
     super.dispose();
   }
 
-  void _addItem() {
-    setState(() => _items.add(_ItemEntry()));
-  }
-
-  void _removeItem(int idx) {
-    setState(() => _items.removeAt(idx));
-  }
+  void _addItem() => setState(() => _items.add(_ItemEntry()));
+  void _removeItem(int idx) => setState(() => _items.removeAt(idx));
 
   Future<void> _save() async {
+    if (_supplierCtrl.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('اسم المورد مطلوب'), backgroundColor: Colors.red),
+      );
+      return;
+    }
     if (_items.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('أضف بنداً واحداً على الأقل'), backgroundColor: Colors.red),
@@ -652,10 +714,14 @@ class _ReceiptVoucherDialogState extends ConsumerState<_ReceiptVoucherDialog> {
     setState(() => _loading = true);
     try {
       final ds = ref.read(dataSourceProvider);
+      final keeperName = widget.keeperName ?? 'أمين المخزن';
       final data = {
         'supplier_name': _supplierCtrl.text.trim(),
+        'supplier_phone': _supplierPhoneCtrl.text.trim(),
+        'supplier_ref': _supplierRefCtrl.text.trim(),
         'notes': _notesCtrl.text.trim(),
-        'created_by': 'أمين المخزن',
+        'created_by': keeperName,
+        'received_by': keeperName,
         'items': _items
             .where((e) => e.name.isNotEmpty && e.qty > 0)
             .map((e) => {
@@ -691,9 +757,14 @@ class _ReceiptVoucherDialogState extends ConsumerState<_ReceiptVoucherDialog> {
             ?.where((m) => m.warehouseType == 'main')
             .toList() ??
         [];
+    final keeperName = widget.keeperName ?? 'أمين المخزن';
 
     return AlertDialog(
-      title: Text(widget.voucherId != null ? 'تعديل سند استلام' : 'سند استلام جديد'),
+      title: Row(children: [
+        const Icon(Icons.download_outlined, color: Colors.teal),
+        const SizedBox(width: 8),
+        Text(widget.voucherId != null ? 'تعديل سند استلام' : 'سند استلام وارد جديد'),
+      ]),
       content: SizedBox(
         width: double.maxFinite,
         child: SingleChildScrollView(
@@ -701,18 +772,62 @@ class _ReceiptVoucherDialogState extends ConsumerState<_ReceiptVoucherDialog> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // ── المستلِم (أمين المخزن) ──────────────────────
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: Colors.teal.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.teal.withOpacity(0.3)),
+                ),
+                child: Row(children: [
+                  const Icon(Icons.person_pin_outlined, color: Colors.teal, size: 18),
+                  const SizedBox(width: 8),
+                  const Text('المستلِم: ', style: TextStyle(color: Colors.teal, fontSize: 13)),
+                  Text(keeperName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                ]),
+              ),
+              const SizedBox(height: 14),
+              // ── بيانات المورد ────────────────────────────────
+              const Text('بيانات المورد',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.grey)),
+              const SizedBox(height: 8),
               TextField(
                 controller: _supplierCtrl,
                 decoration: const InputDecoration(
-                  labelText: 'اسم المورد',
+                  labelText: 'اسم المورد *',
                   prefixIcon: Icon(Icons.business_outlined),
+                  border: OutlineInputBorder(),
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
+              TextField(
+                controller: _supplierPhoneCtrl,
+                keyboardType: TextInputType.phone,
+                textDirection: TextDirection.ltr,
+                decoration: const InputDecoration(
+                  labelText: 'هاتف المورد (اختياري)',
+                  prefixIcon: Icon(Icons.phone_outlined),
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: _supplierRefCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'رقم الفاتورة / المرجع (اختياري)',
+                  prefixIcon: Icon(Icons.receipt_outlined),
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 10),
               TextField(
                 controller: _notesCtrl,
                 maxLines: 2,
-                decoration: const InputDecoration(labelText: 'ملاحظات (اختياري)'),
+                decoration: const InputDecoration(
+                  labelText: 'ملاحظات (اختياري)',
+                  border: OutlineInputBorder(),
+                ),
               ),
               const SizedBox(height: 16),
               Row(
@@ -746,8 +861,9 @@ class _ReceiptVoucherDialogState extends ConsumerState<_ReceiptVoucherDialog> {
       actions: [
         TextButton(onPressed: () => Navigator.pop(context), child: const Text('إلغاء')),
         ElevatedButton(
+          style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white),
           onPressed: _loading ? null : _save,
-          child: _loading ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('حفظ'),
+          child: _loading ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Text('حفظ السند'),
         ),
       ],
     );
@@ -760,8 +876,9 @@ class _ReceiptVoucherDialogState extends ConsumerState<_ReceiptVoucherDialog> {
 
 class _TransferVoucherDialog extends ConsumerStatefulWidget {
   final String? voucherId;
+  final String? keeperName;
   final VoidCallback onSaved;
-  const _TransferVoucherDialog({this.voucherId, required this.onSaved});
+  const _TransferVoucherDialog({this.voucherId, this.keeperName, required this.onSaved});
 
   @override
   ConsumerState<_TransferVoucherDialog> createState() => _TransferVoucherDialogState();
@@ -832,7 +949,7 @@ class _TransferVoucherDialogState extends ConsumerState<_TransferVoucherDialog> 
       } else {
         await ds.createTransferVoucher({
           'notes': _notesCtrl.text.trim(),
-          'created_by': 'أمين المخزن',
+          'created_by': widget.keeperName ?? 'أمين المخزن',
           'items': itemsList,
         });
       }

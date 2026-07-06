@@ -37,17 +37,18 @@ class _WarehouseLoginDialogState extends ConsumerState<WarehouseLoginDialog> {
       final ds = ref.read(dataSourceProvider);
       await ds.signIn(_emailCtrl.text.trim(), _passwordCtrl.text);
       if (!mounted) return;
+      final keeperEmail = _emailCtrl.text.trim();
       Navigator.pop(context);
       Navigator.push(
         context,
         MaterialPageRoute(
           builder: (_) => Scaffold(
             appBar: AppBar(
-              title: const Text('المخزن الرئيسي — أمين المخزن'),
+              title: Text('المخزن الرئيسي — $keeperEmail'),
               backgroundColor: Colors.teal,
               foregroundColor: Colors.white,
             ),
-            body: const WarehouseManagerPage(),
+            body: WarehouseManagerPage(keeperName: keeperEmail),
           ),
         ),
       );

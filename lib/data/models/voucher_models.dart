@@ -43,6 +43,9 @@ class ReceiptVoucherModel {
   final String? id;
   final String? voucherNumber;
   final String? supplierName;
+  final String? supplierPhone;
+  final String? supplierRef;
+  final String? receivedBy;
   final String? date;
   final String status; // draft | posted
   final String? notes;
@@ -55,6 +58,9 @@ class ReceiptVoucherModel {
     this.id,
     this.voucherNumber,
     this.supplierName,
+    this.supplierPhone,
+    this.supplierRef,
+    this.receivedBy,
     this.date,
     this.status = 'draft',
     this.notes,
@@ -68,6 +74,9 @@ class ReceiptVoucherModel {
         id: json['id'] as String?,
         voucherNumber: json['voucher_number'] as String?,
         supplierName: json['supplier_name'] as String?,
+        supplierPhone: json['supplier_phone'] as String?,
+        supplierRef: json['supplier_ref'] as String?,
+        receivedBy: json['received_by'] as String?,
         date: json['date'] as String?,
         status: json['status'] as String? ?? 'draft',
         notes: json['notes'] as String?,
