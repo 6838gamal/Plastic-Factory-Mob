@@ -86,6 +86,18 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: '/warehouse',
             builder: (_, __) => const WarehouseHomePage(),
           ),
+          GoRoute(
+            path: '/warehouse/materials',
+            builder: (_, __) => Scaffold(
+              appBar: AppBar(
+                title: const Text('المواد الخام'),
+                backgroundColor: Colors.teal,
+                foregroundColor: Colors.white,
+                leading: BackButton(onPressed: () => _.go('/warehouse')),
+              ),
+              body: const MaterialsPage(),
+            ),
+          ),
         ],
       ),
       // ── Admin section ────────────────────────────────────────────────────

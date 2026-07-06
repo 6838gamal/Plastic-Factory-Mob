@@ -180,6 +180,28 @@ async def _init_db():
         "CREATE INDEX IF NOT EXISTS idx_transfer_vouchers_status ON transfer_vouchers(status)",
         "CREATE INDEX IF NOT EXISTS idx_transfer_vouchers_created ON transfer_vouchers(created_at DESC)",
         "CREATE INDEX IF NOT EXISTS idx_return_vouchers_original ON return_vouchers(original_voucher_id)",
+        # ── Withdrawal Vouchers (سندات الصرف/السحب) ──────────────────────
+        """CREATE TABLE IF NOT EXISTS withdrawal_vouchers (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          voucher_number VARCHAR(50) NOT NULL,
+          purpose TEXT,
+          status VARCHAR(20) NOT NULL DEFAULT 'draft',
+          notes TEXT,
+          created_by VARCHAR(200) DEFAULT 'admin',
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )""",
+        """CREATE TABLE IF NOT EXISTS withdrawal_voucher_items (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          voucher_id UUID NOT NULL REFERENCES withdrawal_vouchers(id) ON DELETE CASCADE,
+          material_id TEXT,
+          material_name VARCHAR(300) NOT NULL,
+          unit VARCHAR(20) NOT NULL DEFAULT 'كجم',
+          quantity DECIMAL(12,3) NOT NULL DEFAULT 0,
+          notes TEXT,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )""",
+        "CREATE INDEX IF NOT EXISTS idx_withdrawal_vouchers_status ON withdrawal_vouchers(status)",
     ]:
         try:
             await pool.execute(_v_stmt)

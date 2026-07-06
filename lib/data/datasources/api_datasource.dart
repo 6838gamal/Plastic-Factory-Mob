@@ -665,6 +665,68 @@ class ApiDataSource {
     return Map<String, dynamic>.from(res as Map);
   }
 
+  // Withdrawal vouchers
+  Future<List<Map<String, dynamic>>> getWithdrawalVouchers({String? status}) async {
+    final res = await _get('/api/vouchers/withdrawal',
+        query: status != null ? {'status': status} : null);
+    return List<Map<String, dynamic>>.from(
+        (res as List).map((e) => Map<String, dynamic>.from(e as Map)));
+  }
+
+  Future<Map<String, dynamic>> getWithdrawalVoucher(String id) async {
+    final res = await _get('/api/vouchers/withdrawal/$id');
+    return Map<String, dynamic>.from(res as Map);
+  }
+
+  Future<Map<String, dynamic>> createWithdrawalVoucher(
+      Map<String, dynamic> data) async {
+    final res = await _post('/api/vouchers/withdrawal', data);
+    return Map<String, dynamic>.from(res as Map);
+  }
+
+  Future<Map<String, dynamic>> updateWithdrawalVoucher(
+      String id, Map<String, dynamic> data) async {
+    final uri = Uri.parse('$_baseUrl/api/vouchers/withdrawal/$id');
+    final res =
+        await http.patch(uri, headers: _headers, body: jsonEncode(data));
+    if (res.statusCode >= 400) {
+      throw Exception(jsonDecode(res.body)['detail'] ?? 'Request failed');
+    }
+    return Map<String, dynamic>.from(jsonDecode(res.body) as Map);
+  }
+
+  Future<Map<String, dynamic>> submitWithdrawalVoucher(String id,
+      {String submittedBy = 'keeper'}) async {
+    final res = await _post(
+        '/api/vouchers/withdrawal/$id/submit?submitted_by=${Uri.encodeComponent(submittedBy)}',
+        {});
+    return Map<String, dynamic>.from(res as Map);
+  }
+
+  Future<Map<String, dynamic>> approveWithdrawalVoucher(String id,
+      {String approvedBy = 'admin'}) async {
+    final res = await _post(
+        '/api/vouchers/withdrawal/$id/approve?approved_by=${Uri.encodeComponent(approvedBy)}',
+        {});
+    return Map<String, dynamic>.from(res as Map);
+  }
+
+  Future<Map<String, dynamic>> rejectWithdrawalVoucher(String id,
+      {String rejectedBy = 'admin'}) async {
+    final res = await _post(
+        '/api/vouchers/withdrawal/$id/reject?rejected_by=${Uri.encodeComponent(rejectedBy)}',
+        {});
+    return Map<String, dynamic>.from(res as Map);
+  }
+
+  Future<void> deleteWithdrawalVoucher(String id) async {
+    final uri = Uri.parse('$_baseUrl/api/vouchers/withdrawal/$id');
+    final res = await http.delete(uri, headers: _headers);
+    if (res.statusCode >= 400) {
+      throw Exception(jsonDecode(res.body)['detail'] ?? 'Request failed');
+    }
+  }
+
   // ==================== HEALTH ====================
   Future<bool> isHealthy() async {
     try {

@@ -184,3 +184,50 @@ class ReturnVoucherModel {
             [],
       );
 }
+
+// ─────────────────────────── Withdrawal Voucher ───────────────────────────
+
+class WithdrawalVoucherModel {
+  final String? id;
+  final String? voucherNumber;
+  final String? purpose;
+  final String status; // draft | pending_approval | approved | rejected
+  final String? notes;
+  final String? createdBy;
+  final String? createdAt;
+  final int itemCount;
+  final List<VoucherItemModel> items;
+
+  const WithdrawalVoucherModel({
+    this.id,
+    this.voucherNumber,
+    this.purpose,
+    this.status = 'draft',
+    this.notes,
+    this.createdBy,
+    this.createdAt,
+    this.itemCount = 0,
+    this.items = const [],
+  });
+
+  bool get isDraft => status == 'draft';
+  bool get isPending => status == 'pending_approval';
+  bool get isApproved => status == 'approved';
+  bool get isRejected => status == 'rejected';
+
+  factory WithdrawalVoucherModel.fromJson(Map<String, dynamic> json) =>
+      WithdrawalVoucherModel(
+        id: json['id'] as String?,
+        voucherNumber: json['voucher_number'] as String?,
+        purpose: json['purpose'] as String?,
+        status: json['status'] as String? ?? 'draft',
+        notes: json['notes'] as String?,
+        createdBy: json['created_by'] as String?,
+        createdAt: json['created_at'] as String?,
+        itemCount: (json['item_count'] as num? ?? 0).toInt(),
+        items: (json['items'] as List<dynamic>?)
+                ?.map((e) => VoucherItemModel.fromJson(e as Map<String, dynamic>))
+                .toList() ??
+            [],
+      );
+}

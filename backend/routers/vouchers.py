@@ -829,3 +829,270 @@ async def post_return_voucher(voucher_id: str, performed_by: str = "admin"):
     await _write_audit(pool, "post", "return_voucher", voucher_id, performed_by,
                        {"items": len(items)})
     return {"status": "posted", "items_processed": len(items)}
+
+
+# ═══════════════════════════════════════════════════════════════════
+#  WITHDRAWAL VOUCHERS  (سندات الصرف / السحب)
+# ═══════════════════════════════════════════════════════════════════
+
+class WithdrawalVoucherCreate(BaseModel):
+    purpose: Optional[str] = None
+    notes: Optional[str] = None
+    created_by: Optional[str] = "admin"
+    items: List[VoucherItem] = []
+
+
+class WithdrawalItemsUpdate(BaseModel):
+    purpose: Optional[str] = None
+    notes: Optional[str] = None
+    items: List[VoucherItem] = []
+
+
+async def _next_withdrawal_number(pool) -> str:
+    today = DateType.today().strftime("%Y%m%d")
+    count = await pool.fetchval(
+        "SELECT COUNT(*) FROM withdrawal_vouchers WHERE created_at::date = CURRENT_DATE"
+    )
+    return f"WD-{today}-{int(count)+1:03d}"
+
+
+@router.get("/withdrawal")
+async def list_withdrawal_vouchers(status: Optional[str] = Query(None)):
+    pool = await get_pool()
+    rows = await pool.fetch(
+        """SELECT wv.*, COUNT(wi.id)::int AS item_count
+           FROM withdrawal_vouchers wv
+           LEFT JOIN withdrawal_voucher_items wi ON wi.voucher_id = wv.id
+           WHERE ($1::text IS NULL OR wv.status = $1)
+           GROUP BY wv.id
+           ORDER BY wv.created_at DESC""",
+        status,
+    )
+    return [_row_to_dict(r) for r in rows]
+
+
+@router.get("/withdrawal/{voucher_id}")
+async def get_withdrawal_voucher(voucher_id: str):
+    pool = await get_pool()
+    voucher = await pool.fetchrow(
+        "SELECT * FROM withdrawal_vouchers WHERE id=$1::uuid", voucher_id
+    )
+    if not voucher:
+        raise HTTPException(404, "سند السحب غير موجود")
+    items = await pool.fetch(
+        "SELECT * FROM withdrawal_voucher_items WHERE voucher_id=$1::uuid ORDER BY created_at",
+        voucher_id,
+    )
+    result = _row_to_dict(voucher)
+    result["items"] = [_row_to_dict(i) for i in items]
+    return result
+
+
+@router.post("/withdrawal")
+async def create_withdrawal_voucher(body: WithdrawalVoucherCreate):
+    pool = await get_pool()
+    voucher_no = await _next_withdrawal_number(pool)
+    vid = await pool.fetchval(
+        """INSERT INTO withdrawal_vouchers (voucher_number, purpose, notes, created_by)
+           VALUES ($1, $2, $3, $4) RETURNING id""",
+        voucher_no, body.purpose, body.notes, body.created_by,
+    )
+    for item in body.items:
+        await pool.execute(
+            """INSERT INTO withdrawal_voucher_items
+                 (voucher_id, material_id, material_name, unit, quantity, notes)
+               VALUES ($1::uuid, $2, $3, $4, $5, $6)""",
+            str(vid), item.material_id, item.material_name,
+            item.unit, item.requested_qty, item.notes,
+        )
+    await _write_audit(pool, "create", "withdrawal_voucher", str(vid),
+                       body.created_by or "admin",
+                       {"voucher_number": voucher_no, "items": len(body.items)})
+    return {"id": str(vid), "voucher_number": voucher_no, "status": "draft"}
+
+
+@router.patch("/withdrawal/{voucher_id}")
+async def update_withdrawal_voucher(voucher_id: str, body: WithdrawalItemsUpdate):
+    pool = await get_pool()
+    v = await pool.fetchrow(
+        "SELECT status FROM withdrawal_vouchers WHERE id=$1::uuid", voucher_id
+    )
+    if not v:
+        raise HTTPException(404, "سند السحب غير موجود")
+    if v["status"] != "draft":
+        raise HTTPException(400, "لا يمكن تعديل السند في حالته الحالية")
+    await pool.execute(
+        """UPDATE withdrawal_vouchers
+           SET purpose=COALESCE($1, purpose), notes=$2, updated_at=NOW()
+           WHERE id=$3::uuid""",
+        body.purpose, body.notes, voucher_id,
+    )
+    await pool.execute(
+        "DELETE FROM withdrawal_voucher_items WHERE voucher_id=$1::uuid", voucher_id
+    )
+    for item in body.items:
+        await pool.execute(
+            """INSERT INTO withdrawal_voucher_items
+                 (voucher_id, material_id, material_name, unit, quantity, notes)
+               VALUES ($1::uuid, $2, $3, $4, $5, $6)""",
+            voucher_id, item.material_id, item.material_name,
+            item.unit, item.requested_qty, item.notes,
+        )
+    return {"status": "updated"}
+
+
+@router.post("/withdrawal/{voucher_id}/submit")
+async def submit_withdrawal_voucher(voucher_id: str, submitted_by: str = "keeper"):
+    """Keeper submits draft for admin approval (draft → pending_approval)."""
+    pool = await get_pool()
+    v = await pool.fetchrow(
+        "SELECT * FROM withdrawal_vouchers WHERE id=$1::uuid", voucher_id
+    )
+    if not v:
+        raise HTTPException(404, "سند السحب غير موجود")
+    if v["status"] != "draft":
+        raise HTTPException(400, "لا يمكن إرسال السند إلا إذا كان في حالة مسودة")
+    items = await pool.fetch(
+        "SELECT id FROM withdrawal_voucher_items WHERE voucher_id=$1::uuid", voucher_id
+    )
+    if not items:
+        raise HTTPException(400, "لا يوجد بنود في السند — أضف بنوداً قبل الإرسال")
+    await pool.execute(
+        "UPDATE withdrawal_vouchers SET status='pending_approval', updated_at=NOW() WHERE id=$1::uuid",
+        voucher_id,
+    )
+    await _write_audit(pool, "submit", "withdrawal_voucher", voucher_id, submitted_by,
+                       {"voucher_number": v["voucher_number"]})
+    return {"status": "pending_approval"}
+
+
+@router.post("/withdrawal/{voucher_id}/approve")
+async def approve_withdrawal_voucher(voucher_id: str, approved_by: str = "admin"):
+    """Admin approves: deducts quantities from main warehouse inventory.
+
+    Pre-flight checks:
+    - Voucher must be in pending_approval state.
+    - Every item must have a matching raw_material row (or already have a material_id).
+    - Main-warehouse balance must be >= requested quantity for each item.
+    All deductions happen inside a single transaction so partial approvals cannot occur.
+    """
+    pool = await get_pool()
+    v = await pool.fetchrow(
+        "SELECT * FROM withdrawal_vouchers WHERE id=$1::uuid", voucher_id
+    )
+    if not v:
+        raise HTTPException(404, "سند السحب غير موجود")
+    if v["status"] != "pending_approval":
+        raise HTTPException(400, "لا يمكن الموافقة إلا على السندات بانتظار الموافقة")
+    items = await pool.fetch(
+        "SELECT * FROM withdrawal_voucher_items WHERE voucher_id=$1::uuid", voucher_id
+    )
+    if not items:
+        raise HTTPException(400, "لا يوجد بنود في السند")
+
+    voucher_number = v["voucher_number"]
+    purpose_note = v["purpose"] or ""
+
+    # ── Resolve material IDs and validate stock ────────────────────────────
+    resolved: list[dict] = []
+    for item in items:
+        mat_id = item["material_id"]
+        if not mat_id:
+            found = await pool.fetchrow(
+                "SELECT id FROM raw_materials WHERE LOWER(name) = LOWER($1)",
+                item["material_name"],
+            )
+            if not found:
+                raise HTTPException(
+                    400,
+                    f"المادة '{item['material_name']}' غير موجودة في قائمة المواد الخام — لا يمكن اعتماد السند"
+                )
+            mat_id = str(found["id"])
+
+        qty = float(item["quantity"])
+        inv_row = await pool.fetchrow(
+            "SELECT id, balance FROM inventory WHERE material_id=$1::uuid AND warehouse_type='main'",
+            mat_id,
+        )
+        if inv_row is None or float(inv_row["balance"]) < qty:
+            available = float(inv_row["balance"]) if inv_row else 0.0
+            raise HTTPException(
+                400,
+                f"رصيد المادة '{item['material_name']}' في المخزن الرئيسي غير كافٍ "
+                f"(المتاح: {available:.3f} {item['unit']} — المطلوب: {qty:.3f} {item['unit']})"
+            )
+        resolved.append({"mat_id": mat_id, "item_id": str(item["id"]),
+                          "inv_id": str(inv_row["id"]),
+                          "balance_before": float(inv_row["balance"]),
+                          "qty": qty, "unit": item["unit"],
+                          "name": item["material_name"]})
+
+    # ── Apply deductions in a transaction ─────────────────────────────────
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            for r in resolved:
+                balance_after = r["balance_before"] - r["qty"]
+                await conn.execute(
+                    "UPDATE inventory SET balance=$1, updated_at=NOW() WHERE id=$2::uuid",
+                    balance_after, r["inv_id"],
+                )
+                await conn.execute(
+                    "UPDATE withdrawal_voucher_items SET material_id=$1::uuid WHERE id=$2::uuid",
+                    r["mat_id"], r["item_id"],
+                )
+                await conn.execute(
+                    """INSERT INTO inventory_transactions
+                         (material_id, warehouse_type, transaction_type, quantity,
+                          balance_before, balance_after, transaction_ref, created_by, notes)
+                       VALUES ($1::uuid,'main','out',$2,$3,$4,$5,$6,$7)""",
+                    r["mat_id"], r["qty"], r["balance_before"], balance_after,
+                    voucher_number, approved_by,
+                    f"سند صرف {voucher_number} — {purpose_note}",
+                )
+            await conn.execute(
+                "UPDATE withdrawal_vouchers SET status='approved', updated_at=NOW() WHERE id=$1::uuid",
+                voucher_id,
+            )
+
+    await _write_audit(pool, "approve", "withdrawal_voucher", voucher_id, approved_by,
+                       {"voucher_number": voucher_number, "items": len(resolved)})
+    return {"status": "approved", "items_processed": len(resolved)}
+
+
+@router.post("/withdrawal/{voucher_id}/reject")
+async def reject_withdrawal_voucher(voucher_id: str, rejected_by: str = "admin"):
+    """Admin rejects a pending withdrawal (pending_approval → rejected)."""
+    pool = await get_pool()
+    v = await pool.fetchrow(
+        "SELECT status, voucher_number FROM withdrawal_vouchers WHERE id=$1::uuid", voucher_id
+    )
+    if not v:
+        raise HTTPException(404, "سند السحب غير موجود")
+    if v["status"] != "pending_approval":
+        raise HTTPException(400, "لا يمكن رفض إلا السندات بانتظار الموافقة")
+    await pool.execute(
+        "UPDATE withdrawal_vouchers SET status='rejected', updated_at=NOW() WHERE id=$1::uuid",
+        voucher_id,
+    )
+    await _write_audit(pool, "reject", "withdrawal_voucher", voucher_id, rejected_by,
+                       {"voucher_number": v["voucher_number"]})
+    return {"status": "rejected"}
+
+
+@router.delete("/withdrawal/{voucher_id}")
+async def delete_withdrawal_voucher(voucher_id: str):
+    """Keeper deletes a draft or rejected voucher (pending_approval and approved cannot be deleted)."""
+    pool = await get_pool()
+    v = await pool.fetchrow(
+        "SELECT status, voucher_number FROM withdrawal_vouchers WHERE id=$1::uuid", voucher_id
+    )
+    if not v:
+        raise HTTPException(404, "سند السحب غير موجود")
+    if v["status"] not in ("draft", "rejected"):
+        raise HTTPException(400, "لا يمكن حذف السند إلا إذا كان في حالة مسودة أو مرفوض")
+    await pool.execute(
+        "DELETE FROM withdrawal_vouchers WHERE id=$1::uuid", voucher_id
+    )
+    await _write_audit(pool, "delete", "withdrawal_voucher", voucher_id, "keeper",
+                       {"voucher_number": v["voucher_number"]})
+    return {"status": "deleted"}

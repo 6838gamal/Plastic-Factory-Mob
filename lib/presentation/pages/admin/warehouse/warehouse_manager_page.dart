@@ -25,6 +25,15 @@ final _summaryProvider = FutureProvider.autoDispose<List<InventorySummaryModel>>
   return ds.getInventorySummary();
 });
 
+final _suppliersProvider = FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
+  return ref.read(dataSourceProvider).getSuppliers();
+});
+
+final _withdrawalVouchersProvider =
+    FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
+  return ref.read(dataSourceProvider).getWithdrawalVouchers();
+});
+
 // ── Page ─────────────────────────────────────────────────────────
 
 class WarehouseManagerPage extends ConsumerStatefulWidget {
@@ -42,7 +51,7 @@ class _WarehouseManagerPageState extends ConsumerState<WarehouseManagerPage>
   @override
   void initState() {
     super.initState();
-    _tabs = TabController(length: 3, vsync: this);
+    _tabs = TabController(length: 4, vsync: this);
     _tabs.addListener(() => setState(() {}));
   }
 
@@ -59,9 +68,12 @@ class _WarehouseManagerPageState extends ConsumerState<WarehouseManagerPage>
         children: [
           TabBar(
             controller: _tabs,
+            isScrollable: true,
+            tabAlignment: TabAlignment.start,
             tabs: const [
               Tab(icon: Icon(Icons.download_outlined), text: 'سندات الاستلام'),
               Tab(icon: Icon(Icons.swap_horiz_outlined), text: 'سندات التحويل'),
+              Tab(icon: Icon(Icons.remove_circle_outline), text: 'سندات السحب'),
               Tab(icon: Icon(Icons.business_outlined), text: 'الموردون'),
             ],
           ),
@@ -71,21 +83,32 @@ class _WarehouseManagerPageState extends ConsumerState<WarehouseManagerPage>
               children: [
                 _ReceiptTab(isAdmin: widget.keeperName == null),
                 const _TransferTab(),
+                _WithdrawalTab(isAdmin: widget.keeperName == null,
+                    keeperName: widget.keeperName),
                 const SuppliersPage(),
               ],
             ),
           ),
         ],
       ),
-      floatingActionButton: _tabs.index == 2
+      floatingActionButton: _tabs.index == 3
           ? null
           : FloatingActionButton.extended(
-              onPressed: () => _tabs.index == 0
-                  ? _showCreateReceiptDialog(context)
-                  : _showCreateTransferDialog(context),
+              onPressed: () {
+                if (_tabs.index == 0) {
+                  _showCreateReceiptDialog(context);
+                } else if (_tabs.index == 1) {
+                  _showCreateTransferDialog(context);
+                } else {
+                  _showCreateWithdrawalDialog(context);
+                }
+              },
               icon: const Icon(Icons.add),
-              label: Text(
-                  _tabs.index == 0 ? 'سند استلام جديد' : 'سند تحويل جديد'),
+              label: Text(_tabs.index == 0
+                  ? 'سند استلام جديد'
+                  : _tabs.index == 1
+                      ? 'سند تحويل جديد'
+                      : 'سند سحب جديد'),
             ),
     );
   }
@@ -110,6 +133,18 @@ class _WarehouseManagerPageState extends ConsumerState<WarehouseManagerPage>
         keeperName: widget.keeperName,
         onSaved: () {
           ref.invalidate(_transferVouchersProvider);
+        },
+      ),
+    );
+  }
+
+  void _showCreateWithdrawalDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (_) => _WithdrawalVoucherDialog(
+        keeperName: widget.keeperName,
+        onSaved: () {
+          ref.invalidate(_withdrawalVouchersProvider);
         },
       ),
     );
@@ -865,7 +900,7 @@ class _ReceiptVoucherDialog extends ConsumerStatefulWidget {
 }
 
 class _ReceiptVoucherDialogState extends ConsumerState<_ReceiptVoucherDialog> {
-  final _supplierCtrl = TextEditingController();
+  String? _selectedSupplierName;
   final _supplierPhoneCtrl = TextEditingController();
   final _supplierRefCtrl = TextEditingController();
   final _notesCtrl = TextEditingController();
@@ -883,7 +918,7 @@ class _ReceiptVoucherDialogState extends ConsumerState<_ReceiptVoucherDialog> {
       final ds = ref.read(dataSourceProvider);
       final data = await ds.getReceiptVoucher(widget.voucherId!);
       final v = ReceiptVoucherModel.fromJson(data);
-      _supplierCtrl.text = v.supplierName ?? '';
+      _selectedSupplierName = v.supplierName;
       _supplierPhoneCtrl.text = v.supplierPhone ?? '';
       _supplierRefCtrl.text = v.supplierRef ?? '';
       _notesCtrl.text = v.notes ?? '';
@@ -900,7 +935,6 @@ class _ReceiptVoucherDialogState extends ConsumerState<_ReceiptVoucherDialog> {
 
   @override
   void dispose() {
-    _supplierCtrl.dispose();
     _supplierPhoneCtrl.dispose();
     _supplierRefCtrl.dispose();
     _notesCtrl.dispose();
@@ -911,7 +945,7 @@ class _ReceiptVoucherDialogState extends ConsumerState<_ReceiptVoucherDialog> {
   void _removeItem(int idx) => setState(() => _items.removeAt(idx));
 
   Future<void> _save() async {
-    if (_supplierCtrl.text.trim().isEmpty) {
+    if (_selectedSupplierName == null || _selectedSupplierName!.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('اسم المورد مطلوب'), backgroundColor: Colors.red),
       );
@@ -928,7 +962,7 @@ class _ReceiptVoucherDialogState extends ConsumerState<_ReceiptVoucherDialog> {
       final ds = ref.read(dataSourceProvider);
       final keeperName = widget.keeperName ?? 'أمين المخزن';
       final data = {
-        'supplier_name': _supplierCtrl.text.trim(),
+        'supplier_name': _selectedSupplierName ?? '',
         'supplier_phone': _supplierPhoneCtrl.text.trim(),
         'supplier_ref': _supplierRefCtrl.text.trim(),
         'notes': _notesCtrl.text.trim(),
@@ -965,10 +999,12 @@ class _ReceiptVoucherDialogState extends ConsumerState<_ReceiptVoucherDialog> {
   @override
   Widget build(BuildContext context) {
     final summaryAsync = ref.watch(_summaryProvider);
+    final suppliersAsync = ref.watch(_suppliersProvider);
     final materials = summaryAsync.valueOrNull
             ?.where((m) => m.warehouseType == 'main')
             .toList() ??
         [];
+    final suppliers = suppliersAsync.valueOrNull ?? [];
     final keeperName = widget.keeperName ?? 'أمين المخزن';
 
     return AlertDialog(
@@ -1004,13 +1040,44 @@ class _ReceiptVoucherDialogState extends ConsumerState<_ReceiptVoucherDialog> {
               const Text('بيانات المورد',
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.grey)),
               const SizedBox(height: 8),
-              TextField(
-                controller: _supplierCtrl,
+              DropdownButtonFormField<String>(
+                value: suppliers.any((s) => s['name'] == _selectedSupplierName)
+                    ? _selectedSupplierName
+                    : (_selectedSupplierName != null && _selectedSupplierName!.isNotEmpty
+                        ? _selectedSupplierName
+                        : null),
                 decoration: const InputDecoration(
                   labelText: 'اسم المورد *',
                   prefixIcon: Icon(Icons.business_outlined),
                   border: OutlineInputBorder(),
                 ),
+                hint: const Text('اختر المورد'),
+                items: [
+                  ...suppliers.map((s) {
+                    final name = s['name'] as String? ?? '';
+                    return DropdownMenuItem<String>(
+                      value: name,
+                      child: Text(name, overflow: TextOverflow.ellipsis),
+                    );
+                  }),
+                  // Keep existing name as option if not in current suppliers list
+                  if (_selectedSupplierName != null &&
+                      _selectedSupplierName!.isNotEmpty &&
+                      !suppliers.any((s) => s['name'] == _selectedSupplierName))
+                    DropdownMenuItem<String>(
+                      value: _selectedSupplierName!,
+                      child: Text(_selectedSupplierName!, overflow: TextOverflow.ellipsis),
+                    ),
+                ],
+                onChanged: (v) {
+                  setState(() {
+                    _selectedSupplierName = v;
+                    final found = suppliers.where((s) => s['name'] == v).firstOrNull;
+                    if (found != null && (found['phone'] as String?)?.isNotEmpty == true) {
+                      _supplierPhoneCtrl.text = found['phone'] as String;
+                    }
+                  });
+                },
               ),
               const SizedBox(height: 10),
               TextField(
@@ -1285,7 +1352,6 @@ class _ItemRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final hasId = entry.materialId != null && entry.materialId!.isNotEmpty;
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Column(
@@ -1295,46 +1361,37 @@ class _ItemRow extends StatelessWidget {
             children: [
               Expanded(
                 flex: 3,
-                child: Autocomplete<InventorySummaryModel>(
-                  optionsBuilder: (TextEditingValue textEditingValue) {
-                    if (textEditingValue.text.isEmpty) return materials;
-                    return materials
-                        .where((m) => m.materialName.toLowerCase().contains(textEditingValue.text.toLowerCase()))
-                        .toList();
-                  },
-                  displayStringForOption: (m) => m.materialName,
-                  fieldViewBuilder: (ctx, ctrl, fn, onSubmit) {
-                    if (entry.name.isNotEmpty && ctrl.text.isEmpty) ctrl.text = entry.name;
-                    return TextFormField(
-                      controller: ctrl,
-                      focusNode: fn,
-                      decoration: InputDecoration(
-                        labelText: 'اسم المادة',
-                        isDense: true,
-                        suffixIcon: entry.name.isNotEmpty
-                            ? Icon(
-                                hasId ? Icons.check_circle : Icons.warning_amber,
-                                size: 16,
-                                color: hasId ? Colors.green : Colors.orange,
-                              )
-                            : null,
-                      ),
-                      onChanged: (v) {
-                        entry.name = v;
-                        // Clear materialId when user types freely (not via dropdown selection)
-                        if (entry.materialId != null) {
-                          final matched = materials.any((m) => m.materialName == v);
-                          if (!matched) entry.materialId = null;
-                        }
-                        onChanged();
-                      },
-                    );
-                  },
-                  onSelected: (m) {
-                    entry.name = m.materialName;
-                    entry.unit = m.unit;
-                    entry.materialId = m.materialId;
-                    onChanged();
+                child: DropdownButtonFormField<InventorySummaryModel>(
+                  value: entry.name.isNotEmpty
+                      ? materials
+                          .where((m) =>
+                              (entry.materialId != null && entry.materialId!.isNotEmpty)
+                                  ? m.materialId == entry.materialId
+                                  : m.materialName == entry.name)
+                          .firstOrNull
+                      : null,
+                  decoration: const InputDecoration(
+                    labelText: 'اسم المادة',
+                    isDense: true,
+                  ),
+                  hint: const Text('اختر المادة', style: TextStyle(fontSize: 13)),
+                  items: materials
+                      .map((m) => DropdownMenuItem<InventorySummaryModel>(
+                            value: m,
+                            child: Text(
+                              m.materialName,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontSize: 13),
+                            ),
+                          ))
+                      .toList(),
+                  onChanged: (m) {
+                    if (m != null) {
+                      entry.name = m.materialName;
+                      entry.unit = m.unit;
+                      entry.materialId = m.materialId;
+                      onChanged();
+                    }
                   },
                 ),
               ),
@@ -1376,25 +1433,541 @@ class _ItemRow extends StatelessWidget {
               ),
             ],
           ),
-          if (!hasId && entry.name.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(right: 8, top: 2, bottom: 2),
-              child: Row(
-                children: const [
-                  Icon(Icons.warning_amber_outlined, color: Colors.orange, size: 13),
-                  SizedBox(width: 4),
-                  Text(
-                    'اختر المادة من القائمة لضمان تحديث المخزون',
-                    style: TextStyle(color: Colors.orange, fontSize: 11),
-                  ),
-                ],
-              ),
-            ),
         ],
       ),
     );
   }
 }
+
+// ══════════════════════════════════════════════════════════════════
+// Withdrawal Tab
+// ══════════════════════════════════════════════════════════════════
+
+class _WithdrawalTab extends ConsumerWidget {
+  final bool isAdmin;
+  final String? keeperName;
+  const _WithdrawalTab({required this.isAdmin, this.keeperName});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final vouchersAsync = ref.watch(_withdrawalVouchersProvider);
+
+    return vouchersAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => Center(child: Text('خطأ: $e')),
+      data: (vouchers) {
+        if (vouchers.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: const [
+                Icon(Icons.remove_circle_outline, size: 48, color: Colors.grey),
+                SizedBox(height: 12),
+                Text('لا توجد سندات سحب', style: TextStyle(color: Colors.grey)),
+              ],
+            ),
+          );
+        }
+        return RefreshIndicator(
+          onRefresh: () async => ref.invalidate(_withdrawalVouchersProvider),
+          child: ListView.builder(
+            padding: const EdgeInsets.all(12),
+            itemCount: vouchers.length,
+            itemBuilder: (ctx, i) {
+              final v = WithdrawalVoucherModel.fromJson(vouchers[i]);
+              return _WithdrawalVoucherCard(
+                voucher: v,
+                isAdmin: isAdmin,
+                keeperName: keeperName,
+                onAction: () => ref.invalidate(_withdrawalVouchersProvider),
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _WithdrawalVoucherCard extends ConsumerWidget {
+  final WithdrawalVoucherModel voucher;
+  final bool isAdmin;
+  final String? keeperName;
+  final VoidCallback onAction;
+
+  const _WithdrawalVoucherCard({
+    required this.voucher,
+    required this.isAdmin,
+    this.keeperName,
+    required this.onAction,
+  });
+
+  Color _statusColor(String s) {
+    switch (s) {
+      case 'pending_approval': return Colors.orange;
+      case 'approved': return Colors.green;
+      case 'rejected': return Colors.red;
+      default: return Colors.blueGrey;
+    }
+  }
+
+  String _statusLabel(String s) {
+    switch (s) {
+      case 'draft': return 'مسودة';
+      case 'pending_approval': return 'بانتظار الموافقة';
+      case 'approved': return 'معتمد';
+      case 'rejected': return 'مرفوض';
+      default: return s;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final color = _statusColor(voucher.status);
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 10),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.remove_circle_outline, color: Colors.deepOrange, size: 20),
+                const SizedBox(width: 8),
+                Text(voucher.voucherNumber ?? '', style: const TextStyle(fontWeight: FontWeight.bold)),
+                const Spacer(),
+                StatusBadge(text: _statusLabel(voucher.status), color: color),
+              ],
+            ),
+            const Divider(height: 14),
+            if (voucher.purpose?.isNotEmpty == true)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Row(children: [
+                  const Icon(Icons.info_outline, size: 14, color: Colors.grey),
+                  const SizedBox(width: 6),
+                  Expanded(child: Text(voucher.purpose!, style: const TextStyle(fontSize: 13))),
+                ]),
+              ),
+            Row(
+              children: [
+                const Icon(Icons.list_alt, size: 14, color: Colors.grey),
+                const SizedBox(width: 6),
+                Text('${voucher.itemCount} بند', style: const TextStyle(fontSize: 13, color: Colors.grey)),
+                const SizedBox(width: 16),
+                const Icon(Icons.person_outline, size: 14, color: Colors.grey),
+                const SizedBox(width: 6),
+                Text(voucher.createdBy ?? '', style: const TextStyle(fontSize: 13, color: Colors.grey)),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                // ── Admin actions ───────────────────────────────
+                if (isAdmin && voucher.isPending) ...[
+                  OutlinedButton.icon(
+                    icon: const Icon(Icons.close, size: 14),
+                    label: const Text('رفض', style: TextStyle(fontSize: 12)),
+                    style: OutlinedButton.styleFrom(foregroundColor: Colors.red, side: const BorderSide(color: Colors.red)),
+                    onPressed: () => _reject(context, ref),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton.icon(
+                    icon: const Icon(Icons.check, size: 14),
+                    label: const Text('اعتماد', style: TextStyle(fontSize: 12)),
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
+                    onPressed: () => _approve(context, ref),
+                  ),
+                ],
+                // ── Keeper actions ──────────────────────────────
+                if (!isAdmin) ...[
+                  if (voucher.isDraft) ...[
+                    TextButton.icon(
+                      icon: const Icon(Icons.edit_outlined, size: 14),
+                      label: const Text('تعديل', style: TextStyle(fontSize: 12)),
+                      onPressed: () => showDialog(
+                        context: context,
+                        builder: (_) => _WithdrawalVoucherDialog(
+                          voucherId: voucher.id,
+                          keeperName: keeperName,
+                          onSaved: onAction,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    OutlinedButton.icon(
+                      icon: const Icon(Icons.send_outlined, size: 14),
+                      label: const Text('إرسال للاعتماد', style: TextStyle(fontSize: 12)),
+                      style: OutlinedButton.styleFrom(foregroundColor: Colors.teal),
+                      onPressed: () => _submit(context, ref),
+                    ),
+                    const SizedBox(width: 6),
+                    TextButton.icon(
+                      icon: const Icon(Icons.delete_outline, size: 14, color: Colors.red),
+                      label: const Text('حذف', style: TextStyle(fontSize: 12, color: Colors.red)),
+                      onPressed: () => _delete(context, ref),
+                    ),
+                  ],
+                  if (voucher.isPending)
+                    const Text('بانتظار موافقة الإدارة',
+                        style: TextStyle(fontSize: 12, color: Colors.orange)),
+                  if (voucher.isRejected)
+                    TextButton.icon(
+                      icon: const Icon(Icons.delete_outline, size: 14, color: Colors.red),
+                      label: const Text('حذف', style: TextStyle(fontSize: 12, color: Colors.red)),
+                      onPressed: () => _delete(context, ref),
+                    ),
+                ],
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _submit(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('تأكيد الإرسال'),
+        content: const Text('هل تريد إرسال سند السحب للاعتماد؟ لن تتمكن من تعديله بعد الإرسال.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('إلغاء')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('إرسال'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+    try {
+      final ds = ref.read(dataSourceProvider);
+      final name = keeperName ?? 'أمين المخزن';
+      await ds.submitWithdrawalVoucher(voucher.id!, submittedBy: name);
+      onAction();
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('تم إرسال السند للاعتماد'), backgroundColor: Colors.teal),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('خطأ: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  Future<void> _approve(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('تأكيد الاعتماد'),
+        content: Text('اعتماد سند السحب ${voucher.voucherNumber}؟\nسيتم خصم الكميات من المخزن الرئيسي.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('إلغاء')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('اعتماد'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+    try {
+      await ref.read(dataSourceProvider).approveWithdrawalVoucher(voucher.id!);
+      onAction();
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('تم اعتماد سند السحب وخصم الكميات'), backgroundColor: Colors.green),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('خطأ: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  Future<void> _reject(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('رفض السند'),
+        content: Text('رفض سند السحب ${voucher.voucherNumber}؟'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('إلغاء')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('رفض'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+    try {
+      await ref.read(dataSourceProvider).rejectWithdrawalVoucher(voucher.id!);
+      onAction();
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('تم رفض السند'), backgroundColor: Colors.orange),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('خطأ: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  Future<void> _delete(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('حذف السند'),
+        content: const Text('هل أنت متأكد من حذف سند السحب؟'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('إلغاء')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('حذف'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+    try {
+      await ref.read(dataSourceProvider).deleteWithdrawalVoucher(voucher.id!);
+      onAction();
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('خطأ: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════
+// Withdrawal Voucher Dialog
+// ══════════════════════════════════════════════════════════════════
+
+class _WithdrawalVoucherDialog extends ConsumerStatefulWidget {
+  final String? voucherId;
+  final String? keeperName;
+  final VoidCallback onSaved;
+  const _WithdrawalVoucherDialog({this.voucherId, this.keeperName, required this.onSaved});
+
+  @override
+  ConsumerState<_WithdrawalVoucherDialog> createState() => _WithdrawalVoucherDialogState();
+}
+
+class _WithdrawalVoucherDialogState extends ConsumerState<_WithdrawalVoucherDialog> {
+  final _purposeCtrl = TextEditingController();
+  final _notesCtrl = TextEditingController();
+  final _items = <_ItemEntry>[];
+  bool _loading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.voucherId != null) _loadExisting();
+  }
+
+  Future<void> _loadExisting() async {
+    try {
+      final data = await ref.read(dataSourceProvider).getWithdrawalVoucher(widget.voucherId!);
+      final v = WithdrawalVoucherModel.fromJson(data);
+      _purposeCtrl.text = v.purpose ?? '';
+      _notesCtrl.text = v.notes ?? '';
+      for (final item in v.items) {
+        _items.add(_ItemEntry()
+          ..name = item.materialName
+          ..qty = item.requestedQty
+          ..unit = item.unit
+          ..materialId = item.materialId);
+      }
+      if (mounted) setState(() {});
+    } catch (_) {}
+  }
+
+  @override
+  void dispose() {
+    _purposeCtrl.dispose();
+    _notesCtrl.dispose();
+    super.dispose();
+  }
+
+  void _addItem() => setState(() => _items.add(_ItemEntry()));
+  void _removeItem(int idx) => setState(() => _items.removeAt(idx));
+
+  Future<void> _save() async {
+    if (_items.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('أضف بنداً واحداً على الأقل'), backgroundColor: Colors.red),
+      );
+      return;
+    }
+    setState(() => _loading = true);
+    try {
+      final ds = ref.read(dataSourceProvider);
+      final keeperName = widget.keeperName ?? 'أمين المخزن';
+      final data = {
+        'purpose': _purposeCtrl.text.trim(),
+        'notes': _notesCtrl.text.trim(),
+        'created_by': keeperName,
+        'items': _items
+            .where((e) => e.name.isNotEmpty && e.qty > 0)
+            .map((e) => {
+                  'material_name': e.name,
+                  'unit': e.unit,
+                  'requested_qty': e.qty,
+                  if (e.materialId != null) 'material_id': e.materialId,
+                })
+            .toList(),
+      };
+      if (widget.voucherId != null) {
+        await ds.updateWithdrawalVoucher(widget.voucherId!, data);
+      } else {
+        await ds.createWithdrawalVoucher(data);
+      }
+      if (mounted) Navigator.pop(context);
+      widget.onSaved();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('خطأ: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final summaryAsync = ref.watch(_summaryProvider);
+    final materials = summaryAsync.valueOrNull
+            ?.where((m) => m.warehouseType == 'main')
+            .toList() ??
+        [];
+    final keeperName = widget.keeperName ?? 'أمين المخزن';
+
+    return AlertDialog(
+      title: Row(children: [
+        const Icon(Icons.remove_circle_outline, color: Colors.deepOrange),
+        const SizedBox(width: 8),
+        Text(widget.voucherId != null ? 'تعديل سند سحب' : 'سند سحب جديد'),
+      ]),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // ── منشئ السند ──────────────────────────────────
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: Colors.deepOrange.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.deepOrange.withOpacity(0.3)),
+                ),
+                child: Row(children: [
+                  const Icon(Icons.person_pin_outlined, color: Colors.deepOrange, size: 18),
+                  const SizedBox(width: 8),
+                  const Text('منشئ السند: ', style: TextStyle(color: Colors.deepOrange, fontSize: 13)),
+                  Text(keeperName,
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                ]),
+              ),
+              const SizedBox(height: 14),
+              // ── سبب السحب ───────────────────────────────────
+              TextField(
+                controller: _purposeCtrl,
+                maxLines: 2,
+                decoration: const InputDecoration(
+                  labelText: 'سبب / الغرض من السحب *',
+                  prefixIcon: Icon(Icons.info_outline),
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: _notesCtrl,
+                maxLines: 1,
+                decoration: const InputDecoration(
+                  labelText: 'ملاحظات (اختياري)',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  const Text('المواد المطلوب سحبها',
+                      style: TextStyle(fontWeight: FontWeight.bold)),
+                  const Spacer(),
+                  TextButton.icon(
+                    icon: const Icon(Icons.add, size: 16),
+                    label: const Text('إضافة بند'),
+                    onPressed: _addItem,
+                  ),
+                ],
+              ),
+              const Divider(),
+              ..._items.asMap().entries.map((e) => _ItemRow(
+                    index: e.key,
+                    entry: e.value,
+                    materials: materials,
+                    onRemove: () => _removeItem(e.key),
+                    onChanged: () => setState(() {}),
+                  )),
+              if (_items.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 8),
+                  child: Center(
+                    child: Text('اضغط "إضافة بند" لإضافة مادة',
+                        style: TextStyle(color: Colors.grey)),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('إلغاء')),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.deepOrange, foregroundColor: Colors.white),
+          onPressed: _loading ? null : _save,
+          child: _loading
+              ? const SizedBox(
+                  width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+              : const Text('حفظ السند'),
+        ),
+      ],
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════
 
 class StatusBadge extends StatelessWidget {
   final String text;
