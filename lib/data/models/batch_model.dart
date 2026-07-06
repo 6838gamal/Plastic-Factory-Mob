@@ -14,7 +14,7 @@ class BatchMaterialModel {
   factory BatchMaterialModel.fromJson(Map<String, dynamic> json) => BatchMaterialModel(
         materialId: json['material_id'] as String? ?? '',
         materialName: (json['material_name'] ?? json['name']) as String? ?? '',
-        quantity: (json['quantity'] as num).toDouble(),
+        quantity: (json['quantity'] as num?)?.toDouble() ?? 0,
         unit: json['unit'] as String? ?? 'كجم',
       );
 
@@ -99,7 +99,7 @@ class BatchModel {
         id: json['id'] as String,
         batchNumber: json['batch_number'] as String,
         date: DateTime.parse(json['date'] as String),
-        shift: json['shift'] as String,
+        shift: json['shift'] as String? ?? '',
         workerId: json['worker_id'] as String? ?? '',
         workerName: json['worker_name'] as String? ?? '',
         mixerId: json['mixer_id'] as String? ?? '',

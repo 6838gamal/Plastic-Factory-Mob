@@ -131,9 +131,23 @@ async def get_transactions(
     if warehouse_type:
         conditions.append(f"it.warehouse_type=${i}"); params.append(warehouse_type); i += 1
     if from_:
-        conditions.append(f"it.created_at>=${i}"); params.append(from_); i += 1
+        from datetime import datetime as _dt
+        def _parse_dt_inv(s: str) -> _dt:
+            try:
+                return _dt.fromisoformat(s.replace("Z", "+00:00"))
+            except Exception:
+                from datetime import date as _d
+                return _dt.combine(_d.fromisoformat(s[:10]), _dt.min.time())
+        conditions.append(f"it.created_at>=${i}"); params.append(_parse_dt_inv(from_)); i += 1
     if to:
-        conditions.append(f"it.created_at<=${i}"); params.append(to); i += 1
+        from datetime import datetime as _dt
+        def _parse_dt_inv_to(s: str) -> _dt:
+            try:
+                return _dt.fromisoformat(s.replace("Z", "+00:00"))
+            except Exception:
+                from datetime import date as _d, timedelta as _td
+                return _dt.combine(_d.fromisoformat(s[:10]) + _td(days=1), _dt.min.time())
+        conditions.append(f"it.created_at<${i}"); params.append(_parse_dt_inv_to(to)); i += 1
     params.append(limit)
     query = f"""
         SELECT it.*, r.name AS material_name, r.unit

@@ -20,3 +20,5 @@
 - [inventory_summary VIEW idempotency](inventory-summary-view.md) — CREATE OR REPLACE VIEW fails if column count changes; fix: use DROP VIEW IF EXISTS CASCADE + CREATE VIEW in schema.sql; never use CREATE OR REPLACE when adding/removing columns.
 - [deviation formula fix](deviation-formula.md) — correct formula: total_outputs = produced + scrap + waste; deviation% = (outputs - inputs) / inputs × 100. Was wrongly using only produced. Fixed in dashboard.py and reports.py.
 - [Shift handover formula](shift-handover-formula.md) — Expected = opening_from_last_shift + received_from_main - batch_inputs; opening_stock comes from last confirmed/frozen handover's actual_stock_kg (NOT from mixer_balance); unknown_waste = max(0, deficit - scrap_declared).
+- [BatchModel null-safe fromJson](batch-model-null-safety.md) — shift/quantity fields nullable in DB; Dart non-nullable cast throws TypeError; always use `as Type? ?? default`.
+- [audit/inventory date asyncpg fix](audit-date-asyncpg-fix.md) — audit.py and inventory.py passed raw strings for TIMESTAMPTZ params; fixed with _parse_dt() helper returning timezone-aware datetime.

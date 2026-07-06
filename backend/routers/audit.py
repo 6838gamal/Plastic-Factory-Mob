@@ -1,8 +1,36 @@
 import json
+from datetime import datetime
 from fastapi import APIRouter, Query
 from pydantic import BaseModel
 from typing import Optional, Any
 from database import get_pool
+
+
+def _parse_dt(s: str, end_of_day: bool = False) -> datetime:
+    """Convert an ISO datetime/date string to a timezone-aware datetime for asyncpg.
+
+    - Full ISO strings (with T) are parsed as-is, converted to UTC-aware.
+    - Date-only strings (YYYY-MM-DD) become start-of-day (00:00:00 UTC) unless
+      end_of_day=True, in which case they become start of the NEXT day so that
+      ``created_at < next_day`` correctly includes all records on that date.
+    """
+    from datetime import timezone as _tz, timedelta as _td, date as _date
+    s = s.strip()
+    if "T" in s or " " in s:
+        try:
+            dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=_tz.utc)
+            return dt
+        except Exception:
+            pass
+    # Date-only path
+    d = _date.fromisoformat(s[:10])
+    if end_of_day:
+        # next-day midnight so caller can use strict-less-than (<)
+        next_day = d + _td(days=1)
+        return datetime.combine(next_day, datetime.min.time(), tzinfo=_tz.utc)
+    return datetime.combine(d, datetime.min.time(), tzinfo=_tz.utc)
 
 router = APIRouter(prefix="/api/audit", tags=["audit"])
 
@@ -35,9 +63,9 @@ async def get_audit_logs(
     if action:
         conditions.append(f"action=${i}"); params.append(action); i += 1
     if from_:
-        conditions.append(f"created_at>=${i}"); params.append(from_); i += 1
+        conditions.append(f"created_at>=${i}"); params.append(_parse_dt(from_)); i += 1
     if to:
-        conditions.append(f"created_at<=${i}"); params.append(to); i += 1
+        conditions.append(f"created_at<${i}"); params.append(_parse_dt(to, end_of_day=True)); i += 1
     query = f"SELECT * FROM audit_log WHERE {' AND '.join(conditions)} ORDER BY created_at DESC LIMIT 200"
     rows = await pool.fetch(query, *params)
     return [dict(r) for r in rows]

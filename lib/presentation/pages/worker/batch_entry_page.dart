@@ -8,8 +8,21 @@ import '../../widgets/common/loading_widget.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../data/models/reference_models.dart';
+import '../../../data/models/inventory_summary_model.dart';
 import '../../../data/datasources/api_datasource.dart';
 import '../../providers/auth_provider.dart';
+
+// ── رصيد مخزن الخلاط: اسم المادة (lowercase) → الرصيد الحالي ────────────────
+final _mixerBalanceProvider =
+    FutureProvider.autoDispose<Map<String, double>>((ref) async {
+  final ds = ref.read(dataSourceProvider);
+  final items = await ds.getInventorySummary();
+  return {
+    for (final item in items)
+      if (item.warehouseType == AppConstants.warehouseMixer)
+        item.materialName.toLowerCase().trim(): item.currentBalance,
+  };
+});
 
 class BatchEntryPage extends ConsumerStatefulWidget {
   const BatchEntryPage({super.key});
@@ -338,6 +351,7 @@ class _BatchEntryPageState extends ConsumerState<BatchEntryPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text(AppStrings.saveSuccess), backgroundColor: Colors.green),
       );
+      ref.invalidate(_mixerBalanceProvider); // تحديث رصيد مخزن الخلاط بعد الحفظ
       _resetForm();
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -381,6 +395,10 @@ class _BatchEntryPageState extends ConsumerState<BatchEntryPage> {
     final products = ref.watch(productsProvider);
     final mixtureTypes = ref.watch(mixtureTypesProvider);
     final opsState = ref.watch(batchOperationsProvider);
+
+    // رصيد مخزن الخلاط — Map<اسم المادة (lowercase), رصيد كجم>
+    final mixerBal = ref.watch(_mixerBalanceProvider).value ?? {};
+    double? _bal(String label) => mixerBal[label.toLowerCase().trim()];
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -555,18 +573,18 @@ class _BatchEntryPageState extends ConsumerState<BatchEntryPage> {
             _SectionHeader(title: 'المواد الخام', icon: Icons.inventory_2_outlined),
             const SizedBox(height: 12),
 
-            _MatRow(label: 'مواد خام PVC صيني',                    ctrl: _pvcCtrl),
-            _MatRow(label: 'DOP زيت',                               ctrl: _dopCtrl),
-            _MatRow(label: 'سكراب اسود ناعم',                       ctrl: _scrapBlackCtrl),
-            _MatRow(label: 'سكراب ازرق ناعم',                       ctrl: _scrapBlueCtrl),
-            _MatRow(label: 'سكراب ازرق سكري',                       ctrl: _scrapBlueSugarCtrl),
-            _MatRow(label: 'كالسيوم باودر عبوة 25 كيلو',            ctrl: _calciumCtrl),
-            _MatRow(label: 'شمع باودر عبوة 25 كيلو',                ctrl: _waxCtrl),
-            _MatRow(label: 'مثبت استبليزر باودر عبوة 25 كيلو',      ctrl: _stabilizerCtrl),
-            _MatRow(label: 'تيتانيوم',                              ctrl: _titaniumCtrl),
-            _MatRow(label: 'سيتريك اسيد (ملح الليمون) 490 عبوة 25 كجم', ctrl: _citricAcidCtrl),
-            _MatRow(label: 'بيكربونات اصفر محلي',                   ctrl: _bicarYellowCtrl),
-            _MatRow(label: 'بيكربونات ابيض محلي',                   ctrl: _bicarWhiteCtrl),
+            _MatRow(label: 'مواد خام PVC صيني',                    ctrl: _pvcCtrl,          balance: _bal('مواد خام PVC صيني')),
+            _MatRow(label: 'DOP زيت',                               ctrl: _dopCtrl,          balance: _bal('DOP زيت')),
+            _MatRow(label: 'سكراب اسود ناعم',                       ctrl: _scrapBlackCtrl,   balance: _bal('سكراب اسود ناعم')),
+            _MatRow(label: 'سكراب ازرق ناعم',                       ctrl: _scrapBlueCtrl,    balance: _bal('سكراب ازرق ناعم')),
+            _MatRow(label: 'سكراب ازرق سكري',                       ctrl: _scrapBlueSugarCtrl, balance: _bal('سكراب ازرق سكري')),
+            _MatRow(label: 'كالسيوم باودر عبوة 25 كيلو',            ctrl: _calciumCtrl,      balance: _bal('كالسيوم باودر عبوة 25 كيلو')),
+            _MatRow(label: 'شمع باودر عبوة 25 كيلو',                ctrl: _waxCtrl,          balance: _bal('شمع باودر عبوة 25 كيلو')),
+            _MatRow(label: 'مثبت استبليزر باودر عبوة 25 كيلو',      ctrl: _stabilizerCtrl,   balance: _bal('مثبت استبليزر باودر عبوة 25 كيلو')),
+            _MatRow(label: 'تيتانيوم',                              ctrl: _titaniumCtrl,     balance: _bal('تيتانيوم')),
+            _MatRow(label: 'سيتريك اسيد (ملح الليمون) 490 عبوة 25 كجم', ctrl: _citricAcidCtrl, balance: _bal('سيتريك اسيد (ملح الليمون) 490 عبوة 25 كجم')),
+            _MatRow(label: 'بيكربونات اصفر محلي',                   ctrl: _bicarYellowCtrl,  balance: _bal('بيكربونات اصفر محلي')),
+            _MatRow(label: 'بيكربونات ابيض محلي',                   ctrl: _bicarWhiteCtrl,   balance: _bal('بيكربونات ابيض محلي')),
 
             const SizedBox(height: 20),
 
@@ -574,16 +592,16 @@ class _BatchEntryPageState extends ConsumerState<BatchEntryPage> {
             _SectionHeader(title: 'الأصباغ', icon: Icons.color_lens_outlined),
             const SizedBox(height: 12),
 
-            _MatRow(label: 'صبغة سوداء باودر عبوة 10 كيلو',          ctrl: _pig1Ctrl,  unit: 'جرام'),
-            _MatRow(label: 'صبغة زرقاء باودر عبوة 20 كيلو رقم-١٠٢٧', ctrl: _pig2Ctrl,  unit: 'جرام'),
-            _MatRow(label: 'صبغة زرقاء فاتح عبوة 20 كيلو رقم-١٢٥٦',  ctrl: _pig3Ctrl,  unit: 'جرام'),
-            _MatRow(label: 'صبغة ارجواني عبوة 25 كيلو رقم-F٤٠٩',      ctrl: _pig4Ctrl,  unit: 'جرام'),
-            _MatRow(label: 'صبغة احمر زهري عبوة 25 كيلو رقم-F٣٥٨',    ctrl: _pig5Ctrl,  unit: 'جرام'),
-            _MatRow(label: 'صبغة كاكي بيج عبوة 25 كيلو رقم-١٠٣٥',     ctrl: _pig6Ctrl,  unit: 'جرام'),
-            _MatRow(label: 'صبغه خضراء طاووس محلي',                   ctrl: _pig7Ctrl,  unit: 'جرام'),
-            _MatRow(label: 'صبغه برتقالي محلي',                       ctrl: _pig8Ctrl,  unit: 'جرام'),
-            _MatRow(label: 'صبغه زرقاء طاووس محلي',                   ctrl: _pig9Ctrl,  unit: 'جرام'),
-            _MatRow(label: 'صبغه سوداء طاووس محلي',                   ctrl: _pig10Ctrl, unit: 'جرام'),
+            _MatRow(label: 'صبغة سوداء باودر عبوة 10 كيلو',          ctrl: _pig1Ctrl,  unit: 'جرام', balance: _bal('صبغة سوداء باودر عبوة 10 كيلو')),
+            _MatRow(label: 'صبغة زرقاء باودر عبوة 20 كيلو رقم-١٠٢٧', ctrl: _pig2Ctrl,  unit: 'جرام', balance: _bal('صبغة زرقاء باودر عبوة 20 كيلو رقم-١٠٢٧')),
+            _MatRow(label: 'صبغة زرقاء فاتح عبوة 20 كيلو رقم-١٢٥٦',  ctrl: _pig3Ctrl,  unit: 'جرام', balance: _bal('صبغة زرقاء فاتح عبوة 20 كيلو رقم-١٢٥٦')),
+            _MatRow(label: 'صبغة ارجواني عبوة 25 كيلو رقم-F٤٠٩',      ctrl: _pig4Ctrl,  unit: 'جرام', balance: _bal('صبغة ارجواني عبوة 25 كيلو رقم-F٤٠٩')),
+            _MatRow(label: 'صبغة احمر زهري عبوة 25 كيلو رقم-F٣٥٨',    ctrl: _pig5Ctrl,  unit: 'جرام', balance: _bal('صبغة احمر زهري عبوة 25 كيلو رقم-F٣٥٨')),
+            _MatRow(label: 'صبغة كاكي بيج عبوة 25 كيلو رقم-١٠٣٥',     ctrl: _pig6Ctrl,  unit: 'جرام', balance: _bal('صبغة كاكي بيج عبوة 25 كيلو رقم-١٠٣٥')),
+            _MatRow(label: 'صبغه خضراء طاووس محلي',                   ctrl: _pig7Ctrl,  unit: 'جرام', balance: _bal('صبغه خضراء طاووس محلي')),
+            _MatRow(label: 'صبغه برتقالي محلي',                       ctrl: _pig8Ctrl,  unit: 'جرام', balance: _bal('صبغه برتقالي محلي')),
+            _MatRow(label: 'صبغه زرقاء طاووس محلي',                   ctrl: _pig9Ctrl,  unit: 'جرام', balance: _bal('صبغه زرقاء طاووس محلي')),
+            _MatRow(label: 'صبغه سوداء طاووس محلي',                   ctrl: _pig10Ctrl, unit: 'جرام', balance: _bal('صبغه سوداء طاووس محلي')),
 
             const SizedBox(height: 20),
 
@@ -591,12 +609,12 @@ class _BatchEntryPageState extends ConsumerState<BatchEntryPage> {
             _SectionHeader(title: 'إضافات أخرى', icon: Icons.add_circle_outline),
             const SizedBox(height: 12),
 
-            _MatRow(label: 'لواصق موديل ۷۰۳ بالحبه',        ctrl: _add1Ctrl, unit: 'قطعة'),
-            _MatRow(label: 'لواصق موديل ۸۰۳۱-٦٠٣١ بالحبه', ctrl: _add2Ctrl, unit: 'قطعة'),
-            _MatRow(label: 'لواصق موديل ٦٠٢٦-٨٠٢٦ بالحبه', ctrl: _add3Ctrl, unit: 'قطعة'),
-            _MatRow(label: 'لواصق موديل ٦٠٢٢-٨٠٢٢ بالحبه', ctrl: _add4Ctrl, unit: 'قطعة'),
-            _MatRow(label: 'خلطه ازرق',                      ctrl: _add5Ctrl),
-            _MatRow(label: 'راجع مكينه ازرق',                ctrl: _add6Ctrl),
+            _MatRow(label: 'لواصق موديل ۷۰۳ بالحبه',        ctrl: _add1Ctrl, unit: 'قطعة', balance: _bal('لواصق موديل ۷۰۳ بالحبه')),
+            _MatRow(label: 'لواصق موديل ۸۰۳۱-٦٠٣١ بالحبه', ctrl: _add2Ctrl, unit: 'قطعة', balance: _bal('لواصق موديل ۸۰۳۱-٦٠٣١ بالحبه')),
+            _MatRow(label: 'لواصق موديل ٦٠٢٦-٨٠٢٦ بالحبه', ctrl: _add3Ctrl, unit: 'قطعة', balance: _bal('لواصق موديل ٦٠٢٦-٨٠٢٦ بالحبه')),
+            _MatRow(label: 'لواصق موديل ٦٠٢٢-٨٠٢٢ بالحبه', ctrl: _add4Ctrl, unit: 'قطعة', balance: _bal('لواصق موديل ٦٠٢٢-٨٠٢٢ بالحبه')),
+            _MatRow(label: 'خلطه ازرق',                      ctrl: _add5Ctrl, balance: _bal('خلطه ازرق')),
+            _MatRow(label: 'راجع مكينه ازرق',                ctrl: _add6Ctrl, balance: _bal('راجع مكينه ازرق')),
 
             const SizedBox(height: 20),
 
@@ -733,30 +751,73 @@ class _SectionHeader extends StatelessWidget {
   }
 }
 
-// ── Material Row (fixed label + qty input) ─────────────────────
+// ── Material Row (fixed label + qty input + mixer balance) ────────
 class _MatRow extends StatelessWidget {
   final String label;
   final TextEditingController ctrl;
   final String unit;
 
+  /// رصيد مخزن الخلاط بالكجم — null تعني المادة غير موجودة في مخزن الخلاط
+  final double? balance;
+
   const _MatRow({
     required this.label,
     required this.ctrl,
     this.unit = 'كجم',
+    this.balance,
   });
 
   @override
   Widget build(BuildContext context) {
+    final hasBalance = balance != null;
+    final isEmpty = hasBalance && balance! <= 0;
+    final balColor = isEmpty
+        ? Colors.red.shade600
+        : Colors.teal.shade700;
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
+          // ── اسم المادة + رصيد متاح ─────────────────────────
           Expanded(
             flex: 3,
-            child: Text(label,
-                style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13)),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(label,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w500, fontSize: 13)),
+                if (hasBalance) ...[
+                  const SizedBox(height: 2),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        isEmpty
+                            ? Icons.warning_amber_rounded
+                            : Icons.inventory_2_outlined,
+                        size: 11,
+                        color: balColor,
+                      ),
+                      const SizedBox(width: 3),
+                      Text(
+                        'متاح: ${balance! % 1 == 0 ? balance!.toInt() : balance!.toStringAsFixed(2)} كجم',
+                        style: TextStyle(
+                            fontSize: 11,
+                            color: balColor,
+                            fontWeight: FontWeight.w500),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
           ),
           const SizedBox(width: 8),
+          // ── حقل الإدخال ─────────────────────────────────────
           Expanded(
             flex: 2,
             child: TextFormField(
