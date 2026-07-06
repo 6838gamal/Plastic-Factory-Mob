@@ -246,7 +246,124 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
                       toWarehouse: AppConstants.warehouseMain);
                 },
               ),
+            ListTile(
+              leading: CircleAvatar(
+                  backgroundColor: Colors.red.shade700,
+                  child: const Icon(Icons.exposure_zero, color: Colors.white)),
+              title: const Text('تصفير الرصيد'),
+              subtitle: const Text('إعادة رصيد مادة إلى صفر'),
+              onTap: () {
+                Navigator.pop(context);
+                _showResetBalanceDialog(context, defaultWarehouse: _activeWarehouse);
+              },
+            ),
             const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Reset Balance Dialog ─────────────────────────────────────────────────
+
+  Future<void> _showResetBalanceDialog(BuildContext context,
+      {required String defaultWarehouse}) async {
+    final summaryAsync = ref.read(_summaryProvider);
+    final all = summaryAsync.value ?? [];
+    final materials = all.where((m) => m.warehouseType == defaultWarehouse).toList();
+
+    if (materials.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('لا توجد مواد في هذا المخزن.')));
+      return;
+    }
+
+    InventorySummaryModel? selected = materials.first;
+    bool confirmed = false;
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, ss) => AlertDialog(
+          title: Row(children: [
+            Icon(Icons.exposure_zero, color: Colors.red.shade700),
+            const SizedBox(width: 8),
+            const Text('تصفير الرصيد'),
+          ]),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              DropdownButtonFormField<InventorySummaryModel>(
+                value: selected,
+                decoration: const InputDecoration(labelText: 'المادة الخام'),
+                items: materials
+                    .map((m) => DropdownMenuItem(
+                        value: m,
+                        child: Text('${m.materialName} — ${Helpers.formatQuantityInKg(m.balance, m.unit)}')))
+                    .toList(),
+                onChanged: (v) => ss(() => selected = v),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.warning_amber_rounded, color: Colors.red.shade700, size: 18),
+                    const SizedBox(width: 8),
+                    const Expanded(
+                      child: Text(
+                        'سيُعاد الرصيد إلى صفر. هذا الإجراء لا يمكن التراجع عنه.',
+                        style: TextStyle(fontSize: 12, color: Colors.red),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+              CheckboxListTile(
+                value: confirmed,
+                title: const Text('أؤكد تصفير رصيد هذه المادة', style: TextStyle(fontSize: 13)),
+                onChanged: (v) => ss(() => confirmed = v ?? false),
+                contentPadding: EdgeInsets.zero,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('إلغاء'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.red.shade700),
+              onPressed: !confirmed || selected == null ? null : () async {
+                try {
+                  final ds = ref.read(dataSourceProvider);
+                  await ds.updateInventoryBalance(
+                    selected!.materialId,
+                    defaultWarehouse,
+                    0,
+                  );
+                  ref.invalidate(_summaryProvider);
+                  ref.invalidate(_txProvider(''));
+                  if (ctx.mounted) {
+                    Navigator.pop(ctx);
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                        content: Text('تم تصفير رصيد ${selected!.materialName}'),
+                        backgroundColor: Colors.red.shade700));
+                  }
+                } catch (e) {
+                  if (ctx.mounted) {
+                    ScaffoldMessenger.of(ctx).showSnackBar(
+                        SnackBar(content: Text('خطأ: $e'), backgroundColor: Colors.red));
+                  }
+                }
+              },
+              child: const Text('تصفير', style: TextStyle(color: Colors.white)),
+            ),
           ],
         ),
       ),

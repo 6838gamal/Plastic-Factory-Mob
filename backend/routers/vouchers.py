@@ -187,8 +187,8 @@ async def update_receipt_voucher(voucher_id: str, body: ItemsUpdate):
     v = await pool.fetchrow("SELECT status FROM receipt_vouchers WHERE id=$1::uuid", voucher_id)
     if not v:
         raise HTTPException(404, "سند الاستلام غير موجود")
-    if v["status"] == "posted":
-        raise HTTPException(400, "لا يمكن تعديل سند مُرحَّل")
+    if v["status"] in ("posted", "pending_approval", "rejected"):
+        raise HTTPException(400, "لا يمكن تعديل السند في حالته الحالية")
 
     await pool.execute(
         """UPDATE receipt_vouchers
@@ -214,6 +214,137 @@ async def update_receipt_voucher(voucher_id: str, body: ItemsUpdate):
     await _write_audit(pool, "update", "receipt_voucher", voucher_id, "admin",
                        {"items_updated": len(body.items)})
     return {"status": "updated"}
+
+
+@router.post("/receipt/{voucher_id}/submit")
+async def submit_receipt_voucher(voucher_id: str, submitted_by: str = "keeper"):
+    """Keeper submits draft to admin for approval (draft → pending_approval)."""
+    pool = await get_pool()
+    v = await pool.fetchrow("SELECT * FROM receipt_vouchers WHERE id=$1::uuid", voucher_id)
+    if not v:
+        raise HTTPException(404, "سند الاستلام غير موجود")
+    if v["status"] != "draft":
+        raise HTTPException(400, "لا يمكن إرسال السند إلا إذا كان في حالة مسودة")
+    items = await pool.fetch(
+        "SELECT id FROM receipt_voucher_items WHERE voucher_id=$1::uuid", voucher_id
+    )
+    if not items:
+        raise HTTPException(400, "لا يوجد بنود في السند — أضف بنوداً قبل الإرسال")
+    await pool.execute(
+        "UPDATE receipt_vouchers SET status='pending_approval', updated_at=NOW() WHERE id=$1::uuid",
+        voucher_id
+    )
+    await _write_audit(pool, "submit", "receipt_voucher", voucher_id, submitted_by,
+                       {"voucher_number": v["voucher_number"]})
+    return {"status": "pending_approval"}
+
+
+@router.post("/receipt/{voucher_id}/approve")
+async def approve_receipt_voucher(voucher_id: str, approved_by: str = "admin"):
+    """Admin approves and posts to inventory (pending_approval → posted)."""
+    pool = await get_pool()
+    v = await pool.fetchrow("SELECT * FROM receipt_vouchers WHERE id=$1::uuid", voucher_id)
+    if not v:
+        raise HTTPException(404, "سند الاستلام غير موجود")
+    if v["status"] != "pending_approval":
+        raise HTTPException(400, "لا يمكن الموافقة إلا على السندات بانتظار الموافقة")
+
+    items = await pool.fetch(
+        "SELECT * FROM receipt_voucher_items WHERE voucher_id=$1::uuid", voucher_id
+    )
+    if not items:
+        raise HTTPException(400, "لا يوجد بنود في السند")
+
+    for item in items:
+        mat_id = item["material_id"]
+        if not mat_id:
+            found = await pool.fetchrow(
+                "SELECT id FROM raw_materials WHERE LOWER(name) = LOWER($1)",
+                item["material_name"],
+            )
+            if found:
+                mat_id = str(found["id"])
+                await pool.execute(
+                    "UPDATE receipt_voucher_items SET material_id=$1::uuid WHERE id=$2",
+                    mat_id, item["id"],
+                )
+            else:
+                logger.warning(
+                    f"[approve_receipt] No raw_material for name='{item['material_name']}' — skipping"
+                )
+                continue
+
+        qty = float(item["quantity"])
+        existing = await pool.fetchrow(
+            "SELECT id, balance FROM inventory WHERE material_id=$1::uuid AND warehouse_type='main'",
+            mat_id
+        )
+        if existing:
+            balance_before = float(existing["balance"])
+            balance_after = balance_before + qty
+            await pool.execute(
+                "UPDATE inventory SET balance=$1, updated_at=NOW() WHERE id=$2",
+                balance_after, existing["id"]
+            )
+        else:
+            balance_before = 0.0
+            balance_after = qty
+            await pool.execute(
+                """INSERT INTO inventory (material_id, warehouse_type, balance)
+                   VALUES ($1::uuid, 'main', $2)""",
+                mat_id, qty
+            )
+
+        await pool.execute(
+            """INSERT INTO inventory_transactions
+                 (material_id, warehouse_type, transaction_type, quantity,
+                  balance_before, balance_after, transaction_ref, created_by, notes)
+               VALUES ($1::uuid,'main','in',$2,$3,$4,$5,$6,$7)""",
+            mat_id, qty, balance_before, balance_after,
+            v["voucher_number"], approved_by,
+            f"سند استلام رقم {v['voucher_number']} — موافقة الإدارة"
+        )
+
+    await pool.execute(
+        "UPDATE receipt_vouchers SET status='posted', updated_at=NOW() WHERE id=$1::uuid",
+        voucher_id
+    )
+    await _write_audit(pool, "approve", "receipt_voucher", voucher_id, approved_by,
+                       {"voucher_number": v["voucher_number"], "items": len(items)})
+    return {"status": "posted", "items_processed": len(items)}
+
+
+@router.post("/receipt/{voucher_id}/reject")
+async def reject_receipt_voucher(voucher_id: str, rejected_by: str = "admin"):
+    """Admin rejects a pending receipt voucher (pending_approval → rejected)."""
+    pool = await get_pool()
+    v = await pool.fetchrow("SELECT status, voucher_number FROM receipt_vouchers WHERE id=$1::uuid", voucher_id)
+    if not v:
+        raise HTTPException(404, "سند الاستلام غير موجود")
+    if v["status"] != "pending_approval":
+        raise HTTPException(400, "لا يمكن رفض إلا السندات بانتظار الموافقة")
+    await pool.execute(
+        "UPDATE receipt_vouchers SET status='rejected', updated_at=NOW() WHERE id=$1::uuid",
+        voucher_id
+    )
+    await _write_audit(pool, "reject", "receipt_voucher", voucher_id, rejected_by,
+                       {"voucher_number": v["voucher_number"]})
+    return {"status": "rejected"}
+
+
+@router.delete("/receipt/{voucher_id}")
+async def delete_receipt_voucher(voucher_id: str):
+    """Keeper deletes a voucher (only when draft or pending_approval)."""
+    pool = await get_pool()
+    v = await pool.fetchrow("SELECT status, voucher_number FROM receipt_vouchers WHERE id=$1::uuid", voucher_id)
+    if not v:
+        raise HTTPException(404, "سند الاستلام غير موجود")
+    if v["status"] == "posted":
+        raise HTTPException(400, "لا يمكن حذف سند مُرحَّل")
+    await pool.execute("DELETE FROM receipt_vouchers WHERE id=$1::uuid", voucher_id)
+    await _write_audit(pool, "delete", "receipt_voucher", voucher_id, "keeper",
+                       {"voucher_number": v["voucher_number"]})
+    return {"status": "deleted"}
 
 
 @router.post("/receipt/{voucher_id}/post")

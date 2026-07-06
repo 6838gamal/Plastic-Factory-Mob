@@ -68,10 +68,10 @@ class _WarehouseManagerPageState extends ConsumerState<WarehouseManagerPage>
           Expanded(
             child: TabBarView(
               controller: _tabs,
-              children: const [
-                _ReceiptTab(),
-                _TransferTab(),
-                SuppliersPage(),
+              children: [
+                _ReceiptTab(isAdmin: widget.keeperName == null),
+                const _TransferTab(),
+                const SuppliersPage(),
               ],
             ),
           ),
@@ -121,7 +121,8 @@ class _WarehouseManagerPageState extends ConsumerState<WarehouseManagerPage>
 // ══════════════════════════════════════════════════════════════════
 
 class _ReceiptTab extends ConsumerWidget {
-  const _ReceiptTab();
+  final bool isAdmin;
+  const _ReceiptTab({required this.isAdmin});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -143,11 +144,19 @@ class _ReceiptTab extends ConsumerWidget {
               ),
             );
           }
+
+          // Admin sees pending first, then rest
+          final sorted = isAdmin
+              ? [...list.where((v) => v['status'] == 'pending_approval'),
+                 ...list.where((v) => v['status'] != 'pending_approval')]
+              : list;
+
           return ListView.builder(
             padding: const EdgeInsets.all(12),
-            itemCount: list.length,
+            itemCount: sorted.length,
             itemBuilder: (_, i) => _ReceiptVoucherCard(
-              voucher: ReceiptVoucherModel.fromJson(list[i]),
+              voucher: ReceiptVoucherModel.fromJson(sorted[i]),
+              isAdmin: isAdmin,
               onAction: () => ref.invalidate(_receiptVouchersProvider),
             ),
           );
@@ -159,16 +168,39 @@ class _ReceiptTab extends ConsumerWidget {
   }
 }
 
+// ── Status helpers ────────────────────────────────────────────────
+
+Color _receiptStatusColor(String? status) {
+  switch (status) {
+    case 'posted':    return Colors.green;
+    case 'pending_approval': return Colors.indigo;
+    case 'rejected':  return Colors.red;
+    default:          return Colors.orange;
+  }
+}
+
+String _receiptStatusText(String? status) {
+  switch (status) {
+    case 'posted':    return 'مُرحَّل';
+    case 'pending_approval': return 'بانتظار الموافقة';
+    case 'rejected':  return 'مرفوض';
+    default:          return 'مسودة';
+  }
+}
+
+// ── Card ──────────────────────────────────────────────────────────
+
 class _ReceiptVoucherCard extends ConsumerWidget {
   final ReceiptVoucherModel voucher;
+  final bool isAdmin;
   final VoidCallback onAction;
-  const _ReceiptVoucherCard({required this.voucher, required this.onAction});
+  const _ReceiptVoucherCard({required this.voucher, required this.isAdmin, required this.onAction});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isPosted = voucher.status == 'posted';
-    final statusColor = isPosted ? Colors.green : Colors.orange;
-    final statusText = isPosted ? 'مُرحَّل' : 'مسودة';
+    final status = voucher.status ?? 'draft';
+    final statusColor = _receiptStatusColor(status);
+    final statusText = _receiptStatusText(status);
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
@@ -177,6 +209,7 @@ class _ReceiptVoucherCard extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // ── Header row ──────────────────────────────────────
             Row(
               children: [
                 Icon(Icons.receipt_long_outlined, color: statusColor, size: 20),
@@ -191,6 +224,8 @@ class _ReceiptVoucherCard extends ConsumerWidget {
               ],
             ),
             const SizedBox(height: 6),
+
+            // ── Supplier info ────────────────────────────────────
             if (voucher.supplierName?.isNotEmpty == true)
               Row(children: [
                 const Icon(Icons.business_outlined, size: 14, color: Colors.teal),
@@ -224,6 +259,8 @@ class _ReceiptVoucherCard extends ConsumerWidget {
                 Text('استلمه: ${voucher.receivedBy!}', style: const TextStyle(color: Colors.indigo, fontSize: 12)),
               ]),
             ],
+
+            // ── Date / count ─────────────────────────────────────
             const SizedBox(height: 4),
             Row(
               children: [
@@ -234,72 +271,240 @@ class _ReceiptVoucherCard extends ConsumerWidget {
                 Text('${voucher.itemCount} صنف', style: TextStyle(color: Colors.grey[600], fontSize: 12)),
               ],
             ),
-            if (!isPosted) ...[
-              const Divider(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  TextButton.icon(
-                    icon: const Icon(Icons.edit_outlined, size: 16),
-                    label: const Text('تعديل'),
-                    onPressed: () {
-                      showDialog(
-                        context: context,
-                        builder: (_) => _ReceiptVoucherDialog(
-                          voucherId: voucher.id,
-                          onSaved: onAction,
-                        ),
-                      );
-                    },
-                  ),
-                  const SizedBox(width: 8),
-                  ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-                    icon: const Icon(Icons.check_circle_outline, size: 16, color: Colors.white),
-                    label: const Text('ترحيل', style: TextStyle(color: Colors.white)),
-                    onPressed: () => _postVoucher(context, ref),
-                  ),
-                ],
-              ),
-            ],
+
+            // ── Action buttons (role + status aware) ─────────────
+            ..._buildActions(context, ref, status),
           ],
         ),
       ),
     );
   }
 
-  Future<void> _postVoucher(BuildContext context, WidgetRef ref) async {
+  List<Widget> _buildActions(BuildContext context, WidgetRef ref, String status) {
+    if (isAdmin) {
+      // Admin: only acts on pending_approval
+      if (status != 'pending_approval') return [];
+      return [
+        const Divider(height: 16),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
+                icon: const Icon(Icons.cancel_outlined, size: 16),
+                label: const Text('رفض'),
+                onPressed: () => _rejectVoucher(context, ref),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+                icon: const Icon(Icons.check_circle_outline, size: 16, color: Colors.white),
+                label: const Text('موافقة وترحيل', style: TextStyle(color: Colors.white)),
+                onPressed: () => _approveVoucher(context, ref),
+              ),
+            ),
+          ],
+        ),
+      ];
+    } else {
+      // Keeper
+      if (status == 'posted' || status == 'rejected') return [];
+      if (status == 'pending_approval') {
+        return [
+          const Divider(height: 16),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.indigo.shade50,
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.hourglass_top, size: 13, color: Colors.indigo),
+                SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'بانتظار موافقة الإدارة — يمكنك حذف السند للتراجع',
+                    style: TextStyle(color: Colors.indigo, fontSize: 11),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
+              icon: const Icon(Icons.delete_outline, size: 16),
+              label: const Text('حذف / تراجع'),
+              onPressed: () => _deleteVoucher(context, ref),
+            ),
+          ),
+        ];
+      }
+      // draft
+      return [
+        const Divider(height: 16),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            TextButton.icon(
+              icon: const Icon(Icons.delete_outline, size: 16, color: Colors.red),
+              label: const Text('حذف', style: TextStyle(color: Colors.red)),
+              onPressed: () => _deleteVoucher(context, ref),
+            ),
+            const SizedBox(width: 4),
+            TextButton.icon(
+              icon: const Icon(Icons.edit_outlined, size: 16),
+              label: const Text('تعديل'),
+              onPressed: () => showDialog(
+                context: context,
+                builder: (_) => _ReceiptVoucherDialog(
+                  voucherId: voucher.id,
+                  onSaved: onAction,
+                ),
+              ),
+            ),
+            const SizedBox(width: 4),
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.indigo),
+              icon: const Icon(Icons.send_outlined, size: 16, color: Colors.white),
+              label: const Text('إرسال للإدارة', style: TextStyle(color: Colors.white)),
+              onPressed: () => _submitVoucher(context, ref),
+            ),
+          ],
+        ),
+      ];
+    }
+  }
+
+  Future<void> _submitVoucher(BuildContext context, WidgetRef ref) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('تأكيد الترحيل'),
-        content: Text('سيتم إضافة مواد سند ${voucher.voucherNumber} للمخزن الرئيسي. هل أنت متأكد؟'),
+        title: const Text('إرسال للإدارة'),
+        content: Text('سيُرسل السند ${voucher.voucherNumber} للإدارة لمراجعته والموافقة عليه.\nلن تتمكن من التعديل بعد الإرسال.'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('إلغاء')),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.indigo),
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('ترحيل', style: TextStyle(color: Colors.white)),
+            child: const Text('إرسال', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
     );
     if (confirmed != true || !context.mounted) return;
-
     try {
-      final ds = ref.read(dataSourceProvider);
-      await ds.postReceiptVoucher(voucher.id!);
+      await ref.read(dataSourceProvider).submitReceiptVoucher(voucher.id!);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('تم ترحيل السند وإضافة المواد للمخزن'), backgroundColor: Colors.green),
+          const SnackBar(content: Text('تم إرسال السند للإدارة بنجاح'), backgroundColor: Colors.indigo),
         );
       }
       onAction();
     } catch (e) {
       if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطأ: $e'), backgroundColor: Colors.red));
+      }
+    }
+  }
+
+  Future<void> _approveVoucher(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('موافقة وترحيل السند'),
+        content: Text('سيُضاف محتوى السند ${voucher.voucherNumber} للمخزن الرئيسي فوراً. هل تؤكد؟'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('إلغاء')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('موافقة وترحيل', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+    try {
+      await ref.read(dataSourceProvider).approveReceiptVoucher(voucher.id!);
+      if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطأ: $e'), backgroundColor: Colors.red),
+          const SnackBar(content: Text('تمت الموافقة وتم ترحيل السند للمخزن'), backgroundColor: Colors.green),
         );
+      }
+      onAction();
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطأ: $e'), backgroundColor: Colors.red));
+      }
+    }
+  }
+
+  Future<void> _rejectVoucher(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('رفض السند'),
+        content: Text('هل تريد رفض السند ${voucher.voucherNumber}؟ لن تُضاف أي مواد للمخزن.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('إلغاء')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('رفض', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+    try {
+      await ref.read(dataSourceProvider).rejectReceiptVoucher(voucher.id!);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('تم رفض السند'), backgroundColor: Colors.red),
+        );
+      }
+      onAction();
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطأ: $e'), backgroundColor: Colors.red));
+      }
+    }
+  }
+
+  Future<void> _deleteVoucher(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('حذف السند'),
+        content: Text('سيُحذف السند ${voucher.voucherNumber} نهائياً. هل أنت متأكد؟'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('إلغاء')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('حذف', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+    try {
+      await ref.read(dataSourceProvider).deleteReceiptVoucher(voucher.id!);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('تم حذف السند'), backgroundColor: Colors.grey),
+        );
+      }
+      onAction();
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطأ: $e'), backgroundColor: Colors.red));
       }
     }
   }
