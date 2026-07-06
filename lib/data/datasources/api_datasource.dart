@@ -507,6 +507,10 @@ class ApiDataSource {
     return res as Map<String, dynamic>;
   }
 
+  Future<void> resetDashboardCounter(String counter) async {
+    await _post('/api/dashboard/reset/$counter', {});
+  }
+
   // ==================== HEALTH ====================
   Future<bool> isHealthy() async {
     try {

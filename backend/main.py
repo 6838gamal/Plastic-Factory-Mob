@@ -110,6 +110,19 @@ async def _init_db():
         except Exception as exc:
             logger.warning(f"[init_db] Shift handover migration skipped: {exc}")
 
+    # ── Counter resets table ───────────────────────────────────────────────
+    await pool.execute("""
+        CREATE TABLE IF NOT EXISTS counter_resets (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          counter_name VARCHAR(50) NOT NULL,
+          reset_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          reset_by VARCHAR(200) DEFAULT 'admin'
+        )
+    """)
+    await pool.execute(
+        "CREATE INDEX IF NOT EXISTS idx_counter_resets_name_at ON counter_resets(counter_name, reset_at)"
+    )
+
     _col_migrations = [
         "ALTER TABLE shift_handovers ADD COLUMN IF NOT EXISTS unknown_waste_kg DECIMAL(12,3) NOT NULL DEFAULT 0",
         "ALTER TABLE shift_handovers ADD COLUMN IF NOT EXISTS received_from_main_kg DECIMAL(12,3) NOT NULL DEFAULT 0",

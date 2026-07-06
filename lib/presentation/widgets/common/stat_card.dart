@@ -8,6 +8,7 @@ class StatCard extends StatelessWidget {
   final Color color;
   final String? subtitle;
   final VoidCallback? onTap;
+  final VoidCallback? onReset;
 
   const StatCard({
     super.key,
@@ -17,6 +18,7 @@ class StatCard extends StatelessWidget {
     required this.color,
     this.subtitle,
     this.onTap,
+    this.onReset,
   });
 
   @override
@@ -43,7 +45,23 @@ class StatCard extends StatelessWidget {
                     child: Icon(icon, color: color, size: 24),
                   ),
                   const Spacer(),
-                  if (onTap != null)
+                  if (onReset != null)
+                    Tooltip(
+                      message: 'تصفير العداد',
+                      child: InkWell(
+                        onTap: onReset,
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          child: Icon(
+                            Icons.restart_alt_rounded,
+                            size: 18,
+                            color: Colors.grey[400],
+                          ),
+                        ),
+                      ),
+                    )
+                  else if (onTap != null)
                     Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey[400]),
                 ],
               ),

@@ -1,17 +1,27 @@
 """
 Dashboard stats — computed from live DB data for today.
-
-Includes:
- - batches_today, production_today, scrap/waste/stop_time
- - pending_alerts
- - waste_percentage, efficiency_pct, deviation_pct
- - cost_today (sum of qty × cost_per_unit from inventory_transactions)
+Supports per-counter resets via the counter_resets table.
 """
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from datetime import datetime, date
 from database import get_pool
 
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
+
+_VALID_COUNTERS = {"batches", "production", "alerts", "scrap_balance", "inputs"}
+
+
+async def _last_reset(pool, counter: str, day_start: datetime) -> datetime:
+    """Return the last reset time for a counter today, or day_start if none."""
+    row = await pool.fetchrow(
+        "SELECT reset_at FROM counter_resets "
+        "WHERE counter_name=$1 AND reset_at >= $2 "
+        "ORDER BY reset_at DESC LIMIT 1",
+        counter, day_start,
+    )
+    if row:
+        return row["reset_at"].replace(tzinfo=None)
+    return day_start
 
 
 @router.get("/stats")
@@ -21,9 +31,14 @@ async def get_stats():
     day_start = datetime(today.year, today.month, today.day)
     day_end   = datetime(today.year, today.month, today.day, 23, 59, 59)
 
+    # ── Resolve effective start times per counter (after last reset) ──────
+    batches_from    = await _last_reset(pool, "batches",       day_start)
+    production_from = await _last_reset(pool, "production",    day_start)
+    inputs_from     = await _last_reset(pool, "inputs",        day_start)
+
     # ── Batches today ──────────────────────────────────────────
     batches_count = await pool.fetchval(
-        "SELECT COUNT(*) FROM batches WHERE created_at >= $1", day_start
+        "SELECT COUNT(*) FROM batches WHERE created_at >= $1", batches_from
     )
 
     # ── Machine production today ───────────────────────────────
@@ -35,7 +50,7 @@ async def get_stats():
              COALESCE(SUM(stop_time_minutes), 0) AS total_stop_time
            FROM machine_production
            WHERE created_at BETWEEN $1 AND $2""",
-        day_start, day_end,
+        production_from, day_end,
     )
     total_produced   = float(prod["total_produced"])
     total_waste      = float(prod["total_waste"])
@@ -48,7 +63,7 @@ async def get_stats():
            FROM inventory_transactions
            WHERE transaction_type = 'out'
              AND created_at BETWEEN $1 AND $2""",
-        day_start, day_end,
+        inputs_from, day_end,
     )
     total_inputs = float(inv_row["total_inputs"])
 
@@ -59,13 +74,11 @@ async def get_stats():
            JOIN raw_materials rm ON rm.id::text = it.material_id::text
            WHERE it.transaction_type = 'out'
              AND it.created_at BETWEEN $1 AND $2""",
-        day_start, day_end,
+        inputs_from, day_end,
     )
     cost_today = float(cost_row["day_cost"])
 
     # ── KPIs ───────────────────────────────────────────────────
-    # الانحراف = (المخرجات - المدخلات) / المدخلات × 100
-    # المخرجات = الإنتاج النهائي + السكراب + الهالك
     total_outputs = total_produced + total_waste + total_scrap
     efficiency_pct = round(total_produced / total_inputs * 100, 1) if total_inputs > 0 else 0.0
     deviation_pct  = round((total_outputs - total_inputs) / total_inputs * 100, 1) if total_inputs > 0 else 0.0
@@ -101,6 +114,18 @@ async def get_stats():
         today,
     )
 
+    # ── Last reset times (to show in UI) ──────────────────────
+    last_resets: dict = {}
+    for c in _VALID_COUNTERS:
+        row = await pool.fetchrow(
+            "SELECT reset_at FROM counter_resets "
+            "WHERE counter_name=$1 AND reset_at >= $2 "
+            "ORDER BY reset_at DESC LIMIT 1",
+            c, day_start,
+        )
+        if row:
+            last_resets[c] = row["reset_at"].isoformat()
+
     return {
         "batches_today":    int(batches_count),
         "production_today": round(total_produced, 2),
@@ -119,4 +144,41 @@ async def get_stats():
         "custody_debts_total_kg": round(float(custody_debts_total_kg), 3),
         "scrap_balance_kg": round(float(scrap_balance_kg), 3),
         "frozen_shifts_today": int(frozen_shifts_today),
+        "last_resets": last_resets,
     }
+
+
+@router.post("/reset/{counter}")
+async def reset_counter(counter: str):
+    """Reset a specific dashboard counter."""
+    if counter not in _VALID_COUNTERS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"عداد غير معروف. القيم المسموح بها: {', '.join(_VALID_COUNTERS)}",
+        )
+
+    pool = await get_pool()
+    now = datetime.utcnow()
+
+    if counter == "alerts":
+        affected = await pool.execute(
+            "UPDATE alerts SET status='resolved' WHERE status='pending'"
+        )
+        return {"ok": True, "counter": counter, "reset_at": now.isoformat(), "detail": "تم حل جميع التحذيرات المعلقة"}
+
+    elif counter == "scrap_balance":
+        await pool.execute(
+            "UPDATE inventory SET balance=0 WHERE warehouse_type='scrap'"
+        )
+        await pool.execute(
+            "INSERT INTO counter_resets (counter_name, reset_at) VALUES ($1, $2)",
+            counter, now,
+        )
+        return {"ok": True, "counter": counter, "reset_at": now.isoformat(), "detail": "تم تصفير رصيد السكراب"}
+
+    else:
+        await pool.execute(
+            "INSERT INTO counter_resets (counter_name, reset_at) VALUES ($1, $2)",
+            counter, now,
+        )
+        return {"ok": True, "counter": counter, "reset_at": now.isoformat(), "detail": "تم التصفير بنجاح"}
