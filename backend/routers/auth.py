@@ -67,11 +67,11 @@ class ResetPasswordWithTokenRequest(BaseModel):
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-def make_token(user_id: str, email: str) -> str:
+def make_token(user_id: str, email: str, role: str = "admin") -> str:
     payload = {
         "id": user_id,
         "email": email,
-        "role": "admin",
+        "role": role,
         "exp": datetime.utcnow() + timedelta(days=JWT_EXPIRY_DAYS),
     }
     return jwt.encode(payload, SECRET_KEY, algorithm="HS256")
@@ -139,14 +139,15 @@ async def sign_in(body: SignInRequest):
         raise HTTPException(status_code=401, detail="بيانات خاطئة")
     if not bcrypt.checkpw(body.password.encode(), row["password_hash"].encode()):
         raise HTTPException(status_code=401, detail="بيانات خاطئة")
-    token = make_token(str(row["id"]), row["email"])
+    role = row.get("role") or "admin"
+    token = make_token(str(row["id"]), row["email"], role)
     return {
         "token": token,
         "user": {
             "id": str(row["id"]),
             "email": row["email"],
             "name": row.get("name") or None,
-            "role": row.get("role") or "admin",
+            "role": role,
         },
     }
 
@@ -202,7 +203,9 @@ async def change_email(body: ChangeEmailRequest):
         "UPDATE admin_users SET email=$1 WHERE id=$2::uuid",
         body.new_email, body.user_id,
     )
-    token = make_token(body.user_id, body.new_email)
+    role_row = await pool.fetchrow("SELECT role FROM admin_users WHERE id=$1::uuid", body.user_id)
+    role = (role_row["role"] if role_row else None) or "admin"
+    token = make_token(body.user_id, body.new_email, role)
     return {
         "success": True,
         "message": "تم تغيير البريد الإلكتروني بنجاح",

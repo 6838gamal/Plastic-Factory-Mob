@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../data/datasources/api_datasource.dart';
-import '../../providers/auth_provider.dart' show dataSourceProvider;
-import '../../pages/admin/warehouse/warehouse_manager_page.dart';
+import '../../providers/auth_provider.dart';
 
+/// Dialog shown to warehouse managers to log in through the main auth flow.
+/// On success the router automatically redirects to /warehouse — no manual
+/// Navigator.push needed.
 class WarehouseLoginDialog extends ConsumerStatefulWidget {
   const WarehouseLoginDialog({super.key});
 
@@ -33,35 +34,25 @@ class _WarehouseLoginDialogState extends ConsumerState<WarehouseLoginDialog> {
       _loading = true;
       _error = null;
     });
-    try {
-      final ds = ref.read(dataSourceProvider);
-      final res = await ds.signIn(_emailCtrl.text.trim(), _passwordCtrl.text);
-      if (!mounted) return;
-      final user = res['user'] as Map<String, dynamic>? ?? {};
-      final keeperName = (user['name'] as String?)?.isNotEmpty == true
-          ? user['name'] as String
-          : _emailCtrl.text.trim();
-      final displayTitle = (user['name'] as String?)?.isNotEmpty == true
-          ? 'المخزن الرئيسي — ${user['name']}'
-          : 'المخزن الرئيسي — ${_emailCtrl.text.trim()}';
-      Navigator.pop(context);
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => Scaffold(
-            appBar: AppBar(
-              title: Text(displayTitle),
-              backgroundColor: Colors.teal,
-              foregroundColor: Colors.white,
-            ),
-            body: WarehouseManagerPage(keeperName: keeperName),
-          ),
-        ),
-      );
-    } catch (e) {
+    final success = await ref.read(authProvider.notifier).signIn(
+          _emailCtrl.text.trim(),
+          _passwordCtrl.text,
+        );
+    if (!mounted) return;
+    if (success) {
+      final role = ref.read(authProvider).user?.role ?? '';
+      if (role != 'warehouse_manager') {
+        // Signed in as admin or other role — dismiss so router handles redirect
+        Navigator.of(context, rootNavigator: true).pop();
+      } else {
+        // Warehouse manager — dismiss dialog, router will redirect to /warehouse
+        Navigator.of(context, rootNavigator: true).pop();
+      }
+    } else {
       setState(() {
         _loading = false;
-        _error = 'البريد الإلكتروني أو كلمة المرور غير صحيحة';
+        _error = ref.read(authProvider).error ??
+            'البريد الإلكتروني أو كلمة المرور غير صحيحة';
       });
     }
   }
@@ -83,12 +74,14 @@ class _WarehouseLoginDialogState extends ConsumerState<WarehouseLoginDialog> {
                   color: Colors.teal.withOpacity(0.1),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.warehouse, size: 48, color: Colors.teal),
+                child:
+                    const Icon(Icons.warehouse, size: 48, color: Colors.teal),
               ),
               const SizedBox(height: 16),
               const Text(
                 'لوحة أمين المخزن',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                style:
+                    TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 4),
               Text(
@@ -131,7 +124,8 @@ class _WarehouseLoginDialogState extends ConsumerState<WarehouseLoginDialog> {
               if (_error != null) ...[
                 const SizedBox(height: 12),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
                     color: Colors.red.withOpacity(0.08),
                     borderRadius: BorderRadius.circular(8),
@@ -139,12 +133,14 @@ class _WarehouseLoginDialogState extends ConsumerState<WarehouseLoginDialog> {
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.error_outline, color: Colors.red, size: 18),
+                      const Icon(Icons.error_outline,
+                          color: Colors.red, size: 18),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           _error!,
-                          style: const TextStyle(color: Colors.red, fontSize: 13),
+                          style: const TextStyle(
+                              color: Colors.red, fontSize: 13),
                         ),
                       ),
                     ],
@@ -156,7 +152,8 @@ class _WarehouseLoginDialogState extends ConsumerState<WarehouseLoginDialog> {
                 children: [
                   Expanded(
                     child: OutlinedButton(
-                      onPressed: _loading ? null : () => Navigator.pop(context),
+                      onPressed:
+                          _loading ? null : () => Navigator.pop(context),
                       child: const Text('إلغاء'),
                     ),
                   ),

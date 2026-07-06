@@ -4,18 +4,27 @@ import '../../data/datasources/api_datasource.dart';
 class AppUser {
   final String id;
   final String email;
-  const AppUser({required this.id, required this.email});
+  final String role;
+  final String? name;
+  const AppUser({
+    required this.id,
+    required this.email,
+    this.role = 'admin',
+    this.name,
+  });
 }
 
 class AuthState {
   final AppUser? user;
   final bool isAdmin;
+  final bool isWarehouseManager;
   final bool isLoading;
   final String? error;
 
   const AuthState({
     this.user,
     this.isAdmin = false,
+    this.isWarehouseManager = false,
     this.isLoading = false,
     this.error,
   });
@@ -23,12 +32,14 @@ class AuthState {
   AuthState copyWith({
     AppUser? user,
     bool? isAdmin,
+    bool? isWarehouseManager,
     bool? isLoading,
     String? error,
   }) =>
       AuthState(
         user: user ?? this.user,
         isAdmin: isAdmin ?? this.isAdmin,
+        isWarehouseManager: isWarehouseManager ?? this.isWarehouseManager,
         isLoading: isLoading ?? this.isLoading,
         error: error,
       );
@@ -46,11 +57,20 @@ class AuthNotifier extends Notifier<AuthState> {
       final ds = ref.read(dataSourceProvider);
       final response = await ds.signIn(email, password);
       final userMap = response['user'] as Map<String, dynamic>;
+      final role = userMap['role'] as String? ?? 'admin';
+      final name = userMap['name'] as String?;
       final user = AppUser(
         id: userMap['id'] as String,
         email: userMap['email'] as String,
+        role: role,
+        name: name,
       );
-      state = state.copyWith(user: user, isAdmin: true, isLoading: false);
+      state = state.copyWith(
+        user: user,
+        isAdmin: role == 'admin',
+        isWarehouseManager: role == 'warehouse_manager',
+        isLoading: false,
+      );
       return true;
     } catch (e) {
       state = state.copyWith(isLoading: false, error: 'خطأ في تسجيل الدخول: $e');
@@ -90,6 +110,8 @@ class AuthNotifier extends Notifier<AuthState> {
       final user = AppUser(
         id: userMap['id'] as String,
         email: userMap['email'] as String,
+        role: state.user?.role ?? 'admin',
+        name: state.user?.name,
       );
       state = state.copyWith(user: user, isLoading: false);
       return true;

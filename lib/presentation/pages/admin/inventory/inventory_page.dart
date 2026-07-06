@@ -299,7 +299,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
                 items: materials
                     .map((m) => DropdownMenuItem(
                         value: m,
-                        child: Text('${m.materialName} — ${Helpers.formatQuantityInKg(m.balance, m.unit)}')))
+                        child: Text('${m.materialName} — ${Helpers.formatQuantityInKg(m.currentBalance, m.unit)}')))
                     .toList(),
                 onChanged: (v) => ss(() => selected = v),
               ),

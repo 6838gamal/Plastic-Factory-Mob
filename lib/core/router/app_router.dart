@@ -22,6 +22,8 @@ import '../../presentation/pages/admin/inventory/opening_balances_page.dart';
 import '../../presentation/pages/admin/warehouse/warehouse_manager_page.dart';
 import '../../presentation/pages/admin/warehouse/mixing_warehouse_page.dart';
 import '../../presentation/pages/admin/suppliers/suppliers_page.dart';
+import '../../presentation/pages/warehouse/warehouse_shell_page.dart';
+import '../../presentation/pages/warehouse/warehouse_home_page.dart';
 import '../../presentation/providers/auth_provider.dart';
 
 /// A ChangeNotifier that fires whenever auth state changes,
@@ -48,9 +50,22 @@ final routerProvider = Provider<GoRouter>((ref) {
       if (path.startsWith('/splash')) return null;
 
       final isAdmin = ref.read(authProvider).isAdmin;
+      final isWarehouseManager = ref.read(authProvider).isWarehouseManager;
       final onAdmin = path.startsWith('/admin');
-      if (onAdmin && !isAdmin) return '/worker';
+      final onWarehouse = path.startsWith('/warehouse');
+
+      // Protect admin routes — warehouse managers go to their own section
+      if (onAdmin && !isAdmin) {
+        return isWarehouseManager ? '/warehouse' : '/worker';
+      }
+      // Protect warehouse routes — admins go to admin section
+      if (onWarehouse && !isWarehouseManager) {
+        return isAdmin ? '/admin' : '/worker';
+      }
+      // Redirect authenticated users away from /worker
       if (isAdmin && !onAdmin) return '/admin';
+      if (isWarehouseManager && !onWarehouse) return '/warehouse';
+
       return null;
     },
     routes: [
@@ -62,6 +77,18 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/worker',
         builder: (context, state) => const WorkerHomePage(),
       ),
+      // ── Warehouse manager section ────────────────────────────────────────
+      ShellRoute(
+        builder: (context, state, child) =>
+            WarehouseShellPage(child: child),
+        routes: [
+          GoRoute(
+            path: '/warehouse',
+            builder: (_, __) => const WarehouseHomePage(),
+          ),
+        ],
+      ),
+      // ── Admin section ────────────────────────────────────────────────────
       ShellRoute(
         builder: (context, state, child) => AdminShellPage(child: child),
         routes: [

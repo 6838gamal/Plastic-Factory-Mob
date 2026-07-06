@@ -813,6 +813,8 @@ file:///home/runner/workspace/lib/presentation/pages/admin/warehouse/mixing_ware
 file:///home/runner/workspace/lib/presentation/pages/admin/warehouse/warehouse_manager_page.dart
 file:///home/runner/workspace/lib/presentation/pages/admin/workers/workers_page.dart
 file:///home/runner/workspace/lib/presentation/pages/splash/splash_page.dart
+file:///home/runner/workspace/lib/presentation/pages/warehouse/warehouse_home_page.dart
+file:///home/runner/workspace/lib/presentation/pages/warehouse/warehouse_shell_page.dart
 file:///home/runner/workspace/lib/presentation/pages/worker/batch_entry_page.dart
 file:///home/runner/workspace/lib/presentation/pages/worker/machine_entry_page.dart
 file:///home/runner/workspace/lib/presentation/pages/worker/shift_handover_page.dart
