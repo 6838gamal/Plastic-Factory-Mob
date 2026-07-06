@@ -469,7 +469,7 @@ async def add_transaction(body: TransactionCreate):
     )
     balance_before = float(inv["balance"]) if inv else 0.0
 
-    qty_signed = body.quantity if body.transaction_type == "in" else -body.quantity
+    qty_signed = body.quantity if body.transaction_type in ("in", "transfer_in") else -body.quantity
     balance_after = balance_before + qty_signed
 
     await pool.execute(

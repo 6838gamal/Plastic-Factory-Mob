@@ -173,17 +173,25 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
                   backgroundColor: Colors.green,
                   child:
                       const Icon(Icons.add_circle_outline, color: Colors.white)),
-              title: const Text('استلام وارد'),
-              subtitle: const Text('إضافة مواد خام جديدة للمخزون'),
+              title: Text(isMain ? 'استلام وارد' : 'استلام من الرئيسي'),
+              subtitle: Text(isMain
+                  ? 'إضافة مواد خام جديدة للمخزون'
+                  : 'سحب من المخزن الرئيسي وإضافة لمخزن الخلاط'),
               onTap: () {
                 Navigator.pop(context);
-                _showInventoryDialog(context,
-                    title: 'استلام وارد',
-                    transactionType: 'in',
-                    positiveOnly: true,
-                    icon: Icons.add_circle_outline,
-                    iconColor: Colors.green,
-                    defaultWarehouse: _activeWarehouse);
+                if (isMain) {
+                  _showInventoryDialog(context,
+                      title: 'استلام وارد',
+                      transactionType: 'in',
+                      positiveOnly: true,
+                      icon: Icons.add_circle_outline,
+                      iconColor: Colors.green,
+                      defaultWarehouse: _activeWarehouse);
+                } else {
+                  _showTransferDialog(context,
+                      fromWarehouse: AppConstants.warehouseMain,
+                      toWarehouse: AppConstants.warehouseMixer);
+                }
               },
             ),
             ListTile(
@@ -642,33 +650,18 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
                   return;
                 }
                 final ds = ref.read(dataSourceProvider);
+                final authState = ref.read(authProvider);
                 try {
-                  // Deduct from source
-                  await ds.addInventoryTransaction(InventoryTransactionModel(
-                    id: '',
+                  await ds.transferInventory(
                     materialId: selected!.materialId,
-                    warehouseType: fromWarehouse,
-                    transactionType: 'transfer_out',
                     quantity: qty,
-                    createdBy: 'admin',
+                    fromWarehouse: fromWarehouse,
+                    toWarehouse: toWarehouse,
                     notes: notesCtrl.text.trim().isEmpty
-                        ? 'تحويل إلى $toLabel'
+                        ? 'تحويل من $fromLabel إلى $toLabel'
                         : notesCtrl.text.trim(),
-                    createdAt: DateTime.now(),
-                  ));
-                  // Add to destination
-                  await ds.addInventoryTransaction(InventoryTransactionModel(
-                    id: '',
-                    materialId: selected!.materialId,
-                    warehouseType: toWarehouse,
-                    transactionType: 'transfer_in',
-                    quantity: qty,
-                    createdBy: 'admin',
-                    notes: notesCtrl.text.trim().isEmpty
-                        ? 'تحويل من $fromLabel'
-                        : notesCtrl.text.trim(),
-                    createdAt: DateTime.now(),
-                  ));
+                    createdBy: authState.user?.email ?? 'admin',
+                  );
                   ref.invalidate(_summaryProvider);
                   ref.invalidate(_txProvider(''));
                   if (ctx.mounted) {

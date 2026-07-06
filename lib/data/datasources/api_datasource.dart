@@ -319,6 +319,27 @@ class ApiDataSource {
     });
   }
 
+  /// Transfers qty from one warehouse to another via the dedicated atomic
+  /// transfer endpoint — deducts source, adds destination in one call.
+  Future<Map<String, dynamic>> transferInventory({
+    required String materialId,
+    required double quantity,
+    required String fromWarehouse,
+    required String toWarehouse,
+    String? notes,
+    String? createdBy,
+  }) async {
+    final res = await _post('/api/inventory/transfer', {
+      'material_id': materialId,
+      'quantity': quantity,
+      'from_warehouse': fromWarehouse,
+      'to_warehouse': toWarehouse,
+      'notes': notes,
+      'created_by': createdBy,
+    });
+    return res as Map<String, dynamic>;
+  }
+
   /// Atomically resets a material in BOTH main and mixer warehouses in one
   /// server-side transaction — guaranteed all-or-nothing.
   Future<void> resetMaterialBothWarehouses(
