@@ -33,6 +33,12 @@ class ResetMaterialRequest(BaseModel):
     created_by: Optional[str] = None
 
 
+class ResetMaterialBothWarehousesRequest(BaseModel):
+    material_id: str
+    reason: Optional[str] = None
+    created_by: Optional[str] = None
+
+
 class TransferRequest(BaseModel):
     material_id: str
     quantity: float
@@ -282,6 +288,66 @@ async def reset_material(body: ResetMaterialRequest):
         "deleted_transactions": deleted_tx,
         "deleted_opening_balances": deleted_ob,
         "inventory": dict(row),
+    }
+
+
+@router.post("/reset-material-both")
+async def reset_material_both(body: ResetMaterialBothWarehousesRequest):
+    """Atomically zero out ALL details for a material in BOTH warehouses inside
+    a single DB transaction — so both succeed or both fail together."""
+    import json as _json
+    pool = await get_pool()
+    warehouses = ("main", "mixer")
+
+    rm = await pool.fetchrow("SELECT name FROM raw_materials WHERE id::text=$1", body.material_id)
+    material_name = rm["name"] if rm else body.material_id
+
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            results = {}
+            for wh in warehouses:
+                inv = await conn.fetchrow(
+                    "SELECT balance FROM inventory WHERE material_id=$1 AND warehouse_type=$2",
+                    body.material_id, wh,
+                )
+                balance_before = float(inv["balance"]) if inv else 0.0
+
+                await conn.execute(
+                    """DELETE FROM inventory_transactions
+                       WHERE material_id::text=$1 AND warehouse_type=$2""",
+                    body.material_id, wh,
+                )
+                await conn.execute(
+                    """DELETE FROM opening_balances
+                       WHERE material_id::text=$1 AND warehouse_type=$2""",
+                    body.material_id, wh,
+                )
+                row = await conn.fetchrow(
+                    """INSERT INTO inventory (id, material_id, warehouse_type, balance, updated_at)
+                       VALUES (gen_random_uuid(), $1, $2, 0, NOW())
+                       ON CONFLICT (material_id, warehouse_type)
+                       DO UPDATE SET balance=0, updated_at=NOW()
+                       RETURNING *""",
+                    body.material_id, wh,
+                )
+                await conn.execute(
+                    """INSERT INTO audit_log
+                       (id, action, table_name, record_id, old_values, new_values,
+                        user_email, description)
+                       VALUES (gen_random_uuid(), 'reset', 'inventory', NULL, $1, $2, $3, $4)""",
+                    _json.dumps({"balance": balance_before, "material_id": body.material_id, "warehouse_type": wh}),
+                    _json.dumps({"balance": 0, "total_in": 0, "total_out": 0, "total_transfers": 0, "opening_balance": 0}),
+                    body.created_by,
+                    body.reason or f"تصفير كامل لبيانات مادة {material_name} في كلا المخزنين",
+                )
+                results[wh] = dict(row)
+
+    return {
+        "success": True,
+        "material_id": body.material_id,
+        "material_name": material_name,
+        "warehouses_reset": list(warehouses),
+        "inventory": results,
     }
 
 

@@ -270,11 +270,15 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
       {required String defaultWarehouse}) async {
     final summaryAsync = ref.read(_summaryProvider);
     final all = summaryAsync.value ?? [];
-    final materials = all.where((m) => m.warehouseType == defaultWarehouse).toList();
+    // Deduplicate by materialId — we reset both warehouses regardless of which tab is active
+    final seen = <String>{};
+    final materials = all
+        .where((m) => seen.add(m.materialId))
+        .toList();
 
     if (materials.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('لا توجد مواد في هذا المخزن.')));
+          content: Text('لا توجد مواد في المخزن.')));
       return;
     }
 
@@ -316,7 +320,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
                     SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'سيتم تصفير كل تفاصيل هذه المادة في هذا المخزن إلى صفر: الرصيد الحالي، إجمالي الوارد، إجمالي المنصرف، التحويلات، التسويات، والرصيد الافتتاحي. هذا الإجراء لا يمكن التراجع عنه.',
+                        'سيتم تصفير كل تفاصيل هذه المادة في المخزن الرئيسي ومخزن الخلاط معاً إلى صفر: الرصيد الحالي، إجمالي الوارد، إجمالي المنصرف، التحويلات، التسويات، والرصيد الافتتاحي. هذا الإجراء لا يمكن التراجع عنه.',
                         style: TextStyle(fontSize: 12, color: Colors.red),
                       ),
                     ),
@@ -343,17 +347,18 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
                 try {
                   final ds = ref.read(dataSourceProvider);
                   final authState = ref.read(authProvider);
-                  await ds.resetMaterialFull(
+                  final email = authState.user?.email ?? 'admin';
+                  // Single atomic call — resets both warehouses in one DB transaction
+                  await ds.resetMaterialBothWarehouses(
                     selected!.materialId,
-                    defaultWarehouse,
-                    createdBy: authState.user?.email ?? 'admin',
+                    createdBy: email,
                   );
                   ref.invalidate(_summaryProvider);
                   ref.invalidate(_txProvider(''));
                   if (ctx.mounted) {
                     Navigator.pop(ctx);
                     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                        content: Text('تم تصفير كل بيانات ${selected!.materialName}'),
+                        content: Text('تم تصفير كل بيانات ${selected!.materialName} في المخزن الرئيسي والخلاط'),
                         backgroundColor: Colors.red.shade700));
                   }
                 } catch (e) {

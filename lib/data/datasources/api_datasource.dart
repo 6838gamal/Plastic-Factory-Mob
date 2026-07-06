@@ -319,6 +319,20 @@ class ApiDataSource {
     });
   }
 
+  /// Atomically resets a material in BOTH main and mixer warehouses in one
+  /// server-side transaction — guaranteed all-or-nothing.
+  Future<void> resetMaterialBothWarehouses(
+    String materialId, {
+    String? reason,
+    String? createdBy,
+  }) async {
+    await _post('/api/inventory/reset-material-both', {
+      'material_id': materialId,
+      'reason': reason,
+      'created_by': createdBy,
+    });
+  }
+
   Future<void> addInventoryTransaction(InventoryTransactionModel tx) async {
     await _post('/api/inventory/transactions', tx.toJson());
   }
