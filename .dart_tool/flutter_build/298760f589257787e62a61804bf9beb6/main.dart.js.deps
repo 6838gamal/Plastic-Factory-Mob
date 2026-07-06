@@ -797,6 +797,7 @@ file:///home/runner/workspace/lib/data/models/inventory_summary_model.dart
 file:///home/runner/workspace/lib/data/models/machine_production_model.dart
 file:///home/runner/workspace/lib/data/models/raw_material_model.dart
 file:///home/runner/workspace/lib/data/models/reference_models.dart
+file:///home/runner/workspace/lib/data/models/voucher_models.dart
 file:///home/runner/workspace/lib/main.dart
 file:///home/runner/workspace/lib/presentation/pages/admin/admin_shell_page.dart
 file:///home/runner/workspace/lib/presentation/pages/admin/alerts/alerts_page.dart
@@ -813,6 +814,8 @@ file:///home/runner/workspace/lib/presentation/pages/admin/recipes/recipe_manage
 file:///home/runner/workspace/lib/presentation/pages/admin/reports/reports_page.dart
 file:///home/runner/workspace/lib/presentation/pages/admin/settings/settings_page.dart
 file:///home/runner/workspace/lib/presentation/pages/admin/shift_handover/shift_handovers_admin_page.dart
+file:///home/runner/workspace/lib/presentation/pages/admin/warehouse/mixing_warehouse_page.dart
+file:///home/runner/workspace/lib/presentation/pages/admin/warehouse/warehouse_manager_page.dart
 file:///home/runner/workspace/lib/presentation/pages/admin/workers/workers_page.dart
 file:///home/runner/workspace/lib/presentation/pages/splash/splash_page.dart
 file:///home/runner/workspace/lib/presentation/pages/worker/batch_entry_page.dart

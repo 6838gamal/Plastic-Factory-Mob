@@ -19,6 +19,8 @@ import '../../presentation/pages/admin/inventory/stock_take_page.dart';
 import '../../presentation/pages/admin/recipes/recipe_management_page.dart';
 import '../../presentation/pages/admin/shift_handover/shift_handovers_admin_page.dart';
 import '../../presentation/pages/admin/inventory/opening_balances_page.dart';
+import '../../presentation/pages/admin/warehouse/warehouse_manager_page.dart';
+import '../../presentation/pages/admin/warehouse/mixing_warehouse_page.dart';
 import '../../presentation/providers/auth_provider.dart';
 
 /// A ChangeNotifier that fires whenever auth state changes,
@@ -77,6 +79,8 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(path: '/admin/recipes', builder: (_, __) => const RecipeManagementPage()),
           GoRoute(path: '/admin/shift-handover', builder: (_, __) => const ShiftHandoversAdminPage()),
           GoRoute(path: '/admin/opening-balances', builder: (_, __) => const OpeningBalancesPage()),
+          GoRoute(path: '/admin/warehouse-manager', builder: (_, __) => const WarehouseManagerPage()),
+          GoRoute(path: '/admin/mixing-warehouse', builder: (_, __) => const MixingWarehousePage()),
         ],
       ),
     ],

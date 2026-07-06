@@ -3,7 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../data/datasources/api_datasource.dart';
 import '../../../../data/models/voucher_models.dart';
 import '../../../../core/utils/helpers.dart';
-import 'warehouse_manager_page.dart' show _TransferVoucherCard, _StatusBadge;
+import '../../../providers/auth_provider.dart' show dataSourceProvider;
+import 'warehouse_manager_page.dart' show TransferVoucherCard, StatusBadge;
 
 // ── Providers ────────────────────────────────────────────────────
 
@@ -157,7 +158,7 @@ class _PendingTransfersTab extends ConsumerWidget {
             itemCount: list.length,
             itemBuilder: (_, i) {
               final v = TransferVoucherModel.fromJson(list[i]);
-              return _TransferVoucherCard(
+              return TransferVoucherCard(
                 voucher: v,
                 onAction: () {
                   ref.invalidate(_pendingTransfersProvider);
@@ -249,7 +250,7 @@ class _ReturnVoucherCard extends ConsumerWidget {
                     style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                   ),
                 ),
-                _StatusBadge(text: statusText, color: statusColor),
+                StatusBadge(text: statusText, color: statusColor),
               ],
             ),
             const SizedBox(height: 6),

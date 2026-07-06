@@ -177,7 +177,7 @@ class _ReceiptVoucherCard extends ConsumerWidget {
                     style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                   ),
                 ),
-                _StatusBadge(text: statusText, color: statusColor),
+                StatusBadge(text: statusText, color: statusColor),
               ],
             ),
             const SizedBox(height: 6),
@@ -298,7 +298,7 @@ class _TransferTab extends ConsumerWidget {
           return ListView.builder(
             padding: const EdgeInsets.all(12),
             itemCount: list.length,
-            itemBuilder: (_, i) => _TransferVoucherCard(
+            itemBuilder: (_, i) => TransferVoucherCard(
               voucher: TransferVoucherModel.fromJson(list[i]),
               onAction: () => ref.invalidate(_transferVouchersProvider),
               role: 'manager',
@@ -316,11 +316,11 @@ class _TransferTab extends ConsumerWidget {
 // Transfer Voucher Card (shared between manager & mixing pages)
 // ══════════════════════════════════════════════════════════════════
 
-class _TransferVoucherCard extends ConsumerWidget {
+class TransferVoucherCard extends ConsumerWidget {
   final TransferVoucherModel voucher;
   final VoidCallback onAction;
   final String role; // 'manager' | 'mixer'
-  const _TransferVoucherCard({
+  const TransferVoucherCard({
     required this.voucher,
     required this.onAction,
     required this.role,
@@ -347,7 +347,7 @@ class _TransferVoucherCard extends ConsumerWidget {
                     style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                   ),
                 ),
-                _StatusBadge(text: statusText, color: statusColor),
+                StatusBadge(text: statusText, color: statusColor),
               ],
             ),
             const SizedBox(height: 6),
@@ -1035,10 +1035,10 @@ class _ItemRow extends StatelessWidget {
   }
 }
 
-class _StatusBadge extends StatelessWidget {
+class StatusBadge extends StatelessWidget {
   final String text;
   final Color color;
-  const _StatusBadge({required this.text, required this.color});
+  const StatusBadge({required this.text, required this.color});
 
   @override
   Widget build(BuildContext context) {
