@@ -23,6 +23,52 @@ class Helpers {
     return '${_numberFormat.format(kg)} كجم';
   }
 
+  /// Converts [value] from [unit] to kilograms.
+  /// 'قطعة' and unknown units return the value unchanged.
+  static double toKg(double value, String unit) {
+    switch (unit.trim()) {
+      case 'طن':
+        return value * 1000;
+      case 'جرام':
+      case 'غرام':
+        return value / 1000;
+      default:
+        return value; // كجم, كيلو, لتر, قطعة, etc.
+    }
+  }
+
+  /// Returns a display string with the quantity converted to كجم.
+  /// For non-كجم units (except قطعة), appends the original value in parentheses.
+  /// Examples:
+  ///   (25, 'طن')    → "25,000 كجم (25 طن)"
+  ///   (500, 'جرام') → "0.5 كجم (500 جرام)"
+  ///   (22.5, 'لتر') → "22.5 كجم (22.5 لتر)"
+  ///   (22.5, 'كجم') → "22.5 كجم"
+  ///   (5, 'قطعة')   → "5 قطعة"
+  static String formatQuantityInKg(double value, String unit) {
+    final u = unit.trim();
+    if (u == 'قطعة') {
+      return '${_numberFormat.format(value)} قطعة';
+    }
+    final kg = toKg(value, u);
+    final kgStr = '${_numberFormat.format(kg)} كجم';
+    if (u == 'كجم' || u == 'كيلو') {
+      return kgStr;
+    }
+    return '$kgStr (${_numberFormat.format(value)} $u)';
+  }
+
+  /// Compact variant — only shows the kg value (no parenthetical).
+  /// Useful for small chips and tight UI spaces.
+  static String formatQuantityInKgCompact(double value, String unit) {
+    final u = unit.trim();
+    if (u == 'قطعة') {
+      return '${_numberFormat.format(value)} قطعة';
+    }
+    final kg = toKg(value, u);
+    return '${_numberFormat.format(kg)} كجم';
+  }
+
   static String formatPercentage(double value) => '${value.toStringAsFixed(2)}%';
 
   static Color getSeverityColor(String severity) {

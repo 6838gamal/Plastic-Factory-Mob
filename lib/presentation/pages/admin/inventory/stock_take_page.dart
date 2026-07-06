@@ -584,7 +584,7 @@ class _QtyBox extends StatelessWidget {
       Text(label, style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
       const SizedBox(height: 2),
       Text(
-        value != null ? '${value!.toStringAsFixed(value! % 1 == 0 ? 0 : 2)} $unit' : '—',
+        value != null ? Helpers.formatQuantityInKg(value!, unit) : '—',
         style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
       ),
     ]);

@@ -198,7 +198,7 @@ class _MaterialCard extends ConsumerWidget {
         ),
         title: Text(material.name, style: const TextStyle(fontWeight: FontWeight.w600)),
         subtitle: Text(
-          '${material.category} • الحد الأدنى: ${material.minStock} ${material.unit}',
+          '${material.category} • الحد الأدنى: ${Helpers.formatQuantityInKg(material.minStock.toDouble(), material.unit)}',
           style: const TextStyle(fontSize: 12),
         ),
         trailing: Row(

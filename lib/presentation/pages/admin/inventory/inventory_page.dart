@@ -468,7 +468,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
                             children: [
                               Expanded(child: Text(m.materialName)),
                               Text(
-                                '${m.currentBalance.toStringAsFixed(1)} ${m.unit}',
+                                Helpers.formatQuantityInKg(m.currentBalance, m.unit),
                                 style: TextStyle(
                                     color: Colors.grey[500], fontSize: 11),
                               ),
@@ -487,7 +487,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
                     prefixIcon: const Icon(Icons.compare_arrows,
                         color: Colors.purple),
                     helperText: selected != null
-                        ? 'المتاح: ${selected!.currentBalance.toStringAsFixed(2)} ${selected!.unit}'
+                        ? 'المتاح: ${Helpers.formatQuantityInKg(selected!.currentBalance, selected!.unit)}'
                         : null,
                   ),
                 ),
@@ -552,7 +552,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
                     Navigator.pop(ctx);
                     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                         content: Text(
-                            'تم تحويل ${qty.toStringAsFixed(2)} ${selected!.unit} من $fromLabel إلى $toLabel'),
+                            'تم تحويل ${Helpers.formatQuantityInKg(qty, selected!.unit)} من $fromLabel إلى $toLabel'),
                         backgroundColor: Colors.purple));
                   }
                 } catch (e) {
@@ -1035,7 +1035,7 @@ class _SummaryCard extends StatelessWidget {
                       style:
                           TextStyle(color: Colors.grey[600], fontSize: 13)),
                   Text(
-                    '${item.currentBalance.toStringAsFixed(2)} ${item.unit}',
+                    Helpers.formatQuantityInKg(item.currentBalance, item.unit),
                     style: TextStyle(
                         color: statusColor,
                         fontWeight: FontWeight.bold,
@@ -1073,7 +1073,7 @@ class _SummaryCard extends StatelessWidget {
                       size: 13, color: Colors.grey[500]),
                   const SizedBox(width: 4),
                   Text(
-                      'الحد الأدنى: ${item.minStock.toStringAsFixed(0)} ${item.unit}',
+                      'الحد الأدنى: ${Helpers.formatQuantityInKg(item.minStock, item.unit)}',
                       style:
                           TextStyle(fontSize: 11, color: Colors.grey[500])),
                   const SizedBox(width: 8),
@@ -1123,10 +1123,11 @@ class _BalanceChip extends StatelessWidget {
             Text(label, style: TextStyle(color: color, fontSize: 10)),
             const SizedBox(height: 2),
             Text(
-              value.toStringAsFixed(1),
+              Helpers.formatQuantityInKgCompact(value, unit),
               style: TextStyle(
-                  color: color, fontWeight: FontWeight.bold, fontSize: 12),
+                  color: color, fontWeight: FontWeight.bold, fontSize: 11),
               overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
             ),
           ],
         ),

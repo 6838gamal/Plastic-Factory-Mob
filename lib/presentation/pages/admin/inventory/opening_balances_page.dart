@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../data/datasources/api_datasource.dart';
 import '../../../providers/auth_provider.dart';
+import '../../../../core/utils/helpers.dart';
 
 final _openingBalancesProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
   final ds = ref.read(dataSourceProvider);
@@ -335,7 +336,7 @@ class _BalanceCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
-                  '${bal.toStringAsFixed(1)} $unit',
+                  Helpers.formatQuantityInKg(bal, unit),
                   style: const TextStyle(
                       fontWeight: FontWeight.bold, fontSize: 16, color: Colors.blue),
                 ),

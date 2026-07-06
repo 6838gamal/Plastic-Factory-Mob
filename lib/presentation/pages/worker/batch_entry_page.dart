@@ -7,6 +7,7 @@ import '../../providers/batch_provider.dart';
 import '../../widgets/common/loading_widget.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../core/constants/app_constants.dart';
+import '../../../core/utils/helpers.dart';
 import '../../../data/models/reference_models.dart';
 import '../../../data/models/inventory_summary_model.dart';
 import '../../../data/datasources/api_datasource.dart';
@@ -786,18 +787,7 @@ class _MatRow extends StatelessWidget {
   //  قطعة        → "X قطعة"                 (لا تحويل)
   //  غير ذلك     → "X [وحدة]"
   String _buildBalText(double bal, String rawUnit) {
-    final u = rawUnit.trim();
-    switch (u) {
-      case 'كيلو':
-      case 'كجم':
-        return 'متاح: ${_fmt(bal)} كجم';
-      case 'جرام':
-        final kg = bal / 1000;
-        return 'متاح: ${_fmt(bal)} جرام  (≈ ${_fmt(kg)} كجم)';
-      default:
-        // لتر، قطعة، وأي وحدة أخرى — نعرضها كما هي
-        return 'متاح: ${_fmt(bal)} $u';
-    }
+    return 'متاح: ${Helpers.formatQuantityInKg(bal, rawUnit)}';
   }
 
   @override
