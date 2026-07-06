@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../widgets/admin/admin_login_dialog.dart';
-import '../../providers/auth_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../widgets/common/offline_banner.dart';
@@ -197,18 +196,6 @@ class _WorkerDrawer extends ConsumerWidget {
             onTap: () {
               Navigator.pop(context);
               onAdminAccess();
-            },
-          ),
-          // ── تسجيل الخروج ──────────────────────────────────────
-          ListTile(
-            leading: const Icon(Icons.logout, color: Colors.red),
-            title: const Text(
-              'تسجيل الخروج',
-              style: TextStyle(color: Colors.red, fontWeight: FontWeight.w600),
-            ),
-            onTap: () async {
-              Navigator.pop(context);
-              await ref.read(authProvider.notifier).signOut();
             },
           ),
           Padding(
