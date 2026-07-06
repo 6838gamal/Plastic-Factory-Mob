@@ -172,6 +172,28 @@ class ApiDataSource {
     return res as Map<String, dynamic>;
   }
 
+  // ── Suppliers ────────────────────────────────────────────────────
+
+  Future<List<Map<String, dynamic>>> getSuppliers({bool activeOnly = false}) async {
+    final res = await _get('/api/suppliers?active_only=${activeOnly ? 'true' : 'false'}');
+    return (res as List).cast<Map<String, dynamic>>();
+  }
+
+  Future<Map<String, dynamic>> createSupplier(Map<String, dynamic> body) async {
+    final res = await _post('/api/suppliers', body);
+    return res as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> updateSupplier(
+      String id, Map<String, dynamic> body) async {
+    final res = await _put('/api/suppliers/$id', body);
+    return res as Map<String, dynamic>;
+  }
+
+  Future<void> deleteSupplier(String id) async {
+    await _delete('/api/suppliers/$id');
+  }
+
   Future<Map<String, dynamic>> forgotPassword(
       String email, String newPassword) async {
     final res = await _post('/api/auth/forgot-password', {

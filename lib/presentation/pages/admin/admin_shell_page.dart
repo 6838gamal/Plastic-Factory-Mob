@@ -190,6 +190,14 @@ class _AdminDrawer extends ConsumerWidget {
                 ),
                 const Divider(),
                 _DrawerItem(
+                  icon: Icons.business_outlined,
+                  selectedIcon: Icons.business,
+                  title: 'الموردون',
+                  route: '/admin/suppliers',
+                  currentRoute: currentRoute,
+                ),
+                const Divider(),
+                _DrawerItem(
                   icon: Icons.warehouse_outlined,
                   selectedIcon: Icons.warehouse,
                   title: 'المخزن الرئيسي (عاصم)',

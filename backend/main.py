@@ -199,6 +199,22 @@ async def _init_db():
         "CREATE INDEX IF NOT EXISTS idx_counter_resets_name_at ON counter_resets(counter_name, reset_at)"
     )
 
+    # ── Suppliers table ──────────────────────────────────────────────
+    await pool.execute("""
+        CREATE TABLE IF NOT EXISTS suppliers (
+            id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            name        VARCHAR(200) NOT NULL,
+            phone       VARCHAR(50),
+            email       VARCHAR(200),
+            address     TEXT,
+            category    VARCHAR(100),
+            notes       TEXT,
+            is_active   BOOLEAN NOT NULL DEFAULT TRUE,
+            created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+    """)
+
     _col_migrations = [
         "ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS role VARCHAR(50) NOT NULL DEFAULT 'admin'",
         "ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS name VARCHAR(200)",
@@ -439,6 +455,7 @@ from routers import (
 )
 from routers import stock_take, recipes, shift_handover, sms
 from routers import vouchers
+from routers import suppliers
 
 
 @asynccontextmanager
@@ -540,6 +557,7 @@ app.include_router(recipes.router)
 app.include_router(shift_handover.router)
 app.include_router(sms.router)
 app.include_router(vouchers.router)
+app.include_router(suppliers.router)
 
 
 # ─── Health & System Info ─────────────────────────────────────────────────────

@@ -6,6 +6,7 @@ import '../../../../data/models/inventory_summary_model.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../../core/utils/helpers.dart';
 import '../../../../core/constants/app_constants.dart';
+import '../suppliers/suppliers_page.dart';
 
 // ── Providers ────────────────────────────────────────────────────
 
@@ -41,7 +42,8 @@ class _WarehouseManagerPageState extends ConsumerState<WarehouseManagerPage>
   @override
   void initState() {
     super.initState();
-    _tabs = TabController(length: 2, vsync: this);
+    _tabs = TabController(length: 3, vsync: this);
+    _tabs.addListener(() => setState(() {}));
   }
 
   @override
@@ -60,6 +62,7 @@ class _WarehouseManagerPageState extends ConsumerState<WarehouseManagerPage>
             tabs: const [
               Tab(icon: Icon(Icons.download_outlined), text: 'سندات الاستلام'),
               Tab(icon: Icon(Icons.swap_horiz_outlined), text: 'سندات التحويل'),
+              Tab(icon: Icon(Icons.business_outlined), text: 'الموردون'),
             ],
           ),
           Expanded(
@@ -68,18 +71,22 @@ class _WarehouseManagerPageState extends ConsumerState<WarehouseManagerPage>
               children: const [
                 _ReceiptTab(),
                 _TransferTab(),
+                SuppliersPage(),
               ],
             ),
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _tabs.index == 0
-            ? _showCreateReceiptDialog(context)
-            : _showCreateTransferDialog(context),
-        icon: const Icon(Icons.add),
-        label: Text(_tabs.index == 0 ? 'سند استلام جديد' : 'سند تحويل جديد'),
-      ),
+      floatingActionButton: _tabs.index == 2
+          ? null
+          : FloatingActionButton.extended(
+              onPressed: () => _tabs.index == 0
+                  ? _showCreateReceiptDialog(context)
+                  : _showCreateTransferDialog(context),
+              icon: const Icon(Icons.add),
+              label: Text(
+                  _tabs.index == 0 ? 'سند استلام جديد' : 'سند تحويل جديد'),
+            ),
     );
   }
 
