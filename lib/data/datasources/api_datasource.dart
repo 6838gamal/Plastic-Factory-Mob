@@ -163,10 +163,11 @@ class ApiDataSource {
   }
 
   Future<Map<String, dynamic>> upsertWarehouseAccount(
-      String email, String password) async {
+      String email, String password, {String? name}) async {
     final res = await _put('/api/auth/warehouse-account', {
       'email': email,
       'password': password,
+      if (name != null && name.isNotEmpty) 'name': name,
     });
     return res as Map<String, dynamic>;
   }

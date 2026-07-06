@@ -140,7 +140,15 @@ async def sign_in(body: SignInRequest):
     if not bcrypt.checkpw(body.password.encode(), row["password_hash"].encode()):
         raise HTTPException(status_code=401, detail="بيانات خاطئة")
     token = make_token(str(row["id"]), row["email"])
-    return {"token": token, "user": {"id": str(row["id"]), "email": row["email"]}}
+    return {
+        "token": token,
+        "user": {
+            "id": str(row["id"]),
+            "email": row["email"],
+            "name": row.get("name") or None,
+            "role": row.get("role") or "admin",
+        },
+    }
 
 
 @router.post("/signup")
@@ -208,18 +216,19 @@ async def change_email(body: ChangeEmailRequest):
 class WarehouseAccountRequest(BaseModel):
     email: str
     password: str
+    name: Optional[str] = None
 
 
 @router.get("/warehouse-account")
 async def get_warehouse_account():
-    """Return the warehouse manager account email (or null if not yet created)."""
+    """Return the warehouse manager account (email + name) or null if not yet created."""
     pool = await get_pool()
     row = await pool.fetchrow(
-        "SELECT id, email FROM admin_users WHERE role='warehouse_manager' LIMIT 1"
+        "SELECT id, email, name FROM admin_users WHERE role='warehouse_manager' LIMIT 1"
     )
     if row:
-        return {"exists": True, "email": row["email"]}
-    return {"exists": False, "email": None}
+        return {"exists": True, "email": row["email"], "name": row["name"]}
+    return {"exists": False, "email": None, "name": None}
 
 
 @router.put("/warehouse-account")
@@ -244,14 +253,14 @@ async def upsert_warehouse_account(body: WarehouseAccountRequest):
     )
     if existing:
         await pool.execute(
-            "UPDATE admin_users SET email=$1, password_hash=$2 WHERE id=$3",
-            body.email, hashed, existing["id"],
+            "UPDATE admin_users SET email=$1, password_hash=$2, name=$3 WHERE id=$4",
+            body.email, hashed, body.name, existing["id"],
         )
     else:
         await pool.execute(
-            "INSERT INTO admin_users (id, email, password_hash, role) "
-            "VALUES (gen_random_uuid(), $1, $2, 'warehouse_manager')",
-            body.email, hashed,
+            "INSERT INTO admin_users (id, email, password_hash, role, name) "
+            "VALUES (gen_random_uuid(), $1, $2, 'warehouse_manager', $3)",
+            body.email, hashed, body.name,
         )
     return {"success": True, "message": "تم حفظ بيانات أمين المخزن بنجاح"}
 

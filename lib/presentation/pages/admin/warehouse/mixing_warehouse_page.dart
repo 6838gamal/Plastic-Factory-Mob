@@ -159,18 +159,30 @@ class _PendingTransfersTab extends ConsumerWidget {
               Container(
                 width: double.infinity,
                 margin: const EdgeInsets.fromLTRB(12, 12, 12, 0),
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 decoration: BoxDecoration(
                   color: Colors.teal.withOpacity(0.08),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.teal.withOpacity(0.3)),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.teal.withOpacity(0.4)),
                 ),
                 child: const Row(children: [
-                  Icon(Icons.warehouse_outlined, color: Colors.teal, size: 16),
-                  SizedBox(width: 8),
-                  Text(
-                    'مصدر الوارد: المخزن الرئيسي فقط',
-                    style: TextStyle(color: Colors.teal, fontSize: 13, fontWeight: FontWeight.w600),
+                  Icon(Icons.lock_outlined, color: Colors.teal, size: 16),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'مصدر الوارد: المخزن الرئيسي فقط',
+                          style: TextStyle(color: Colors.teal, fontSize: 13, fontWeight: FontWeight.bold),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          'لا يُسمح باستلام وارد من أي طرف خارجي',
+                          style: TextStyle(color: Colors.teal, fontSize: 11),
+                        ),
+                      ],
+                    ),
                   ),
                 ]),
               ),

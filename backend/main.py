@@ -201,6 +201,7 @@ async def _init_db():
 
     _col_migrations = [
         "ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS role VARCHAR(50) NOT NULL DEFAULT 'admin'",
+        "ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS name VARCHAR(200)",
         "ALTER TABLE receipt_vouchers ADD COLUMN IF NOT EXISTS received_by VARCHAR(200)",
         "ALTER TABLE receipt_vouchers ADD COLUMN IF NOT EXISTS supplier_phone VARCHAR(100)",
         "ALTER TABLE receipt_vouchers ADD COLUMN IF NOT EXISTS supplier_ref VARCHAR(200)",

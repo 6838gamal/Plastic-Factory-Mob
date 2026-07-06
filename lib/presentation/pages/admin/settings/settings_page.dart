@@ -84,6 +84,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           data: (info) {
             final exists = info['exists'] as bool? ?? false;
             final email = info['email'] as String?;
+            final name = info['name'] as String?;
             return Card(
               child: Column(
                 children: [
@@ -98,9 +99,21 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                     ),
                     title: const Text('أمين المخزن الرئيسي'),
                     subtitle: exists
-                        ? Text(email ?? '—',
-                            style: const TextStyle(
-                                fontSize: 12, color: Colors.teal))
+                        ? Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (name?.isNotEmpty == true)
+                                Text(name!,
+                                    style: const TextStyle(
+                                        fontSize: 13,
+                                        color: Colors.teal,
+                                        fontWeight: FontWeight.w600)),
+                              Text(email ?? '—',
+                                  style: TextStyle(
+                                      fontSize: 12, color: Colors.grey[600])),
+                            ],
+                          )
                         : const Text('لم يُنشأ الحساب بعد',
                             style: TextStyle(
                                 fontSize: 12, color: Colors.orange)),
@@ -113,10 +126,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   const Divider(height: 0),
                   ListTile(
                     leading: const Icon(Icons.edit, color: Colors.blue, size: 20),
-                    title: Text(exists ? 'تعديل البريد الإلكتروني' : 'إنشاء الحساب'),
-                    subtitle: const Text('تغيير بريد أمين المخزن'),
+                    title: Text(exists ? 'تعديل بيانات أمين المخزن' : 'إنشاء الحساب'),
+                    subtitle: const Text('الاسم والبريد الإلكتروني'),
                     trailing: const Icon(Icons.arrow_forward_ios, size: 14),
-                    onTap: () => _showWarehouseEmailDialog(context, email ?? ''),
+                    onTap: () => _showWarehouseEmailDialog(context, email ?? '', currentName: name ?? ''),
                   ),
                   const Divider(height: 0),
                   ListTile(
@@ -467,8 +480,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     );
   }
 
-  // ── حساب أمين المخزن — تعديل البريد ──────────────────────────
-  void _showWarehouseEmailDialog(BuildContext context, String currentEmail) {
+  // ── حساب أمين المخزن — تعديل البريد والاسم ───────────────────
+  void _showWarehouseEmailDialog(BuildContext context, String currentEmail, {String currentName = ''}) {
+    final nameCtrl = TextEditingController(text: currentName);
     final emailCtrl = TextEditingController(text: currentEmail);
     final passCtrl = TextEditingController();
     bool obscure = true;
@@ -488,11 +502,22 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             mainAxisSize: MainAxisSize.min,
             children: [
               TextField(
+                controller: nameCtrl,
+                textDirection: TextDirection.rtl,
+                decoration: const InputDecoration(
+                  labelText: 'الاسم الكامل لأمين المخزن *',
+                  prefixIcon: Icon(Icons.person_outlined),
+                  border: OutlineInputBorder(),
+                  helperText: 'يظهر في سندات الاستلام',
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
                 controller: emailCtrl,
                 keyboardType: TextInputType.emailAddress,
                 textDirection: TextDirection.ltr,
                 decoration: const InputDecoration(
-                  labelText: 'البريد الإلكتروني',
+                  labelText: 'البريد الإلكتروني *',
                   prefixIcon: Icon(Icons.email_outlined),
                   border: OutlineInputBorder(),
                 ),
@@ -502,7 +527,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 controller: passCtrl,
                 obscureText: obscure,
                 decoration: InputDecoration(
-                  labelText: 'كلمة المرور الجديدة',
+                  labelText: 'كلمة المرور الجديدة *',
                   prefixIcon: const Icon(Icons.lock_outlined),
                   border: const OutlineInputBorder(),
                   suffixIcon: IconButton(
@@ -530,9 +555,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               onPressed: loading
                   ? null
                   : () async {
+                      final name = nameCtrl.text.trim();
                       final email = emailCtrl.text.trim();
                       final pass = passCtrl.text;
-                      if (email.isEmpty || pass.isEmpty) {
+                      if (name.isEmpty || email.isEmpty || pass.isEmpty) {
                         ss(() => errorMsg = 'يرجى ملء جميع الحقول');
                         return;
                       }
@@ -545,7 +571,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                       try {
                         await ref
                             .read(dataSourceProvider)
-                            .upsertWarehouseAccount(email, pass);
+                            .upsertWarehouseAccount(email, pass, name: name);
                         ref.invalidate(_warehouseAccountProvider);
                         if (ctx.mounted) Navigator.pop(ctx);
                         if (context.mounted) {

@@ -35,20 +35,26 @@ class _WarehouseLoginDialogState extends ConsumerState<WarehouseLoginDialog> {
     });
     try {
       final ds = ref.read(dataSourceProvider);
-      await ds.signIn(_emailCtrl.text.trim(), _passwordCtrl.text);
+      final res = await ds.signIn(_emailCtrl.text.trim(), _passwordCtrl.text);
       if (!mounted) return;
-      final keeperEmail = _emailCtrl.text.trim();
+      final user = res['user'] as Map<String, dynamic>? ?? {};
+      final keeperName = (user['name'] as String?)?.isNotEmpty == true
+          ? user['name'] as String
+          : _emailCtrl.text.trim();
+      final displayTitle = (user['name'] as String?)?.isNotEmpty == true
+          ? 'المخزن الرئيسي — ${user['name']}'
+          : 'المخزن الرئيسي — ${_emailCtrl.text.trim()}';
       Navigator.pop(context);
       Navigator.push(
         context,
         MaterialPageRoute(
           builder: (_) => Scaffold(
             appBar: AppBar(
-              title: Text('المخزن الرئيسي — $keeperEmail'),
+              title: Text(displayTitle),
               backgroundColor: Colors.teal,
               foregroundColor: Colors.white,
             ),
-            body: WarehouseManagerPage(keeperName: keeperEmail),
+            body: WarehouseManagerPage(keeperName: keeperName),
           ),
         ),
       );
