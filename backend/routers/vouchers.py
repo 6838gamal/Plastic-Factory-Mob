@@ -243,7 +243,9 @@ async def submit_receipt_voucher(voucher_id: str, submitted_by: str = "keeper"):
 
 @router.post("/receipt/{voucher_id}/approve")
 async def approve_receipt_voucher(voucher_id: str, approved_by: str = "admin"):
-    """Admin approves and posts to inventory (pending_approval → posted)."""
+    """Admin approves the receipt voucher (pending_approval → approved).
+    No inventory movement at this stage — the warehouse manager must
+    explicitly receive the goods via the /post endpoint."""
     pool = await get_pool()
     v = await pool.fetchrow("SELECT * FROM receipt_vouchers WHERE id=$1::uuid", voucher_id)
     if not v:
@@ -252,68 +254,18 @@ async def approve_receipt_voucher(voucher_id: str, approved_by: str = "admin"):
         raise HTTPException(400, "لا يمكن الموافقة إلا على السندات بانتظار الموافقة")
 
     items = await pool.fetch(
-        "SELECT * FROM receipt_voucher_items WHERE voucher_id=$1::uuid", voucher_id
+        "SELECT id FROM receipt_voucher_items WHERE voucher_id=$1::uuid", voucher_id
     )
     if not items:
         raise HTTPException(400, "لا يوجد بنود في السند")
 
-    for item in items:
-        mat_id = item["material_id"]
-        if not mat_id:
-            found = await pool.fetchrow(
-                "SELECT id FROM raw_materials WHERE LOWER(name) = LOWER($1)",
-                item["material_name"],
-            )
-            if found:
-                mat_id = str(found["id"])
-                await pool.execute(
-                    "UPDATE receipt_voucher_items SET material_id=$1::uuid WHERE id=$2",
-                    mat_id, item["id"],
-                )
-            else:
-                logger.warning(
-                    f"[approve_receipt] No raw_material for name='{item['material_name']}' — skipping"
-                )
-                continue
-
-        qty = float(item["quantity"])
-        existing = await pool.fetchrow(
-            "SELECT id, balance FROM inventory WHERE material_id=$1::uuid AND warehouse_type='main'",
-            mat_id
-        )
-        if existing:
-            balance_before = float(existing["balance"])
-            balance_after = balance_before + qty
-            await pool.execute(
-                "UPDATE inventory SET balance=$1, updated_at=NOW() WHERE id=$2",
-                balance_after, existing["id"]
-            )
-        else:
-            balance_before = 0.0
-            balance_after = qty
-            await pool.execute(
-                """INSERT INTO inventory (material_id, warehouse_type, balance)
-                   VALUES ($1::uuid, 'main', $2)""",
-                mat_id, qty
-            )
-
-        await pool.execute(
-            """INSERT INTO inventory_transactions
-                 (material_id, warehouse_type, transaction_type, quantity,
-                  balance_before, balance_after, transaction_ref, created_by, notes)
-               VALUES ($1::uuid,'main','in',$2,$3,$4,$5,$6,$7)""",
-            mat_id, qty, balance_before, balance_after,
-            v["voucher_number"], approved_by,
-            f"سند استلام رقم {v['voucher_number']} — موافقة الإدارة"
-        )
-
     await pool.execute(
-        "UPDATE receipt_vouchers SET status='posted', updated_at=NOW() WHERE id=$1::uuid",
+        "UPDATE receipt_vouchers SET status='approved', updated_at=NOW() WHERE id=$1::uuid",
         voucher_id
     )
     await _write_audit(pool, "approve", "receipt_voucher", voucher_id, approved_by,
                        {"voucher_number": v["voucher_number"], "items": len(items)})
-    return {"status": "posted", "items_processed": len(items)}
+    return {"status": "approved", "message": "تم قبول السند — يظهر الآن في قائمة الاستلام في المخزن الرئيسي"}
 
 
 @router.post("/receipt/{voucher_id}/reject")
@@ -357,6 +309,8 @@ async def post_receipt_voucher(voucher_id: str, performed_by: str = "admin"):
         raise HTTPException(404, "سند الاستلام غير موجود")
     if v["status"] == "posted":
         raise HTTPException(400, "السند مُرحَّل مسبقاً")
+    if v["status"] not in ("approved", "posted"):
+        raise HTTPException(400, f"يمكن ترحيل السندات المقبولة (approved) فقط — الحالة الحالية: {v['status']}")
 
     items = await pool.fetch(
         "SELECT * FROM receipt_voucher_items WHERE voucher_id=$1::uuid", voucher_id

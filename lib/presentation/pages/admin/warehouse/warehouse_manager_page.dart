@@ -51,7 +51,8 @@ class _WarehouseManagerPageState extends ConsumerState<WarehouseManagerPage>
   @override
   void initState() {
     super.initState();
-    _tabs = TabController(length: 4, vsync: this);
+    // Keepers see 3 tabs (no Transfer tab); admins see 4
+    _tabs = TabController(length: widget.keeperName == null ? 4 : 3, vsync: this);
     _tabs.addListener(() => setState(() {}));
   }
 
@@ -63,6 +64,36 @@ class _WarehouseManagerPageState extends ConsumerState<WarehouseManagerPage>
 
   @override
   Widget build(BuildContext context) {
+    final isKeeper = widget.keeperName != null;
+    // Suppliers tab is index 3 for admin, index 2 for keeper
+    final suppliersIndex = isKeeper ? 2 : 3;
+
+    final tabs = isKeeper
+        ? const [
+            Tab(icon: Icon(Icons.download_outlined), text: 'سندات الاستلام'),
+            Tab(icon: Icon(Icons.remove_circle_outline), text: 'سندات السحب'),
+            Tab(icon: Icon(Icons.business_outlined), text: 'الموردون'),
+          ]
+        : const [
+            Tab(icon: Icon(Icons.download_outlined), text: 'سندات الاستلام'),
+            Tab(icon: Icon(Icons.swap_horiz_outlined), text: 'سندات التحويل'),
+            Tab(icon: Icon(Icons.remove_circle_outline), text: 'سندات السحب'),
+            Tab(icon: Icon(Icons.business_outlined), text: 'الموردون'),
+          ];
+
+    final tabViews = isKeeper
+        ? <Widget>[
+            _ReceiptTab(isAdmin: false),
+            _WithdrawalTab(isAdmin: false, keeperName: widget.keeperName),
+            const SuppliersPage(),
+          ]
+        : <Widget>[
+            const _ReceiptTab(isAdmin: true),
+            const _TransferTab(),
+            _WithdrawalTab(isAdmin: true, keeperName: null),
+            const SuppliersPage(),
+          ];
+
     return Scaffold(
       body: Column(
         children: [
@@ -70,34 +101,20 @@ class _WarehouseManagerPageState extends ConsumerState<WarehouseManagerPage>
             controller: _tabs,
             isScrollable: true,
             tabAlignment: TabAlignment.start,
-            tabs: const [
-              Tab(icon: Icon(Icons.download_outlined), text: 'سندات الاستلام'),
-              Tab(icon: Icon(Icons.swap_horiz_outlined), text: 'سندات التحويل'),
-              Tab(icon: Icon(Icons.remove_circle_outline), text: 'سندات السحب'),
-              Tab(icon: Icon(Icons.business_outlined), text: 'الموردون'),
-            ],
+            tabs: tabs,
           ),
           Expanded(
-            child: TabBarView(
-              controller: _tabs,
-              children: [
-                _ReceiptTab(isAdmin: widget.keeperName == null),
-                const _TransferTab(),
-                _WithdrawalTab(isAdmin: widget.keeperName == null,
-                    keeperName: widget.keeperName),
-                const SuppliersPage(),
-              ],
-            ),
+            child: TabBarView(controller: _tabs, children: tabViews),
           ),
         ],
       ),
-      floatingActionButton: _tabs.index == 3
+      floatingActionButton: _tabs.index == suppliersIndex
           ? null
           : FloatingActionButton.extended(
               onPressed: () {
                 if (_tabs.index == 0) {
                   _showCreateReceiptDialog(context);
-                } else if (_tabs.index == 1) {
+                } else if (!isKeeper && _tabs.index == 1) {
                   _showCreateTransferDialog(context);
                 } else {
                   _showCreateWithdrawalDialog(context);
@@ -106,7 +123,7 @@ class _WarehouseManagerPageState extends ConsumerState<WarehouseManagerPage>
               icon: const Icon(Icons.add),
               label: Text(_tabs.index == 0
                   ? 'سند استلام جديد'
-                  : _tabs.index == 1
+                  : (!isKeeper && _tabs.index == 1)
                       ? 'سند تحويل جديد'
                       : 'سند سحب جديد'),
             ),
@@ -180,10 +197,13 @@ class _ReceiptTab extends ConsumerWidget {
             );
           }
 
-          // Admin sees pending first, then rest
+          // Admin: pending_approval first, then approved, then rest
           final sorted = isAdmin
-              ? [...list.where((v) => v['status'] == 'pending_approval'),
-                 ...list.where((v) => v['status'] != 'pending_approval')]
+              ? [
+                  ...list.where((v) => v['status'] == 'pending_approval'),
+                  ...list.where((v) => v['status'] == 'approved'),
+                  ...list.where((v) => v['status'] != 'pending_approval' && v['status'] != 'approved'),
+                ]
               : list;
 
           return ListView.builder(
@@ -207,19 +227,21 @@ class _ReceiptTab extends ConsumerWidget {
 
 Color _receiptStatusColor(String? status) {
   switch (status) {
-    case 'posted':    return Colors.green;
+    case 'posted':           return Colors.green;
+    case 'approved':         return Colors.teal;
     case 'pending_approval': return Colors.indigo;
-    case 'rejected':  return Colors.red;
-    default:          return Colors.orange;
+    case 'rejected':         return Colors.red;
+    default:                 return Colors.orange;
   }
 }
 
 String _receiptStatusText(String? status) {
   switch (status) {
-    case 'posted':    return 'مُرحَّل';
+    case 'posted':           return 'مُرحَّل';
+    case 'approved':         return 'مقبول — بانتظار الاستلام';
     case 'pending_approval': return 'بانتظار الموافقة';
-    case 'rejected':  return 'مرفوض';
-    default:          return 'مسودة';
+    case 'rejected':         return 'مرفوض';
+    default:                 return 'مسودة';
   }
 }
 
@@ -342,35 +364,93 @@ class _ReceiptVoucherCard extends ConsumerWidget {
 
   List<Widget> _buildActions(BuildContext context, WidgetRef ref, String status) {
     if (isAdmin) {
-      // Admin: only acts on pending_approval
-      if (status != 'pending_approval') return [];
-      return [
-        const Divider(height: 16),
-        Row(
-          children: [
-            Expanded(
-              child: OutlinedButton.icon(
-                style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
-                icon: const Icon(Icons.cancel_outlined, size: 16),
-                label: const Text('رفض'),
-                onPressed: () => _rejectVoucher(context, ref),
+      // Admin: Step 1 — accept (pending_approval → approved, no inventory move)
+      if (status == 'pending_approval') {
+        return [
+          const Divider(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
+                  icon: const Icon(Icons.cancel_outlined, size: 16),
+                  label: const Text('رفض'),
+                  onPressed: () => _rejectVoucher(context, ref),
+                ),
               ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-                icon: const Icon(Icons.check_circle_outline, size: 16, color: Colors.white),
-                label: const Text('موافقة وترحيل', style: TextStyle(color: Colors.white)),
-                onPressed: () => _approveVoucher(context, ref),
+              const SizedBox(width: 8),
+              Expanded(
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
+                  icon: const Icon(Icons.check_outlined, size: 16, color: Colors.white),
+                  label: const Text('قبول', style: TextStyle(color: Colors.white)),
+                  onPressed: () => _approveVoucher(context, ref),
+                ),
               ),
-            ),
-          ],
-        ),
-      ];
+            ],
+          ),
+        ];
+      }
+      // Admin: Step 2 — edit quantities then post to inventory (approved → posted)
+      if (status == 'approved') {
+        return [
+          const Divider(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: TextButton.icon(
+                  icon: const Icon(Icons.edit_outlined, size: 16),
+                  label: const Text('تعديل الكميات'),
+                  onPressed: () => showDialog(
+                    context: context,
+                    builder: (_) => _ReceiptVoucherDialog(
+                      voucherId: voucher.id,
+                      onSaved: onAction,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+                  icon: const Icon(Icons.warehouse_outlined, size: 16, color: Colors.white),
+                  label: const Text('ترحيل للمخزن', style: TextStyle(color: Colors.white)),
+                  onPressed: () => _postVoucher(context, ref),
+                ),
+              ),
+            ],
+          ),
+        ];
+      }
+      return [];
     } else {
       // Keeper
       if (status == 'posted' || status == 'rejected') return [];
+      if (status == 'approved') {
+        return [
+          const Divider(height: 16),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.teal.shade50,
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.inventory_2_outlined, size: 13, color: Colors.teal),
+                SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'تم القبول — في انتظار الاستلام في المخزن الرئيسي',
+                    style: TextStyle(color: Colors.teal, fontSize: 11),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ];
+      }
       if (status == 'pending_approval') {
         return [
           const Divider(height: 16),
@@ -477,14 +557,17 @@ class _ReceiptVoucherCard extends ConsumerWidget {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('موافقة وترحيل السند'),
-        content: Text('سيُضاف محتوى السند ${voucher.voucherNumber} للمخزن الرئيسي فوراً. هل تؤكد؟'),
+        title: const Text('قبول السند'),
+        content: Text(
+          'سيُقبل السند ${voucher.voucherNumber} ويظهر في قائمة الاستلام بالمخزن الرئيسي.\n'
+          'يمكنك تعديل الكميات ثم الترحيل للمخزن لاحقاً.',
+        ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('إلغاء')),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('موافقة وترحيل', style: TextStyle(color: Colors.white)),
+            child: const Text('قبول', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -494,7 +577,48 @@ class _ReceiptVoucherCard extends ConsumerWidget {
       await ref.read(dataSourceProvider).approveReceiptVoucher(voucher.id!);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('تمت الموافقة وتم ترحيل السند للمخزن'), backgroundColor: Colors.green),
+          const SnackBar(
+            content: Text('تم قبول السند — يظهر الآن في قائمة الاستلام للمخزن الرئيسي'),
+            backgroundColor: Colors.teal,
+          ),
+        );
+      }
+      onAction();
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطأ: $e'), backgroundColor: Colors.red));
+      }
+    }
+  }
+
+  Future<void> _postVoucher(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('ترحيل للمخزن'),
+        content: Text(
+          'سيُضاف محتوى السند ${voucher.voucherNumber} للمخزن الرئيسي بالكميات المحددة.\n'
+          'هل تريد المتابعة؟',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('إلغاء')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('ترحيل', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+    try {
+      await ref.read(dataSourceProvider).postReceiptVoucher(voucher.id!);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('تم ترحيل السند للمخزن الرئيسي بنجاح'),
+            backgroundColor: Colors.green,
+          ),
         );
       }
       onAction();
