@@ -814,10 +814,13 @@ file:///home/runner/workspace/lib/presentation/pages/admin/recipes/recipe_manage
 file:///home/runner/workspace/lib/presentation/pages/admin/reports/reports_page.dart
 file:///home/runner/workspace/lib/presentation/pages/admin/settings/settings_page.dart
 file:///home/runner/workspace/lib/presentation/pages/admin/shift_handover/shift_handovers_admin_page.dart
+file:///home/runner/workspace/lib/presentation/pages/admin/suppliers/suppliers_page.dart
 file:///home/runner/workspace/lib/presentation/pages/admin/warehouse/mixing_warehouse_page.dart
 file:///home/runner/workspace/lib/presentation/pages/admin/warehouse/warehouse_manager_page.dart
 file:///home/runner/workspace/lib/presentation/pages/admin/workers/workers_page.dart
 file:///home/runner/workspace/lib/presentation/pages/splash/splash_page.dart
+file:///home/runner/workspace/lib/presentation/pages/warehouse/warehouse_home_page.dart
+file:///home/runner/workspace/lib/presentation/pages/warehouse/warehouse_shell_page.dart
 file:///home/runner/workspace/lib/presentation/pages/worker/batch_entry_page.dart
 file:///home/runner/workspace/lib/presentation/pages/worker/machine_entry_page.dart
 file:///home/runner/workspace/lib/presentation/pages/worker/shift_handover_page.dart

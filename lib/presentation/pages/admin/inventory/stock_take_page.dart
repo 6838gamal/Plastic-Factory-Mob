@@ -61,7 +61,7 @@ class _StockTakePageState extends ConsumerState<StockTakePage>
     final notesCtrl = TextEditingController();
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (ctx) => AlertDialog(
         title: const Text('بدء جرد دوري جديد'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -78,8 +78,8 @@ class _StockTakePageState extends ConsumerState<StockTakePage>
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('إلغاء')),
-          ElevatedButton(onPressed: () => Navigator.pop(context, true), child: const Text('بدء')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('إلغاء')),
+          ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('بدء')),
         ],
       ),
     );
@@ -176,14 +176,14 @@ class _StockTakePageState extends ConsumerState<StockTakePage>
   Future<void> _closeSession() async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (ctx) => AlertDialog(
         title: const Text('إغلاق الجرد'),
         content: const Text('بعد الإغلاق لن تتمكن من تعديل الأرقام.\nهل تريد إغلاق الجرد؟'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('إلغاء')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('إلغاء')),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            onPressed: () => Navigator.pop(context, true),
+            onPressed: () => Navigator.pop(ctx, true),
             child: const Text('إغلاق', style: TextStyle(color: Colors.white)),
           ),
         ],

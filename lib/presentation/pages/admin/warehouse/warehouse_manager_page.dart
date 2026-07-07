@@ -444,14 +444,14 @@ class _ReceiptVoucherCard extends ConsumerWidget {
   Future<void> _submitVoucher(BuildContext context, WidgetRef ref) async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (ctx) => AlertDialog(
         title: const Text('إرسال للإدارة'),
         content: Text('سيُرسل السند ${voucher.voucherNumber} للإدارة لمراجعته والموافقة عليه.\nلن تتمكن من التعديل بعد الإرسال.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('إلغاء')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('إلغاء')),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.indigo),
-            onPressed: () => Navigator.pop(context, true),
+            onPressed: () => Navigator.pop(ctx, true),
             child: const Text('إرسال', style: TextStyle(color: Colors.white)),
           ),
         ],
@@ -476,14 +476,14 @@ class _ReceiptVoucherCard extends ConsumerWidget {
   Future<void> _approveVoucher(BuildContext context, WidgetRef ref) async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (ctx) => AlertDialog(
         title: const Text('موافقة وترحيل السند'),
         content: Text('سيُضاف محتوى السند ${voucher.voucherNumber} للمخزن الرئيسي فوراً. هل تؤكد؟'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('إلغاء')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('إلغاء')),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-            onPressed: () => Navigator.pop(context, true),
+            onPressed: () => Navigator.pop(ctx, true),
             child: const Text('موافقة وترحيل', style: TextStyle(color: Colors.white)),
           ),
         ],
@@ -508,14 +508,14 @@ class _ReceiptVoucherCard extends ConsumerWidget {
   Future<void> _rejectVoucher(BuildContext context, WidgetRef ref) async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (ctx) => AlertDialog(
         title: const Text('رفض السند'),
         content: Text('هل تريد رفض السند ${voucher.voucherNumber}؟ لن تُضاف أي مواد للمخزن.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('إلغاء')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('إلغاء')),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            onPressed: () => Navigator.pop(context, true),
+            onPressed: () => Navigator.pop(ctx, true),
             child: const Text('رفض', style: TextStyle(color: Colors.white)),
           ),
         ],
@@ -540,14 +540,14 @@ class _ReceiptVoucherCard extends ConsumerWidget {
   Future<void> _deleteVoucher(BuildContext context, WidgetRef ref) async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (ctx) => AlertDialog(
         title: const Text('حذف السند'),
         content: Text('سيُحذف السند ${voucher.voucherNumber} نهائياً. هل أنت متأكد؟'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('إلغاء')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('إلغاء')),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            onPressed: () => Navigator.pop(context, true),
+            onPressed: () => Navigator.pop(ctx, true),
             child: const Text('حذف', style: TextStyle(color: Colors.white)),
           ),
         ],
@@ -780,7 +780,7 @@ class TransferVoucherCard extends ConsumerWidget {
       if (!context.mounted) return;
       showDialog(
         context: context,
-        builder: (_) => AlertDialog(
+        builder: (ctx) => AlertDialog(
           title: Text('سند تحويل — ${full.voucherNumber}'),
           content: SizedBox(
             width: double.maxFinite,
@@ -809,7 +809,7 @@ class TransferVoucherCard extends ConsumerWidget {
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('إغلاق')),
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إغلاق')),
           ],
         ),
       );
@@ -825,14 +825,14 @@ class TransferVoucherCard extends ConsumerWidget {
   Future<void> _submitVoucher(BuildContext context, WidgetRef ref) async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (ctx) => AlertDialog(
         title: const Text('إرسال للتأكيد'),
         content: const Text('سيتم إرسال السند لمشرف الخلطات للتأكيد. لن يمكن حذفه بعد ذلك.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('إلغاء')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('إلغاء')),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
-            onPressed: () => Navigator.pop(context, true),
+            onPressed: () => Navigator.pop(ctx, true),
             child: const Text('إرسال', style: TextStyle(color: Colors.white)),
           ),
         ],
@@ -860,14 +860,14 @@ class TransferVoucherCard extends ConsumerWidget {
   Future<void> _cancelVoucher(BuildContext context, WidgetRef ref) async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (ctx) => AlertDialog(
         title: const Text('إلغاء السند'),
         content: const Text('هل تريد إلغاء هذا السند نهائياً؟'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('لا')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('لا')),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            onPressed: () => Navigator.pop(context, true),
+            onPressed: () => Navigator.pop(ctx, true),
             child: const Text('نعم، إلغاء', style: TextStyle(color: Colors.white)),
           ),
         ],
@@ -895,7 +895,7 @@ class TransferVoucherCard extends ConsumerWidget {
   Future<void> _confirmVoucher(BuildContext context, WidgetRef ref) async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (ctx) => AlertDialog(
         title: const Text('تأكيد استلام المواد'),
         content: Text(
           'بتأكيد هذا السند سيتم:\n'
@@ -904,10 +904,10 @@ class TransferVoucherCard extends ConsumerWidget {
           'لا يمكن التراجع — أنشئ سند مرتجع للتسوية إن لزم.',
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('إلغاء')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('إلغاء')),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-            onPressed: () => Navigator.pop(context, true),
+            onPressed: () => Navigator.pop(ctx, true),
             child: const Text('تأكيد الاستلام', style: TextStyle(color: Colors.white)),
           ),
         ],

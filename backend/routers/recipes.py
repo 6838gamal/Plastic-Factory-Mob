@@ -29,30 +29,40 @@ async def ensure_tables():
             created_at    TIMESTAMPTZ DEFAULT NOW()
         );
     """)
-    # Migrate existing UUID column → TEXT (idempotent)
-    await pool.execute("""
-        DO $$
-        BEGIN
-            -- Drop FK if still present
-            IF EXISTS (
-                SELECT 1 FROM information_schema.table_constraints
-                WHERE table_name='recipes'
-                  AND constraint_type='FOREIGN KEY'
-                  AND constraint_name LIKE '%mixture_type_id%'
-            ) THEN
-                ALTER TABLE recipes DROP CONSTRAINT IF EXISTS recipes_mixture_type_id_fkey;
-            END IF;
-            -- Convert UUID → TEXT if needed
-            IF EXISTS (
-                SELECT 1 FROM information_schema.columns
-                WHERE table_name='recipes'
-                  AND column_name='mixture_type_id'
-                  AND data_type='uuid'
-            ) THEN
-                ALTER TABLE recipes ALTER COLUMN mixture_type_id TYPE TEXT USING mixture_type_id::text;
-            END IF;
-        END$$;
-    """)
+    # Migrate: add missing columns idempotently using individual ALTER TABLE statements
+    migrations = [
+        """ALTER TABLE recipes ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW()""",
+        """ALTER TABLE recipes ADD COLUMN IF NOT EXISTS notes TEXT""",
+        """ALTER TABLE recipes ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true""",
+        # recipe_items: old schema had material_id + quantity as NOT NULL; drop both
+        # constraints so we can insert rows with only material_name/standard_qty.
+        """ALTER TABLE recipe_items ALTER COLUMN material_id DROP NOT NULL""",
+        """ALTER TABLE recipe_items ALTER COLUMN quantity DROP NOT NULL""",
+        """ALTER TABLE recipe_items ALTER COLUMN quantity SET DEFAULT 0""",
+    ]
+    for stmt in migrations:
+        try:
+            await pool.execute(stmt)
+        except Exception:
+            pass  # column already exists, no constraint to drop, or table not yet created
+
+    # Convert mixture_type_id UUID → TEXT if needed (run only when type is uuid)
+    uuid_cols = await pool.fetch(
+        """SELECT 1 FROM information_schema.columns
+           WHERE table_name='recipes' AND column_name='mixture_type_id' AND data_type='uuid'"""
+    )
+    if uuid_cols:
+        await pool.execute(
+            "ALTER TABLE recipes DROP CONSTRAINT IF EXISTS recipes_mixture_type_id_fkey"
+        )
+        await pool.execute(
+            "ALTER TABLE recipes ALTER COLUMN mixture_type_id TYPE TEXT USING mixture_type_id::text"
+        )
+
+    # Ensure UNIQUE index on mixture_type_id exists (required for ON CONFLICT)
+    await pool.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS recipes_mixture_type_id_key ON recipes (mixture_type_id)"
+    )
 
 
 # ── Pydantic models ────────────────────────────────────────────────────────
@@ -70,13 +80,14 @@ class RecipeUpsert(BaseModel):
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────
-async def _recipe_with_items(pool, recipe_id: str):
-    recipe = await pool.fetchrow("SELECT * FROM recipes WHERE id=$1", recipe_id)
+async def _recipe_with_items(pool, recipe_id):
+    recipe_id_str = str(recipe_id)  # recipe_items.recipe_id is TEXT
+    recipe = await pool.fetchrow("SELECT * FROM recipes WHERE id=$1::uuid", recipe_id_str)
     if not recipe:
         return None
     items = await pool.fetch(
         "SELECT * FROM recipe_items WHERE recipe_id=$1 ORDER BY material_name",
-        recipe_id,
+        recipe_id_str,
     )
     return {**dict(recipe), "items": [dict(i) for i in items]}
 
@@ -96,7 +107,7 @@ async def list_recipes():
     for rec in recipes:
         items = await pool.fetch(
             "SELECT * FROM recipe_items WHERE recipe_id=$1 ORDER BY material_name",
-            rec["id"],
+            str(rec["id"]),  # recipe_items.recipe_id is TEXT, not UUID
         )
         result.append({**dict(rec), "items": [dict(i) for i in items]})
     return result
@@ -115,7 +126,7 @@ async def get_recipe_by_mixture(mixture_type_id: str):
         return None
     items = await pool.fetch(
         "SELECT * FROM recipe_items WHERE recipe_id=$1 ORDER BY material_name",
-        recipe["id"],
+        str(recipe["id"]),  # recipe_items.recipe_id is TEXT, not UUID
     )
     return {**dict(recipe), "items": [dict(i) for i in items]}
 
@@ -137,7 +148,7 @@ async def upsert_recipe(body: RecipeUpsert):
                    RETURNING *""",
                 body.mixture_type_id, body.name, body.notes,
             )
-            recipe_id = recipe["id"]
+            recipe_id = str(recipe["id"])  # recipe_items.recipe_id is TEXT, not UUID
 
             # Replace all items
             await conn.execute("DELETE FROM recipe_items WHERE recipe_id=$1", recipe_id)

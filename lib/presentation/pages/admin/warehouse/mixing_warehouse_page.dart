@@ -367,7 +367,7 @@ class _ReturnVoucherCard extends ConsumerWidget {
   Future<void> _postReturn(BuildContext context, WidgetRef ref) async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (ctx) => AlertDialog(
         title: const Text('تأكيد ترحيل المرتجع'),
         content: const Text(
           'سيتم:\n'
@@ -376,10 +376,10 @@ class _ReturnVoucherCard extends ConsumerWidget {
           'هل تريد المتابعة؟',
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('إلغاء')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('إلغاء')),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.deepOrange),
-            onPressed: () => Navigator.pop(context, true),
+            onPressed: () => Navigator.pop(ctx, true),
             child: const Text('ترحيل', style: TextStyle(color: Colors.white)),
           ),
         ],

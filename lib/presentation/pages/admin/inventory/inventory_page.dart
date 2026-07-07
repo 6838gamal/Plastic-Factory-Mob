@@ -148,125 +148,128 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
 
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (_) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(height: 12),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.add_circle_outline, color: color, size: 20),
-                const SizedBox(width: 8),
-                Text('إضافة حركة — $warehouseLabel',
-                    style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                        color: color)),
-              ],
-            ),
-            const Divider(),
-            ListTile(
-              leading: CircleAvatar(
-                  backgroundColor: Colors.green,
-                  child:
-                      const Icon(Icons.add_circle_outline, color: Colors.white)),
-              title: Text(isMain ? 'استلام وارد' : 'استلام من الرئيسي'),
-              subtitle: Text(isMain
-                  ? 'إضافة مواد خام جديدة للمخزون'
-                  : 'سحب من المخزن الرئيسي وإضافة لمخزن الخلاط'),
-              onTap: () {
-                Navigator.pop(context);
-                if (isMain) {
-                  _showInventoryDialog(context,
-                      title: 'استلام وارد',
-                      transactionType: 'in',
-                      positiveOnly: true,
-                      icon: Icons.add_circle_outline,
-                      iconColor: Colors.green,
-                      defaultWarehouse: _activeWarehouse);
-                } else {
-                  _showTransferDialog(context,
-                      fromWarehouse: AppConstants.warehouseMain,
-                      toWarehouse: AppConstants.warehouseMixer);
-                }
-              },
-            ),
-            ListTile(
-              leading: CircleAvatar(
-                  backgroundColor: Colors.orange,
-                  child: const Icon(Icons.tune, color: Colors.white)),
-              title: const Text('تسوية يدوية'),
-              subtitle: const Text('تعديل الرصيد يدوياً (زيادة أو نقصان)'),
-              onTap: () {
-                Navigator.pop(context);
-                _showInventoryDialog(context,
-                    title: 'تسوية يدوية',
-                    transactionType: 'adjustment',
-                    positiveOnly: false,
-                    icon: Icons.tune,
-                    iconColor: Colors.orange,
-                    defaultWarehouse: _activeWarehouse);
-              },
-            ),
-            ListTile(
-              leading: CircleAvatar(
-                  backgroundColor: Colors.blue,
-                  child: const Icon(Icons.playlist_add_check,
-                      color: Colors.white)),
-              title: const Text('رصيد افتتاحي'),
-              subtitle: const Text('تسجيل الرصيد الافتتاحي لمادة'),
-              onTap: () {
-                Navigator.pop(context);
-                _showOpeningBalanceDialog(context,
-                    defaultWarehouse: _activeWarehouse);
-              },
-            ),
-            if (isMain)
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.add_circle_outline, color: color, size: 20),
+                  const SizedBox(width: 8),
+                  Text('إضافة حركة — $warehouseLabel',
+                      style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                          color: color)),
+                ],
+              ),
+              const Divider(),
               ListTile(
                 leading: CircleAvatar(
-                    backgroundColor: Colors.purple,
-                    child: const Icon(Icons.compare_arrows,
-                        color: Colors.white)),
-                title: const Text('تحويل للخلاط'),
-                subtitle: const Text('نقل كمية من الرئيسي إلى الخلاط'),
+                    backgroundColor: Colors.green,
+                    child:
+                        const Icon(Icons.add_circle_outline, color: Colors.white)),
+                title: Text(isMain ? 'استلام وارد' : 'استلام من الرئيسي'),
+                subtitle: Text(isMain
+                    ? 'إضافة مواد خام جديدة للمخزون'
+                    : 'سحب من المخزن الرئيسي وإضافة لمخزن الخلاط'),
                 onTap: () {
                   Navigator.pop(context);
-                  _showTransferDialog(context,
-                      fromWarehouse: AppConstants.warehouseMain,
-                      toWarehouse: AppConstants.warehouseMixer);
-                },
-              )
-            else
-              ListTile(
-                leading: CircleAvatar(
-                    backgroundColor: Colors.indigo,
-                    child: const Icon(Icons.compare_arrows,
-                        color: Colors.white)),
-                title: const Text('إرجاع للرئيسي'),
-                subtitle: const Text('إرجاع كمية من الخلاط إلى الرئيسي'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _showTransferDialog(context,
-                      fromWarehouse: AppConstants.warehouseMixer,
-                      toWarehouse: AppConstants.warehouseMain);
+                  if (isMain) {
+                    _showInventoryDialog(context,
+                        title: 'استلام وارد',
+                        transactionType: 'in',
+                        positiveOnly: true,
+                        icon: Icons.add_circle_outline,
+                        iconColor: Colors.green,
+                        defaultWarehouse: _activeWarehouse);
+                  } else {
+                    _showTransferDialog(context,
+                        fromWarehouse: AppConstants.warehouseMain,
+                        toWarehouse: AppConstants.warehouseMixer);
+                  }
                 },
               ),
-            ListTile(
-              leading: CircleAvatar(
-                  backgroundColor: Colors.red.shade700,
-                  child: const Icon(Icons.exposure_zero, color: Colors.white)),
-              title: const Text('تصفير بيانات مادة'),
-              subtitle: const Text('إعادة كل تفاصيل المادة (الرصيد، الوارد، المنصرف، التحويلات، الرصيد الافتتاحي) إلى صفر'),
-              onTap: () {
-                Navigator.pop(context);
-                _showResetBalanceDialog(context, defaultWarehouse: _activeWarehouse);
-              },
-            ),
-            const SizedBox(height: 8),
-          ],
+              ListTile(
+                leading: CircleAvatar(
+                    backgroundColor: Colors.orange,
+                    child: const Icon(Icons.tune, color: Colors.white)),
+                title: const Text('تسوية يدوية'),
+                subtitle: const Text('تعديل الرصيد يدوياً (زيادة أو نقصان)'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showInventoryDialog(context,
+                      title: 'تسوية يدوية',
+                      transactionType: 'adjustment',
+                      positiveOnly: false,
+                      icon: Icons.tune,
+                      iconColor: Colors.orange,
+                      defaultWarehouse: _activeWarehouse);
+                },
+              ),
+              ListTile(
+                leading: CircleAvatar(
+                    backgroundColor: Colors.blue,
+                    child: const Icon(Icons.playlist_add_check,
+                        color: Colors.white)),
+                title: const Text('رصيد افتتاحي'),
+                subtitle: const Text('تسجيل الرصيد الافتتاحي لمادة'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showOpeningBalanceDialog(context,
+                      defaultWarehouse: _activeWarehouse);
+                },
+              ),
+              if (isMain)
+                ListTile(
+                  leading: CircleAvatar(
+                      backgroundColor: Colors.purple,
+                      child: const Icon(Icons.compare_arrows,
+                          color: Colors.white)),
+                  title: const Text('تحويل للخلاط'),
+                  subtitle: const Text('نقل كمية من الرئيسي إلى الخلاط'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _showTransferDialog(context,
+                        fromWarehouse: AppConstants.warehouseMain,
+                        toWarehouse: AppConstants.warehouseMixer);
+                  },
+                )
+              else
+                ListTile(
+                  leading: CircleAvatar(
+                      backgroundColor: Colors.indigo,
+                      child: const Icon(Icons.compare_arrows,
+                          color: Colors.white)),
+                  title: const Text('إرجاع للرئيسي'),
+                  subtitle: const Text('إرجاع كمية من الخلاط إلى الرئيسي'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _showTransferDialog(context,
+                        fromWarehouse: AppConstants.warehouseMixer,
+                        toWarehouse: AppConstants.warehouseMain);
+                  },
+                ),
+              ListTile(
+                leading: CircleAvatar(
+                    backgroundColor: Colors.red.shade700,
+                    child: const Icon(Icons.exposure_zero, color: Colors.white)),
+                title: const Text('تصفير بيانات مادة'),
+                subtitle: const Text('إعادة كل تفاصيل المادة (الرصيد، الوارد، المنصرف، التحويلات، الرصيد الافتتاحي) إلى صفر'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showResetBalanceDialog(context, defaultWarehouse: _activeWarehouse);
+                },
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
         ),
       ),
     );
