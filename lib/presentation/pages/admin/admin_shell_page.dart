@@ -146,6 +146,20 @@ class _AdminDrawer extends ConsumerWidget {
                   currentRoute: currentRoute,
                 ),
                 _DrawerItem(
+                  icon: Icons.straighten_outlined,
+                  selectedIcon: Icons.straighten,
+                  title: 'معايير الإنتاج',
+                  route: '/admin/production-standards',
+                  currentRoute: currentRoute,
+                ),
+                _DrawerItem(
+                  icon: Icons.monitor_heart_outlined,
+                  selectedIcon: Icons.monitor_heart,
+                  title: 'مراقبة الهدر والانحراف',
+                  route: '/admin/waste-monitoring',
+                  currentRoute: currentRoute,
+                ),
+                _DrawerItem(
                   icon: Icons.people_outline,
                   selectedIcon: Icons.people,
                   title: AppStrings.workers,

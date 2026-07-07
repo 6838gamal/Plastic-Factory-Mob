@@ -315,35 +315,49 @@ class _MachineEntryPageState extends ConsumerState<MachineEntryPage> {
             ),
             const SizedBox(height: 12),
 
-            // ── Production Standard (optional) ───────────────────────
+            // ── Production Standard (required) ───────────────────────
             standards.when(
               data: (list) {
-                if (list.isEmpty) return const SizedBox.shrink();
+                if (list.isEmpty) {
+                  return Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.red.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.red.shade200),
+                    ),
+                    child: const Row(children: [
+                      Icon(Icons.warning_amber_outlined, color: Colors.red, size: 18),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'لا توجد معايير إنتاج مفعّلة — أضف معياراً أولاً من إدارة معايير الإنتاج',
+                          style: TextStyle(color: Colors.red, fontSize: 12),
+                        ),
+                      ),
+                    ]),
+                  );
+                }
                 return DropdownButtonFormField<ProductionStandardModel>(
                   value: _selectedStandard,
                   decoration: InputDecoration(
-                    labelText: 'معيار الإنتاج (اختياري)',
+                    labelText: 'معيار الإنتاج *',
                     prefixIcon: const Icon(Icons.straighten, color: Colors.indigo),
                     helperText: _selectedStandard != null
                         ? 'المعيار: ${_selectedStandard!.standardGramPerPair.toStringAsFixed(0)} جرام/زوج'
-                        : 'اختر معيار لحساب مؤشر الهدر',
+                        : 'يجب اختيار معيار الإنتاج للصنف',
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
                   ),
                   isExpanded: true,
-                  items: [
-                    const DropdownMenuItem<ProductionStandardModel>(
-                      value: null,
-                      child: Text('بدون معيار'),
-                    ),
-                    ...list.map((s) => DropdownMenuItem(
-                          value: s,
-                          child: Text(
-                              '${s.productName} — ${s.standardGramPerPair.toStringAsFixed(0)} جم/زوج'),
-                        )),
-                  ],
+                  items: list.map((s) => DropdownMenuItem(
+                        value: s,
+                        child: Text(
+                            '${s.productName} — ${s.standardGramPerPair.toStringAsFixed(0)} جم/زوج'),
+                      )).toList(),
                   onChanged: (v) => setState(() => _selectedStandard = v),
+                  validator: (v) => v == null ? 'معيار الإنتاج مطلوب' : null,
                 );
               },
               loading: () => const SizedBox.shrink(),
@@ -365,11 +379,16 @@ class _MachineEntryPageState extends ConsumerState<MachineEntryPage> {
                 controller: _pairsCtrl,
                 keyboardType: TextInputType.number,
                 decoration: const InputDecoration(
-                  labelText: 'عدد الأزواج المنتجة',
+                  labelText: 'عدد الأزواج المنتجة *',
                   prefixIcon: Icon(Icons.people_outline),
                   suffixText: 'زوج',
-                  helperText: 'أدخل العدد لحساب مؤشر الهدر',
+                  helperText: 'مطلوب لحساب مؤشر الهدر والانحراف عن المعيار',
                 ),
+                validator: (v) {
+                  final n = int.tryParse(v?.trim() ?? '');
+                  if (n == null || n <= 0) return 'عدد الأزواج مطلوب ويجب أن يكون أكبر من صفر';
+                  return null;
+                },
               ),
             ),
 

@@ -132,10 +132,24 @@ async def update_standard(standard_id: str, body: StandardCreate):
         body.product_name, body.product_code, body.standard_gram_per_pair,
         body.is_active, body.notes, standard_id,
     )
+    import json as _json
     await pool.execute(
-        """INSERT INTO audit_log (id, action, table_name, record_id, description)
-           VALUES (gen_random_uuid(), 'update', 'production_standards', $1, $2)""",
+        """INSERT INTO audit_log
+           (id, action, table_name, record_id, old_values, new_values, description)
+           VALUES (gen_random_uuid(), 'update', 'production_standards', $1, $2, $3, $4)""",
         standard_id,
+        _json.dumps({
+            "product_name": old["product_name"],
+            "standard_gram_per_pair": float(old["standard_gram_per_pair"]),
+            "is_active": old["is_active"],
+            "notes": old["notes"],
+        }),
+        _json.dumps({
+            "product_name": body.product_name,
+            "standard_gram_per_pair": body.standard_gram_per_pair,
+            "is_active": body.is_active,
+            "notes": body.notes,
+        }),
         (
             f"تعديل معيار: {old['product_name']} "
             f"({old['standard_gram_per_pair']}→{body.standard_gram_per_pair} جرام/زوج)"
@@ -148,13 +162,10 @@ async def update_standard(standard_id: str, body: StandardCreate):
 async def delete_standard(standard_id: str):
     pool = await get_pool()
     await _ensure_table(pool)
-    # Check usage in production records
-    try:
-        used = await pool.fetchval(
-            "SELECT COUNT(*) FROM machine_production WHERE standard_id=$1", standard_id
-        )
-    except Exception:
-        used = 0
+    # Check usage in production records — do NOT swallow errors (silent 0 is unsafe)
+    used = await pool.fetchval(
+        "SELECT COUNT(*) FROM machine_production WHERE standard_id=$1", standard_id
+    )
     if used and used > 0:
         raise HTTPException(
             status_code=400,
