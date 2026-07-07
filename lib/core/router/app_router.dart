@@ -22,6 +22,8 @@ import '../../presentation/pages/admin/inventory/opening_balances_page.dart';
 import '../../presentation/pages/admin/warehouse/warehouse_manager_page.dart';
 import '../../presentation/pages/admin/warehouse/mixing_warehouse_page.dart';
 import '../../presentation/pages/admin/suppliers/suppliers_page.dart';
+import '../../presentation/pages/admin/production_standards/production_standards_page.dart';
+import '../../presentation/pages/admin/waste_monitoring/waste_monitoring_page.dart';
 import '../../presentation/pages/warehouse/warehouse_shell_page.dart';
 import '../../presentation/pages/warehouse/warehouse_home_page.dart';
 import '../../presentation/providers/auth_provider.dart';
@@ -130,6 +132,14 @@ final routerProvider = Provider<GoRouter>((ref) {
               ),
               body: const SuppliersPage(),
             ),
+          ),
+          GoRoute(
+            path: '/admin/production-standards',
+            builder: (_, __) => const ProductionStandardsPage(),
+          ),
+          GoRoute(
+            path: '/admin/waste-monitoring',
+            builder: (_, __) => const WasteMonitoringPage(),
           ),
         ],
       ),

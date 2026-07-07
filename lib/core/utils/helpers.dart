@@ -108,10 +108,12 @@ class Helpers {
       'excess_consumption': 'استهلاك زائد',
       'low_consumption': 'استهلاك ناقص',
       'production_deviation': 'انحراف إنتاج',
+      'industrial_deviation': 'انحراف صناعي',
       'high_waste': 'هالك مرتفع',
       'high_scrap': 'سكراب مرتفع',
       'machine_stop': 'توقف ماكينة',
       'process_failed': 'فشل عملية',
+      'yield_deviation': 'انحراف معيار الإنتاج',
     };
     return map[type] ?? type;
   }

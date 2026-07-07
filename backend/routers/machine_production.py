@@ -6,6 +6,7 @@ Rules:
      * scrap_quantity → added to scrap material inventory (warehouse_type='mixer')
      * industrial deviation alert raised when |outputs - inputs| / inputs > threshold
      * Auto 11: if projected deviation > notes_threshold AND notes is empty → HTTP 400
+     * yield_deviation alert raised when actual_gram_per_pair > standard_gram_per_pair
  - Edit reverses scrap additions before applying new ones.
  - Delete reverses scrap additions.
  - Every change is written to audit_log.
@@ -50,6 +51,9 @@ class ProductionCreate(BaseModel):
     transaction_id: Optional[str] = None
     status: Optional[str] = "saved"
     created_by: Optional[str] = None
+    # ── Yield standard fields ────────────────────────────────
+    standard_id: Optional[str] = None
+    pairs_produced: Optional[int] = None
 
 
 # ─────────────────────── helpers ────────────────────────────────
@@ -164,9 +168,6 @@ async def _check_notes_required(pool, batch_number: str, body: ProductionCreate,
                                  exclude_production_id: str = None):
     """
     Auto 11 — Pre-check: if projected deviation > notes_threshold and notes are empty → raise 400.
-
-    Projects what the deviation WILL be after this production record is added,
-    then enforces the notes requirement before any DB write.
     """
     if not batch_number:
         return
@@ -182,7 +183,6 @@ async def _check_notes_required(pool, batch_number: str, body: ProductionCreate,
     if total_inputs <= 0:
         return
 
-    # Get existing production totals (exclude current record if editing)
     conditions = ["batch_number=$1"]
     params = [batch_number]
     if exclude_production_id:
@@ -293,6 +293,81 @@ async def _check_industrial_deviation(pool, batch_number: str, production_id: st
         )
 
 
+async def _compute_yield_stats(pool, body: ProductionCreate):
+    """
+    Compute yield stats based on standard.
+    Returns (actual_gram_per_pair, standard_gram_per_pair, deviation_pct, indicator)
+    or (actual_gram, None, None, None) if no standard set.
+    """
+    pairs = body.pairs_produced
+    if not pairs or pairs <= 0:
+        return None, None, None, None
+
+    total_kg = (
+        float(body.produced_quantity or 0) +
+        float(body.scrap_quantity or 0) +
+        float(body.waste_quantity or 0)
+    )
+    actual_gram = (total_kg * 1000.0) / pairs
+
+    if not body.standard_id:
+        return actual_gram, None, None, None
+
+    try:
+        std_row = await pool.fetchrow(
+            "SELECT standard_gram_per_pair FROM production_standards WHERE id=$1::uuid",
+            body.standard_id,
+        )
+    except Exception as exc:
+        print(f"[yield_stats] Failed to look up standard id={body.standard_id}: {exc}")
+        return actual_gram, None, None, None
+
+    if not std_row:
+        return actual_gram, None, None, None
+
+    standard_gram = float(std_row["standard_gram_per_pair"])
+    deviation_pct = ((actual_gram - standard_gram) / standard_gram) * 100
+
+    if deviation_pct <= 0:
+        indicator = "normal"
+    elif deviation_pct <= 5:
+        indicator = "warning"
+    else:
+        indicator = "critical"
+
+    return actual_gram, standard_gram, deviation_pct, indicator
+
+
+async def _create_yield_deviation_alert(
+    pool, production_id: str, body: ProductionCreate,
+    actual_gram: float, standard_gram: float,
+    deviation_pct: float, indicator: str,
+):
+    """Create a yield_deviation alert when actual consumption exceeds standard."""
+    if deviation_pct is None or deviation_pct <= 0:
+        return
+    severity = "critical" if indicator == "critical" else "high"
+    description = (
+        f"انحراف معيار الإنتاج — صنف: {body.product_name or ''} | "
+        f"ماكينة: {body.machine_name or ''} | "
+        f"المعيار: {standard_gram:.0f} جرام/زوج | "
+        f"الفعلي: {actual_gram:.0f} جرام/زوج | "
+        f"الانحراف: +{deviation_pct:.1f}%"
+    )
+    try:
+        await pool.execute(
+            """INSERT INTO alerts
+               (id, alert_type, severity, machine_id, machine_name, worker_name,
+                description, status, transaction_id)
+               VALUES (gen_random_uuid(), 'yield_deviation', $1, $2, $3, $4, $5, 'pending', $6)
+               ON CONFLICT (transaction_id) WHERE transaction_id IS NOT NULL DO NOTHING""",
+            severity, body.machine_id, body.machine_name, body.worker_name,
+            description, f"yield_{production_id}",
+        )
+    except Exception as exc:
+        print(f"[yield_alert] Failed to create yield deviation alert: {exc}")
+
+
 async def _refresh_daily_report(date_str: str):
     """Auto 5 — Regenerate today's daily report snapshot in the background (non-locking)."""
     try:
@@ -347,18 +422,26 @@ async def create_production(body: ProductionCreate):
     # ── Auto 11: Enforce notes when deviation is large ────────
     await _check_notes_required(pool, body.batch_number, body)
 
+    # ── Compute yield stats ───────────────────────────────────
+    actual_gram, standard_gram, deviation_pct, indicator = await _compute_yield_stats(pool, body)
+
     row = await pool.fetchrow(
         """INSERT INTO machine_production (
             id, batch_number, machine_id, machine_name, product_id, product_name,
             worker_id, worker_name, produced_quantity, scrap_quantity, waste_quantity,
-            stop_time_minutes, notes, production_image_url, transaction_id, status
-        ) VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+            stop_time_minutes, notes, production_image_url, transaction_id, status,
+            standard_id, pairs_produced, actual_gram_per_pair, standard_gram_per_pair,
+            deviation_from_standard_pct, waste_indicator
+        ) VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15,
+                  $16, $17, $18, $19, $20, $21)
         RETURNING *""",
         body.batch_number, body.machine_id, body.machine_name,
         body.product_id, body.product_name, body.worker_id, body.worker_name,
         body.produced_quantity, body.scrap_quantity, body.waste_quantity,
         body.stop_time_minutes, body.notes, body.production_image_url,
         body.transaction_id, body.status,
+        body.standard_id, body.pairs_produced,
+        actual_gram, standard_gram, deviation_pct, indicator,
     )
     production_id = str(row["id"])
 
@@ -383,6 +466,13 @@ async def create_production(body: ProductionCreate):
     # ── Industrial deviation check + alert ────────────────────
     await _check_industrial_deviation(pool, body.batch_number, production_id)
 
+    # ── Yield deviation alert ─────────────────────────────────
+    if actual_gram is not None and standard_gram is not None and deviation_pct is not None:
+        await _create_yield_deviation_alert(
+            pool, production_id, body,
+            actual_gram, standard_gram, deviation_pct, indicator,
+        )
+
     # ── Auto 5: Refresh daily report in background ────────────
     from datetime import date
     asyncio.create_task(_refresh_daily_report(str(date.today())))
@@ -398,23 +488,54 @@ async def update_production(production_id: str, body: ProductionCreate):
     await _check_notes_required(pool, body.batch_number, body,
                                  exclude_production_id=production_id)
 
-    # Reverse old scrap addition
-    old = await pool.fetchrow(
-        "SELECT scrap_quantity FROM machine_production WHERE id=$1", production_id
+    # ── Fetch existing record (patch semantics for yield fields) ──
+    existing = await pool.fetchrow(
+        """SELECT scrap_quantity, standard_id, pairs_produced,
+                  actual_gram_per_pair, deviation_from_standard_pct
+           FROM machine_production WHERE id=$1""",
+        production_id,
     )
-    if old:
-        await _remove_scrap_from_inventory(pool, production_id, float(old["scrap_quantity"] or 0))
+    if not existing:
+        raise HTTPException(status_code=404, detail="Production record not found")
+
+    # Fall back to stored yield inputs when caller doesn't provide them
+    effective_standard_id = body.standard_id if body.standard_id is not None \
+        else existing["standard_id"]
+    effective_pairs = body.pairs_produced if body.pairs_produced is not None \
+        else (existing["pairs_produced"] or 0)
+
+    # Reverse old scrap addition
+    await _remove_scrap_from_inventory(
+        pool, production_id, float(existing["scrap_quantity"] or 0)
+    )
+
+    # ── Recompute yield stats using effective (possibly carried-over) inputs ──
+    class _EffectiveBody:
+        """Thin wrapper so _compute_yield_stats sees the right standard/pairs."""
+        def __init__(self, b, sid, pairs):
+            self.__dict__.update(vars(b) if hasattr(b, '__dict__') else b.model_dump())
+            self.standard_id = sid
+            self.pairs_produced = pairs
+
+    effective_body = _EffectiveBody(body, effective_standard_id, effective_pairs)
+    actual_gram, standard_gram, deviation_pct, indicator = \
+        await _compute_yield_stats(pool, effective_body)
 
     row = await pool.fetchrow(
         """UPDATE machine_production SET
             produced_quantity=$1, scrap_quantity=$2, waste_quantity=$3,
-            stop_time_minutes=$4, notes=$5, status=$6, updated_at=NOW()
-           WHERE id=$7 RETURNING *""",
+            stop_time_minutes=$4, notes=$5, status=$6,
+            standard_id=$7, pairs_produced=$8,
+            actual_gram_per_pair=$9, standard_gram_per_pair=$10,
+            deviation_from_standard_pct=$11, waste_indicator=$12,
+            updated_at=NOW()
+           WHERE id=$13 RETURNING *""",
         body.produced_quantity, body.scrap_quantity, body.waste_quantity,
-        body.stop_time_minutes, body.notes, body.status or "saved", production_id,
+        body.stop_time_minutes, body.notes, body.status or "saved",
+        effective_standard_id, effective_pairs,
+        actual_gram, standard_gram, deviation_pct, indicator,
+        production_id,
     )
-    if not row:
-        raise HTTPException(status_code=404, detail="Production record not found")
 
     # Add new scrap to inventory
     new_scrap = float(body.scrap_quantity or 0)
@@ -433,6 +554,28 @@ async def update_production(production_id: str, body: ProductionCreate):
     )
 
     await _check_industrial_deviation(pool, str(row["batch_number"]), production_id)
+
+    # ── Yield alert: only touch when yield inputs actually changed ────
+    old_deviation = existing["deviation_from_standard_pct"]
+    old_gram = existing["actual_gram_per_pair"]
+    yield_inputs_changed = (
+        effective_standard_id != existing["standard_id"]
+        or effective_pairs != (existing["pairs_produced"] or 0)
+        or actual_gram != (float(old_gram) if old_gram is not None else None)
+    )
+    if yield_inputs_changed:
+        try:
+            await pool.execute(
+                "DELETE FROM alerts WHERE transaction_id=$1",
+                f"yield_{production_id}",
+            )
+        except Exception:
+            pass
+        if actual_gram is not None and standard_gram is not None and deviation_pct is not None:
+            await _create_yield_deviation_alert(
+                pool, production_id, effective_body,
+                actual_gram, standard_gram, deviation_pct, indicator,
+            )
 
     # ── Auto 5: Refresh daily report in background ────────────
     from datetime import date
@@ -456,6 +599,16 @@ async def delete_production(production_id: str):
            VALUES (gen_random_uuid(),'delete','machine_production',$1,$2)""",
         production_id, "حذف سجل إنتاج",
     )
+
+    # Remove yield alert
+    try:
+        await pool.execute(
+            "DELETE FROM alerts WHERE transaction_id=$1",
+            f"yield_{production_id}",
+        )
+    except Exception:
+        pass
+
     await pool.execute("DELETE FROM machine_production WHERE id=$1", production_id)
 
     # ── Auto 5: Refresh daily report in background ────────────

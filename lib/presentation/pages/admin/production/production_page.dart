@@ -6,6 +6,7 @@ import '../../../../data/models/machine_production_model.dart';
 import '../../../../data/datasources/api_datasource.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../../core/utils/helpers.dart';
+import '../../../../data/models/production_standard_model.dart';
 
 class ProductionPage extends ConsumerStatefulWidget {
   const ProductionPage({super.key});
@@ -172,6 +173,9 @@ class _ProductionPageState extends ConsumerState<ProductionPage> {
                   'stop_time_minutes': double.tryParse(stopCtrl.text) ?? p.stopTimeMinutes,
                   'notes': notesCtrl.text.trim().isEmpty ? null : notesCtrl.text.trim(),
                   'status': p.status,
+                  // Round-trip yield inputs so the backend preserves/recomputes stats
+                  'standard_id': p.standardId,
+                  'pairs_produced': p.pairsProduced > 0 ? p.pairsProduced : null,
                 });
                 ref.invalidate(machineProductionsProvider(ProductionFilters(from: _from, to: _to)));
                 if (ctx.mounted) {
@@ -349,6 +353,30 @@ class _ProductionCard extends StatelessWidget {
                 _Row('الهالك', '${production.wasteQuantity.toStringAsFixed(2)} كجم'),
                 _Row('وقت التوقف', '${production.stopTimeMinutes.toStringAsFixed(0)} دقيقة'),
                 _Row('الكفاءة', '${production.efficiency.toStringAsFixed(1)}%'),
+                // ── Yield standard rows ──────────────────────────
+                if (production.pairsProduced > 0)
+                  _Row('عدد الأزواج', '${production.pairsProduced} زوج'),
+                if (production.standardGramPerPair != null)
+                  _Row('معيار الإنتاج', '${production.standardGramPerPair!.toStringAsFixed(0)} جم/زوج'),
+                if (production.actualGramPerPair != null)
+                  _Row('الفعلي', '${production.actualGramPerPair!.toStringAsFixed(0)} جم/زوج'),
+                if (production.deviationFromStandardPct != null) ...[
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Row(
+                      children: [
+                        const Text('الانحراف:',
+                            style: TextStyle(
+                                fontSize: 13, color: Colors.grey)),
+                        const Spacer(),
+                        _WasteBadge(
+                          deviation: production.deviationFromStandardPct!,
+                          indicator: production.wasteIndicatorStr,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 if (production.notes != null && production.notes!.isNotEmpty)
                   _Row('ملاحظات', production.notes!),
                 if (production.productionImageUrl != null) ...[
@@ -369,6 +397,38 @@ class _ProductionCard extends StatelessWidget {
     );
   }
 }
+
+// ── Waste Indicator Badge ──────────────────────────────────────────────────────
+
+class _WasteBadge extends StatelessWidget {
+  final double deviation;
+  final String? indicator;
+
+  const _WasteBadge({required this.deviation, required this.indicator});
+
+  @override
+  Widget build(BuildContext context) {
+    final ind = wasteIndicatorFromString(indicator);
+    final color = Color(ind.colorValue);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withOpacity(0.35)),
+      ),
+      child: Text(
+        deviation <= 0
+            ? '✓ ضمن المعيار'
+            : '+${deviation.toStringAsFixed(1)}% — ${ind.label}',
+        style:
+            TextStyle(color: color, fontWeight: FontWeight.w600, fontSize: 12),
+      ),
+    );
+  }
+}
+
+// ── Simple label–value row ─────────────────────────────────────────────────────
 
 class _Row extends StatelessWidget {
   final String label;

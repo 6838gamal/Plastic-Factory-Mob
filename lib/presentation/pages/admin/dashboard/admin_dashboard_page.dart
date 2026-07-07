@@ -398,6 +398,8 @@ class _QuickActions extends StatelessWidget {
       {'icon': Icons.blender, 'label': 'الطبخات', 'route': '/admin/batches', 'color': Colors.teal},
       {'icon': Icons.precision_manufacturing, 'label': 'الإنتاج', 'route': '/admin/production', 'color': Colors.orange},
       {'icon': Icons.bar_chart, 'label': 'التقارير', 'route': '/admin/reports', 'color': Colors.purple},
+      {'icon': Icons.straighten, 'label': 'معايير الإنتاج', 'route': '/admin/production-standards', 'color': Colors.indigo},
+      {'icon': Icons.analytics_outlined, 'label': 'مراقبة الهدر', 'route': '/admin/waste-monitoring', 'color': Colors.deepOrange},
     ];
 
     return GridView.count(

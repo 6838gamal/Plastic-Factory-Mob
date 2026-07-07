@@ -7,6 +7,7 @@ import '../../providers/batch_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../data/models/reference_models.dart';
+import '../../../data/models/production_standard_model.dart';
 import '../../../data/datasources/api_datasource.dart';
 
 class MachineEntryPage extends ConsumerStatefulWidget {
@@ -24,9 +25,11 @@ class _MachineEntryPageState extends ConsumerState<MachineEntryPage> {
   final _wasteQtyCtrl = TextEditingController();
   final _stopTimeCtrl = TextEditingController();
   final _notesCtrl = TextEditingController();
+  final _pairsCtrl = TextEditingController();
 
   MachineModel? _selectedMachine;
   ProductModel? _selectedProduct;
+  ProductionStandardModel? _selectedStandard;
   File? _productionImage;
 
   // Recent batch numbers for autocomplete
@@ -36,6 +39,11 @@ class _MachineEntryPageState extends ConsumerState<MachineEntryPage> {
   @override
   void initState() {
     super.initState();
+    // Listen to quantity fields to refresh waste indicator live
+    _producedQtyCtrl.addListener(() => setState(() {}));
+    _scrapQtyCtrl.addListener(() => setState(() {}));
+    _wasteQtyCtrl.addListener(() => setState(() {}));
+    _pairsCtrl.addListener(() => setState(() {}));
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadRecentBatchNumbers());
   }
 
@@ -59,7 +67,43 @@ class _MachineEntryPageState extends ConsumerState<MachineEntryPage> {
     _wasteQtyCtrl.dispose();
     _stopTimeCtrl.dispose();
     _notesCtrl.dispose();
+    _pairsCtrl.dispose();
     super.dispose();
+  }
+
+  // ── Yield stats (computed live from form values) ─────────────────
+  YieldStats? get _yieldStats {
+    final pairs = int.tryParse(_pairsCtrl.text.trim()) ?? 0;
+    if (pairs <= 0 || _selectedStandard == null) return null;
+    final totalKg = (double.tryParse(_producedQtyCtrl.text) ?? 0) +
+        (double.tryParse(_scrapQtyCtrl.text) ?? 0) +
+        (double.tryParse(_wasteQtyCtrl.text) ?? 0);
+    if (totalKg <= 0) return null;
+    final actualGram = (totalKg * 1000) / pairs;
+    final standardGram = _selectedStandard!.standardGramPerPair;
+    final deviation = ((actualGram - standardGram) / standardGram) * 100;
+    return YieldStats(
+      actualGramPerPair: actualGram,
+      standardGramPerPair: standardGram,
+      deviationPct: deviation,
+      indicator: wasteIndicatorFromDeviation(deviation),
+    );
+  }
+
+  // ── Auto-match standard when product is selected ─────────────────
+  void _onProductSelected(ProductModel? product) {
+    setState(() {
+      _selectedProduct = product;
+      _selectedStandard = null;
+    });
+    if (product == null) return;
+    // Try to find a matching standard by product name
+    final standards = ref.read(productionStandardsProvider).value ?? [];
+    final match = standards.where((s) =>
+        s.productName.toLowerCase() == product.name.toLowerCase()).firstOrNull;
+    if (match != null && mounted) {
+      setState(() => _selectedStandard = match);
+    }
   }
 
   Future<void> _pickImage() async {
@@ -103,6 +147,8 @@ class _MachineEntryPageState extends ConsumerState<MachineEntryPage> {
       'notes': _notesCtrl.text.trim(),
       'production_image_url': imageUrl,
       'recorded_at': DateTime.now().toIso8601String(),
+      'standard_id': _selectedStandard?.id,
+      'pairs_produced': int.tryParse(_pairsCtrl.text.trim()) ?? 0,
     };
 
     final result = await ref.read(batchOperationsProvider.notifier).saveProduction(data);
@@ -131,9 +177,11 @@ class _MachineEntryPageState extends ConsumerState<MachineEntryPage> {
     _wasteQtyCtrl.clear();
     _stopTimeCtrl.clear();
     _notesCtrl.clear();
+    _pairsCtrl.clear();
     setState(() {
       _selectedMachine = null;
       _selectedProduct = null;
+      _selectedStandard = null;
       _productionImage = null;
     });
     _loadRecentBatchNumbers();
@@ -143,7 +191,9 @@ class _MachineEntryPageState extends ConsumerState<MachineEntryPage> {
   Widget build(BuildContext context) {
     final machines = ref.watch(machinesProvider);
     final products = ref.watch(productsProvider);
+    final standards = ref.watch(productionStandardsProvider);
     final opsState = ref.watch(batchOperationsProvider);
+    final stats = _yieldStats;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -155,7 +205,7 @@ class _MachineEntryPageState extends ConsumerState<MachineEntryPage> {
             _buildSection('بيانات الإنتاج', Icons.precision_manufacturing),
             const SizedBox(height: 12),
 
-            // ── Batch Number — autocomplete from saved batches ───────────
+            // ── Batch Number ─────────────────────────────────────────
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -175,7 +225,6 @@ class _MachineEntryPageState extends ConsumerState<MachineEntryPage> {
                     setState(() => _batchNumberCtrl.text = value);
                   },
                   fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
-                    // Sync our controller text to autocomplete's controller
                     controller.text = _batchNumberCtrl.text;
                     controller.addListener(() {
                       _batchNumberCtrl.text = controller.text;
@@ -236,7 +285,7 @@ class _MachineEntryPageState extends ConsumerState<MachineEntryPage> {
             ),
             const SizedBox(height: 12),
 
-            // ── Machine dropdown ─────────────────────────────────────────
+            // ── Machine ──────────────────────────────────────────────
             machines.when(
               data: (list) => DropdownButtonFormField<MachineModel>(
                 value: _selectedMachine,
@@ -251,18 +300,54 @@ class _MachineEntryPageState extends ConsumerState<MachineEntryPage> {
             ),
             const SizedBox(height: 12),
 
-            // ── Product dropdown ─────────────────────────────────────────
+            // ── Product ──────────────────────────────────────────────
             products.when(
               data: (list) => DropdownButtonFormField<ProductModel>(
                 value: _selectedProduct,
                 decoration: const InputDecoration(labelText: '${AppStrings.product} *'),
                 isExpanded: true,
                 items: list.map((p) => DropdownMenuItem(value: p, child: Text(p.name))).toList(),
-                onChanged: (v) => setState(() => _selectedProduct = v),
+                onChanged: _onProductSelected,
                 validator: (v) => v == null ? 'المنتج مطلوب' : null,
               ),
               loading: () => const LinearProgressIndicator(),
               error: (e, _) => Text('خطأ: $e'),
+            ),
+            const SizedBox(height: 12),
+
+            // ── Production Standard (optional) ───────────────────────
+            standards.when(
+              data: (list) {
+                if (list.isEmpty) return const SizedBox.shrink();
+                return DropdownButtonFormField<ProductionStandardModel>(
+                  value: _selectedStandard,
+                  decoration: InputDecoration(
+                    labelText: 'معيار الإنتاج (اختياري)',
+                    prefixIcon: const Icon(Icons.straighten, color: Colors.indigo),
+                    helperText: _selectedStandard != null
+                        ? 'المعيار: ${_selectedStandard!.standardGramPerPair.toStringAsFixed(0)} جرام/زوج'
+                        : 'اختر معيار لحساب مؤشر الهدر',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  isExpanded: true,
+                  items: [
+                    const DropdownMenuItem<ProductionStandardModel>(
+                      value: null,
+                      child: Text('بدون معيار'),
+                    ),
+                    ...list.map((s) => DropdownMenuItem(
+                          value: s,
+                          child: Text(
+                              '${s.productName} — ${s.standardGramPerPair.toStringAsFixed(0)} جم/زوج'),
+                        )),
+                  ],
+                  onChanged: (v) => setState(() => _selectedStandard = v),
+                );
+              },
+              loading: () => const SizedBox.shrink(),
+              error: (_, __) => const SizedBox.shrink(),
             ),
             const SizedBox(height: 20),
 
@@ -273,7 +358,48 @@ class _MachineEntryPageState extends ConsumerState<MachineEntryPage> {
             _buildQuantityRow(AppStrings.scrap, _scrapQtyCtrl),
             _buildQuantityRow(AppStrings.waste, _wasteQtyCtrl),
 
-            const SizedBox(height: 12),
+            // ── Pairs Produced ───────────────────────────────────────
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: TextFormField(
+                controller: _pairsCtrl,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'عدد الأزواج المنتجة',
+                  prefixIcon: Icon(Icons.people_outline),
+                  suffixText: 'زوج',
+                  helperText: 'أدخل العدد لحساب مؤشر الهدر',
+                ),
+              ),
+            ),
+
+            // ── Waste Indicator (live) ───────────────────────────────
+            if (stats != null) ...[
+              _WasteIndicatorCard(stats: stats),
+              const SizedBox(height: 12),
+            ] else if (_selectedStandard != null) ...[
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey.shade300),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline, color: Colors.grey.shade500, size: 18),
+                    const SizedBox(width: 8),
+                    Text(
+                      'أدخل الكميات وعدد الأزواج لحساب مؤشر الهدر',
+                      style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
+
+            const SizedBox(height: 4),
             TextFormField(
               controller: _stopTimeCtrl,
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -284,7 +410,7 @@ class _MachineEntryPageState extends ConsumerState<MachineEntryPage> {
             ),
             const SizedBox(height: 12),
 
-            // ── Production image ─────────────────────────────────────────
+            // ── Production image ─────────────────────────────────────
             _buildSection('صورة الإنتاج', Icons.camera_alt_outlined),
             const SizedBox(height: 8),
             InkWell(
@@ -323,7 +449,7 @@ class _MachineEntryPageState extends ConsumerState<MachineEntryPage> {
             ),
             const SizedBox(height: 24),
 
-            // ── Submit ───────────────────────────────────────────────────
+            // ── Submit ───────────────────────────────────────────────
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
@@ -372,6 +498,127 @@ class _MachineEntryPageState extends ConsumerState<MachineEntryPage> {
             ? (v) => (v == null || v.trim().isEmpty) ? '$label مطلوب' : null
             : null,
       ),
+    );
+  }
+}
+
+// ── Waste Indicator Card ───────────────────────────────────────────────────────
+
+class _WasteIndicatorCard extends StatelessWidget {
+  final YieldStats stats;
+  const _WasteIndicatorCard({required this.stats});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = Color(stats.indicator.colorValue);
+    final deviation = stats.deviationPct;
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.4), width: 1.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(_indicatorIcon(stats.indicator), color: color, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                'مؤشر الهدر — ${stats.indicator.label}',
+                style: TextStyle(
+                    color: color,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14),
+              ),
+              const Spacer(),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  deviation <= 0
+                      ? '✓ ضمن المعيار'
+                      : '+${deviation.toStringAsFixed(1)}%',
+                  style: TextStyle(
+                      color: color,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: _StatItem(
+                  label: 'المعيار',
+                  value:
+                      '${stats.standardGramPerPair.toStringAsFixed(0)} جم/زوج',
+                  color: Colors.grey.shade700,
+                ),
+              ),
+              Expanded(
+                child: _StatItem(
+                  label: 'الفعلي',
+                  value:
+                      '${stats.actualGramPerPair.toStringAsFixed(0)} جم/زوج',
+                  color: color,
+                ),
+              ),
+              Expanded(
+                child: _StatItem(
+                  label: 'الفرق',
+                  value:
+                      '${(stats.actualGramPerPair - stats.standardGramPerPair).toStringAsFixed(0)} جم',
+                  color: color,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  IconData _indicatorIcon(WasteIndicator ind) {
+    switch (ind) {
+      case WasteIndicator.normal:
+        return Icons.check_circle_outline;
+      case WasteIndicator.warning:
+        return Icons.warning_amber_outlined;
+      case WasteIndicator.critical:
+        return Icons.error_outline;
+    }
+  }
+}
+
+class _StatItem extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color color;
+
+  const _StatItem(
+      {required this.label, required this.value, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Text(label,
+            style: const TextStyle(fontSize: 11, color: Colors.grey)),
+        const SizedBox(height: 2),
+        Text(value,
+            style: TextStyle(
+                fontWeight: FontWeight.bold, color: color, fontSize: 13)),
+      ],
     );
   }
 }

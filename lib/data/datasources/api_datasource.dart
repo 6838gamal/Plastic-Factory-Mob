@@ -776,6 +776,56 @@ class ApiDataSource {
     }
   }
 
+  // ==================== PRODUCTION STANDARDS ====================
+  Future<List<Map<String, dynamic>>> getProductionStandards({bool activeOnly = false}) async {
+    final res = await _get('/api/production-standards',
+        query: {'active_only': activeOnly ? 'true' : 'false'});
+    return (res as List).cast<Map<String, dynamic>>();
+  }
+
+  Future<Map<String, dynamic>?> getProductionStandardByProduct(String productName) async {
+    try {
+      final res = await _get('/api/production-standards/by-product',
+          query: {'name': productName});
+      if (res == null) return null;
+      return res as Map<String, dynamic>;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<Map<String, dynamic>> createProductionStandard(Map<String, dynamic> data) async {
+    final res = await _post('/api/production-standards', data);
+    return res as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> updateProductionStandard(
+      String id, Map<String, dynamic> data) async {
+    final res = await _put('/api/production-standards/$id', data);
+    return res as Map<String, dynamic>;
+  }
+
+  Future<void> deleteProductionStandard(String id) async {
+    await _delete('/api/production-standards/$id');
+  }
+
+  // ==================== WASTE MONITORING ====================
+  Future<Map<String, dynamic>> getWasteMonitoringDashboard({
+    DateTime? from,
+    DateTime? to,
+  }) async {
+    final res = await _get('/api/waste-monitoring/dashboard', query: {
+      'from': from?.toIso8601String().split('T').first,
+      'to': to?.toIso8601String().split('T').first,
+    });
+    return res as Map<String, dynamic>;
+  }
+
+  Future<List<Map<String, dynamic>>> getWasteMonitoringTrend({int days = 7}) async {
+    final res = await _get('/api/waste-monitoring/trend', query: {'days': '$days'});
+    return (res as List).cast<Map<String, dynamic>>();
+  }
+
   // ==================== HEALTH ====================
   Future<bool> isHealthy() async {
     try {

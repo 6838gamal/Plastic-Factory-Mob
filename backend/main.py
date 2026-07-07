@@ -237,6 +237,24 @@ async def _init_db():
         )
     """)
 
+    # ── Production Standards table ─────────────────────────────────────
+    await pool.execute("""
+        CREATE TABLE IF NOT EXISTS production_standards (
+            id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            product_name    VARCHAR(200) NOT NULL,
+            product_code    VARCHAR(50),
+            standard_gram_per_pair DECIMAL(10,3) NOT NULL,
+            is_active       BOOLEAN NOT NULL DEFAULT TRUE,
+            notes           TEXT,
+            created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+    """)
+    await pool.execute(
+        "CREATE INDEX IF NOT EXISTS idx_production_standards_active "
+        "ON production_standards (is_active, product_name)"
+    )
+
     _col_migrations = [
         "ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS role VARCHAR(50) NOT NULL DEFAULT 'admin'",
         "ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS name VARCHAR(200)",
@@ -264,6 +282,13 @@ async def _init_db():
         "ALTER TABLE stock_take_items ADD COLUMN IF NOT EXISTS counted_at TIMESTAMPTZ",
         # stock_take_sessions: closed_at timestamp for when session was closed
         "ALTER TABLE stock_take_sessions ADD COLUMN IF NOT EXISTS closed_at TIMESTAMPTZ",
+        # machine_production: yield standard fields
+        "ALTER TABLE machine_production ADD COLUMN IF NOT EXISTS standard_id VARCHAR(100)",
+        "ALTER TABLE machine_production ADD COLUMN IF NOT EXISTS pairs_produced INTEGER DEFAULT 0",
+        "ALTER TABLE machine_production ADD COLUMN IF NOT EXISTS actual_gram_per_pair DECIMAL(10,3)",
+        "ALTER TABLE machine_production ADD COLUMN IF NOT EXISTS standard_gram_per_pair DECIMAL(10,3)",
+        "ALTER TABLE machine_production ADD COLUMN IF NOT EXISTS deviation_from_standard_pct DECIMAL(10,3)",
+        "ALTER TABLE machine_production ADD COLUMN IF NOT EXISTS waste_indicator VARCHAR(20)",
         # receipt_vouchers: per-step tracking for audit trail
         "ALTER TABLE receipt_vouchers ADD COLUMN IF NOT EXISTS submitted_by VARCHAR(200)",
         "ALTER TABLE receipt_vouchers ADD COLUMN IF NOT EXISTS submitted_at TIMESTAMPTZ",
@@ -489,6 +514,7 @@ from routers import (
 from routers import stock_take, recipes, shift_handover, sms
 from routers import vouchers
 from routers import suppliers
+from routers import production_standards, waste_monitoring
 
 
 @asynccontextmanager
@@ -591,6 +617,8 @@ app.include_router(shift_handover.router)
 app.include_router(sms.router)
 app.include_router(vouchers.router)
 app.include_router(suppliers.router)
+app.include_router(production_standards.router)
+app.include_router(waste_monitoring.router)
 
 
 # ─── Health & System Info ─────────────────────────────────────────────────────
