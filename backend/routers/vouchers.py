@@ -130,7 +130,19 @@ async def list_receipt_vouchers(status: Optional[str] = Query(None)):
     rows = await pool.fetch(
         """SELECT rv.*, COUNT(ri.id)::int AS item_count,
                   COALESCE(array_agg(ri.material_name ORDER BY ri.created_at)
-                           FILTER (WHERE ri.id IS NOT NULL), ARRAY[]::text[]) AS item_names
+                           FILTER (WHERE ri.id IS NOT NULL), ARRAY[]::text[]) AS item_names,
+                  COALESCE(
+                    json_agg(
+                      json_build_object(
+                        'id', ri.id::text,
+                        'material_id', ri.material_id::text,
+                        'material_name', ri.material_name,
+                        'unit', ri.unit,
+                        'requested_qty', ri.quantity
+                      ) ORDER BY ri.created_at
+                    ) FILTER (WHERE ri.id IS NOT NULL),
+                    '[]'::json
+                  ) AS items
            FROM receipt_vouchers rv
            LEFT JOIN receipt_voucher_items ri ON ri.voucher_id = rv.id
            WHERE ($1::text IS NULL OR rv.status = $1)

@@ -15,9 +15,14 @@ final _receiptVouchersProvider = FutureProvider.autoDispose<List<Map<String, dyn
   return ds.getReceiptVouchers();
 });
 
-final _transferVouchersProvider = FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
+final transferVouchersProvider = FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
   final ds = ref.read(dataSourceProvider);
   return ds.getTransferVouchers();
+});
+
+final _approvedReceiptsProvider = FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
+  final ds = ref.read(dataSourceProvider);
+  return ds.getReceiptVouchers(status: 'approved');
 });
 
 final _summaryProvider = FutureProvider.autoDispose<List<InventorySummaryModel>>((ref) async {
@@ -51,8 +56,8 @@ class _WarehouseManagerPageState extends ConsumerState<WarehouseManagerPage>
   @override
   void initState() {
     super.initState();
-    // Keepers see 3 tabs (no Transfer tab); admins see 4
-    _tabs = TabController(length: widget.keeperName == null ? 4 : 3, vsync: this);
+    // Keepers see 4 tabs (+ incoming receipt); admins see 3 (transfers live in mixing-warehouse)
+    _tabs = TabController(length: widget.keeperName == null ? 3 : 4, vsync: this);
     _tabs.addListener(() => setState(() {}));
   }
 
@@ -65,31 +70,32 @@ class _WarehouseManagerPageState extends ConsumerState<WarehouseManagerPage>
   @override
   Widget build(BuildContext context) {
     final isKeeper = widget.keeperName != null;
-    // Suppliers tab is index 3 for admin, index 2 for keeper
-    final suppliersIndex = isKeeper ? 2 : 3;
+    // Admin: 3 tabs (Receipts, Withdrawals, Suppliers) — transfers live in mixing-warehouse page
+    // Keeper: 4 tabs (استلام وارد, Receipts, Withdrawals, Suppliers)
+    final suppliersIndex = isKeeper ? 3 : 2;
 
     final tabs = isKeeper
         ? const [
+            Tab(icon: Icon(Icons.inbox_outlined), text: 'استلام وارد'),
             Tab(icon: Icon(Icons.download_outlined), text: 'سندات الاستلام'),
             Tab(icon: Icon(Icons.remove_circle_outline), text: 'سندات السحب'),
             Tab(icon: Icon(Icons.business_outlined), text: 'الموردون'),
           ]
         : const [
             Tab(icon: Icon(Icons.download_outlined), text: 'سندات الاستلام'),
-            Tab(icon: Icon(Icons.swap_horiz_outlined), text: 'سندات التحويل'),
             Tab(icon: Icon(Icons.remove_circle_outline), text: 'سندات السحب'),
             Tab(icon: Icon(Icons.business_outlined), text: 'الموردون'),
           ];
 
     final tabViews = isKeeper
         ? <Widget>[
+            const _IncomingReceiptTab(),
             _ReceiptTab(isAdmin: false),
             _WithdrawalTab(isAdmin: false, keeperName: widget.keeperName),
             const SuppliersPage(),
           ]
         : <Widget>[
             const _ReceiptTab(isAdmin: true),
-            const _TransferTab(),
             _WithdrawalTab(isAdmin: true, keeperName: null),
             const SuppliersPage(),
           ];
@@ -108,24 +114,26 @@ class _WarehouseManagerPageState extends ConsumerState<WarehouseManagerPage>
           ),
         ],
       ),
-      floatingActionButton: _tabs.index == suppliersIndex
+      // Hide FAB on: suppliers tab (both roles), incoming-receipt tab (keeper tab 0)
+      floatingActionButton: (_tabs.index == suppliersIndex || (isKeeper && _tabs.index == 0))
           ? null
           : FloatingActionButton.extended(
               onPressed: () {
-                if (_tabs.index == 0) {
-                  _showCreateReceiptDialog(context);
-                } else if (!isKeeper && _tabs.index == 1) {
-                  _showCreateTransferDialog(context);
-                } else {
-                  _showCreateWithdrawalDialog(context);
-                }
-              },
-              icon: const Icon(Icons.add),
-              label: Text(_tabs.index == 0
-                  ? 'سند استلام جديد'
-                  : (!isKeeper && _tabs.index == 1)
-                      ? 'سند تحويل جديد'
-                      : 'سند سحب جديد'),
+                // Keeper: tab 0=incoming(no FAB handled above), 1=receipts, 2=withdrawals, 3=suppliers
+              // Admin:  tab 0=receipts, 1=withdrawals, 2=suppliers
+              if (isKeeper) {
+                if (_tabs.index == 1) _showCreateReceiptDialog(context);
+                else _showCreateWithdrawalDialog(context);
+              } else {
+                if (_tabs.index == 0) _showCreateReceiptDialog(context);
+                else _showCreateWithdrawalDialog(context);
+              }
+            },
+            icon: const Icon(Icons.add),
+            label: Text(() {
+              if (isKeeper) return _tabs.index == 1 ? 'سند استلام جديد' : 'سند سحب جديد';
+              return _tabs.index == 0 ? 'سند استلام جديد' : 'سند سحب جديد';
+            }()),
             ),
     );
   }
@@ -146,10 +154,10 @@ class _WarehouseManagerPageState extends ConsumerState<WarehouseManagerPage>
     showDialog(
       context: context,
       useSafeArea: false,
-      builder: (_) => _TransferVoucherDialog(
+      builder: (_) => TransferVoucherDialog(
         keeperName: widget.keeperName,
         onSaved: () {
-          ref.invalidate(_transferVouchersProvider);
+          ref.invalidate(transferVouchersProvider);
         },
       ),
     );
@@ -214,6 +222,94 @@ class _ReceiptTab extends ConsumerWidget {
               isAdmin: isAdmin,
               onAction: () => ref.invalidate(_receiptVouchersProvider),
             ),
+          );
+        },
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => Center(child: Text('خطأ: ${Helpers.friendlyError(e)}')),
+      ),
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════
+// Incoming Receipt Tab (keeper) — shows approved vouchers ready to post
+// ══════════════════════════════════════════════════════════════════
+
+class _IncomingReceiptTab extends ConsumerWidget {
+  const _IncomingReceiptTab();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final vouchers = ref.watch(_approvedReceiptsProvider);
+
+    return RefreshIndicator(
+      onRefresh: () async => ref.invalidate(_approvedReceiptsProvider),
+      child: vouchers.when(
+        data: (list) {
+          if (list.isEmpty) {
+            return const Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.inbox_outlined, size: 64, color: Colors.grey),
+                  SizedBox(height: 12),
+                  Text('لا توجد سندات بانتظار الاستلام',
+                      style: TextStyle(color: Colors.grey, fontSize: 15)),
+                  SizedBox(height: 6),
+                  Text(
+                    'عندما تُوافق الإدارة على سند استلام\nسيظهر هنا لتقوم بترحيله للمخزن',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.grey, fontSize: 12),
+                  ),
+                ],
+              ),
+            );
+          }
+
+          return Column(
+            children: [
+              // ── Banner ──────────────────────────────────────
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                color: Colors.teal.shade50,
+                child: Row(
+                  children: [
+                    const Icon(Icons.info_outlined, size: 16, color: Colors.teal),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'هذه السندات وافقت عليها الإدارة — اضغط "ترحيل للمخزن" لإضافة المواد للمخزن الرئيسي',
+                        style: TextStyle(color: Colors.teal.shade800, fontSize: 12),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: Colors.teal,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        '${list.length}',
+                        style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // ── List ────────────────────────────────────────
+              Expanded(
+                child: ListView.builder(
+                  padding: const EdgeInsets.all(12),
+                  itemCount: list.length,
+                  itemBuilder: (_, i) => _ReceiptVoucherCard(
+                    voucher: ReceiptVoucherModel.fromJson(list[i]),
+                    isAdmin: false,
+                    onAction: () => ref.invalidate(_approvedReceiptsProvider),
+                  ),
+                ),
+              ),
+            ],
           );
         },
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -317,26 +413,57 @@ class _ReceiptVoucherCard extends ConsumerWidget {
               ]),
             ],
 
-            // ── Material names chips ─────────────────────────────
-            if (voucher.itemNames.isNotEmpty) ...[
+            // ── Item details (name + qty + unit per row) ─────────
+            if (voucher.items.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.teal.shade50,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: Colors.teal.shade100),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('البنود (${voucher.items.length} صنف)',
+                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.teal.shade700)),
+                    const SizedBox(height: 4),
+                    ...voucher.items.map((item) => Padding(
+                      padding: const EdgeInsets.only(top: 3),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.fiber_manual_record, size: 6, color: Colors.teal),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(item.materialName,
+                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+                          ),
+                          Text(
+                            '${item.requestedQty % 1 == 0 ? item.requestedQty.toInt() : item.requestedQty} ${item.unit}',
+                            style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+                          ),
+                        ],
+                      ),
+                    )),
+                  ],
+                ),
+              ),
+            ] else if (voucher.itemNames.isNotEmpty) ...[
               const SizedBox(height: 6),
               Wrap(
                 spacing: 4,
                 runSpacing: 4,
                 children: voucher.itemNames
                     .map((name) => Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 3),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
                             color: Colors.teal.shade50,
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                                color: Colors.teal.shade200, width: 0.8),
+                            border: Border.all(color: Colors.teal.shade200, width: 0.8),
                           ),
                           child: Text(name,
-                              style: TextStyle(
-                                  fontSize: 11,
-                                  color: Colors.teal.shade800)),
+                              style: TextStyle(fontSize: 11, color: Colors.teal.shade800)),
                         ))
                     .toList(),
               ),
@@ -449,24 +576,41 @@ class _ReceiptVoucherCard extends ConsumerWidget {
       if (status == 'approved') {
         return [
           const Divider(height: 16),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: Colors.teal.shade50,
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: const Row(
-              children: [
-                Icon(Icons.inventory_2_outlined, size: 13, color: Colors.teal),
-                SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    'تم القبول — في انتظار الاستلام في المخزن الرئيسي',
-                    style: TextStyle(color: Colors.teal, fontSize: 11),
+          Row(
+            children: [
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.teal.shade50,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.inventory_2_outlined, size: 13, color: Colors.teal),
+                      SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          'مقبول — جاهز للاستلام في المخزن',
+                          style: TextStyle(color: Colors.teal, fontSize: 11),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(width: 8),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green,
+                  foregroundColor: Colors.white,
+                  visualDensity: VisualDensity.compact,
+                ),
+                icon: const Icon(Icons.warehouse_outlined, size: 15),
+                label: const Text('ترحيل للمخزن', style: TextStyle(fontSize: 12)),
+                onPressed: () => _postVoucher(context, ref),
+              ),
+            ],
           ),
         ];
       }
@@ -876,15 +1020,15 @@ class _AuditEvent {
 // Transfer Tab
 // ══════════════════════════════════════════════════════════════════
 
-class _TransferTab extends ConsumerWidget {
-  const _TransferTab();
+class TransferTab extends ConsumerWidget {
+  const TransferTab();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final vouchers = ref.watch(_transferVouchersProvider);
+    final vouchers = ref.watch(transferVouchersProvider);
 
     return RefreshIndicator(
-      onRefresh: () async => ref.invalidate(_transferVouchersProvider),
+      onRefresh: () async => ref.invalidate(transferVouchersProvider),
       child: vouchers.when(
         data: (list) {
           if (list.isEmpty) {
@@ -904,7 +1048,7 @@ class _TransferTab extends ConsumerWidget {
             itemCount: list.length,
             itemBuilder: (_, i) => TransferVoucherCard(
               voucher: TransferVoucherModel.fromJson(list[i]),
-              onAction: () => ref.invalidate(_transferVouchersProvider),
+              onAction: () => ref.invalidate(transferVouchersProvider),
               role: 'manager',
             ),
           );
@@ -1023,7 +1167,7 @@ class TransferVoucherCard extends ConsumerWidget {
                       onPressed: () => showDialog(
                         context: context,
                         useSafeArea: false,
-                        builder: (_) => _TransferVoucherDialog(
+                        builder: (_) => TransferVoucherDialog(
                           voucherId: voucher.id,
                           onSaved: onAction,
                         ),
@@ -1517,17 +1661,17 @@ class _ReceiptVoucherDialogState extends ConsumerState<_ReceiptVoucherDialog> {
 // Transfer Voucher Dialog
 // ══════════════════════════════════════════════════════════════════
 
-class _TransferVoucherDialog extends ConsumerStatefulWidget {
+class TransferVoucherDialog extends ConsumerStatefulWidget {
   final String? voucherId;
   final String? keeperName;
   final VoidCallback onSaved;
-  const _TransferVoucherDialog({this.voucherId, this.keeperName, required this.onSaved});
+  const TransferVoucherDialog({this.voucherId, this.keeperName, required this.onSaved});
 
   @override
-  ConsumerState<_TransferVoucherDialog> createState() => _TransferVoucherDialogState();
+  ConsumerState<TransferVoucherDialog> createState() => _TransferVoucherDialogState();
 }
 
-class _TransferVoucherDialogState extends ConsumerState<_TransferVoucherDialog> {
+class _TransferVoucherDialogState extends ConsumerState<TransferVoucherDialog> {
   final _notesCtrl = TextEditingController();
   final _items = <_ItemEntry>[];
   bool _loading = false;
@@ -1730,59 +1874,84 @@ class _ItemRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
+    final itemNo = index + 1;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.grey.shade300),
+        borderRadius: BorderRadius.circular(8),
+        color: Colors.grey.shade50,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // ── Header: item number + remove ─────────────────────
+          Row(
+            children: [
+              Text(
+                'البند $itemNo',
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.indigo),
+              ),
+              const Spacer(),
+              InkWell(
+                onTap: onRemove,
+                child: const Icon(Icons.remove_circle_outline, color: Colors.red, size: 20),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          // ── Material dropdown (full width) ───────────────────
+          DropdownButtonFormField<InventorySummaryModel>(
+            value: entry.name.isNotEmpty
+                ? materials
+                    .where((m) =>
+                        (entry.materialId != null && entry.materialId!.isNotEmpty)
+                            ? m.materialId == entry.materialId
+                            : m.materialName == entry.name)
+                    .firstOrNull
+                : null,
+            decoration: const InputDecoration(
+              labelText: 'اسم المادة *',
+              prefixIcon: Icon(Icons.science_outlined, size: 18),
+              isDense: true,
+              border: OutlineInputBorder(),
+            ),
+            hint: const Text('اختر المادة', style: TextStyle(fontSize: 13)),
+            isExpanded: true,
+            items: materials
+                .map((m) => DropdownMenuItem<InventorySummaryModel>(
+                      value: m,
+                      child: Text(
+                        m.materialName,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 13),
+                      ),
+                    ))
+                .toList(),
+            onChanged: (m) {
+              if (m != null) {
+                entry.name = m.materialName;
+                entry.unit = m.unit;
+                entry.materialId = m.materialId;
+                onChanged();
+              }
+            },
+          ),
+          const SizedBox(height: 8),
+          // ── Qty + Unit side by side ──────────────────────────
           Row(
             children: [
               Expanded(
                 flex: 3,
-                child: DropdownButtonFormField<InventorySummaryModel>(
-                  value: entry.name.isNotEmpty
-                      ? materials
-                          .where((m) =>
-                              (entry.materialId != null && entry.materialId!.isNotEmpty)
-                                  ? m.materialId == entry.materialId
-                                  : m.materialName == entry.name)
-                          .firstOrNull
-                      : null,
-                  decoration: const InputDecoration(
-                    labelText: 'اسم المادة',
-                    isDense: true,
-                  ),
-                  hint: const Text('اختر المادة', style: TextStyle(fontSize: 13)),
-                  items: materials
-                      .map((m) => DropdownMenuItem<InventorySummaryModel>(
-                            value: m,
-                            child: Text(
-                              m.materialName,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(fontSize: 13),
-                            ),
-                          ))
-                      .toList(),
-                  onChanged: (m) {
-                    if (m != null) {
-                      entry.name = m.materialName;
-                      entry.unit = m.unit;
-                      entry.materialId = m.materialId;
-                      onChanged();
-                    }
-                  },
-                ),
-              ),
-              const SizedBox(width: 8),
-              SizedBox(
-                width: 80,
                 child: TextFormField(
                   initialValue: entry.qty > 0 ? entry.qty.toString() : '',
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: InputDecoration(
-                    labelText: 'الكمية',
-                    suffixText: entry.unit,
+                  decoration: const InputDecoration(
+                    labelText: 'الكمية *',
                     isDense: true,
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.scale_outlined, size: 18),
                   ),
                   onChanged: (v) {
                     entry.qty = double.tryParse(v) ?? 0;
@@ -1790,24 +1959,24 @@ class _ItemRow extends StatelessWidget {
                   },
                 ),
               ),
-              const SizedBox(width: 4),
-              SizedBox(
-                width: 72,
+              const SizedBox(width: 8),
+              Expanded(
+                flex: 2,
                 child: DropdownButtonFormField<String>(
                   value: entry.unit,
-                  decoration: const InputDecoration(isDense: true, labelText: 'وحدة'),
+                  decoration: const InputDecoration(
+                    isDense: true,
+                    labelText: 'الوحدة',
+                    border: OutlineInputBorder(),
+                  ),
                   items: AppConstants.units
-                      .map((u) => DropdownMenuItem(value: u, child: Text(u, style: const TextStyle(fontSize: 12))))
+                      .map((u) => DropdownMenuItem(value: u, child: Text(u, style: const TextStyle(fontSize: 13))))
                       .toList(),
                   onChanged: (v) {
                     if (v != null) entry.unit = v;
                     onChanged();
                   },
                 ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.remove_circle_outline, color: Colors.red, size: 20),
-                onPressed: onRemove,
               ),
             ],
           ),

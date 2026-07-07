@@ -4,7 +4,8 @@ import '../../../../data/datasources/api_datasource.dart';
 import '../../../../data/models/voucher_models.dart';
 import '../../../../core/utils/helpers.dart';
 import '../../../providers/auth_provider.dart' show dataSourceProvider;
-import 'warehouse_manager_page.dart' show TransferVoucherCard, StatusBadge;
+import 'warehouse_manager_page.dart'
+    show TransferVoucherCard, StatusBadge, TransferTab, TransferVoucherDialog, transferVouchersProvider;
 
 // ── Providers ────────────────────────────────────────────────────
 
@@ -39,7 +40,7 @@ class _MixingWarehousePageState extends ConsumerState<MixingWarehousePage>
   @override
   void initState() {
     super.initState();
-    _tabs = TabController(length: 2, vsync: this);
+    _tabs = TabController(length: 3, vsync: this);
     _tabs.addListener(() => setState(() {}));
   }
 
@@ -58,6 +59,8 @@ class _MixingWarehousePageState extends ConsumerState<MixingWarehousePage>
         children: [
           TabBar(
             controller: _tabs,
+            isScrollable: true,
+            tabAlignment: TabAlignment.start,
             tabs: [
               Tab(
                 child: Row(
@@ -83,6 +86,7 @@ class _MixingWarehousePageState extends ConsumerState<MixingWarehousePage>
                   ],
                 ),
               ),
+              const Tab(icon: Icon(Icons.swap_horiz_outlined), text: 'سندات التحويل'),
               const Tab(icon: Icon(Icons.assignment_return_outlined), text: 'سندات المرتجع'),
             ],
           ),
@@ -91,20 +95,40 @@ class _MixingWarehousePageState extends ConsumerState<MixingWarehousePage>
               controller: _tabs,
               children: const [
                 _PendingTransfersTab(),
+                TransferTab(),
                 _ReturnVouchersTab(),
               ],
             ),
           ),
         ],
       ),
-      floatingActionButton: _tabs.index == 1
-          ? FloatingActionButton.extended(
-              onPressed: () => _showCreateReturnDialog(context),
-              icon: const Icon(Icons.assignment_return_outlined),
-              label: const Text('سند مرتجع جديد'),
-              backgroundColor: Colors.deepOrange,
-            )
-          : null,
+      floatingActionButton: switch (_tabs.index) {
+        1 => FloatingActionButton.extended(
+            onPressed: () => _showCreateTransferDialog(context),
+            icon: const Icon(Icons.swap_horiz_outlined),
+            label: const Text('سند تحويل جديد'),
+            backgroundColor: Colors.blue,
+          ),
+        2 => FloatingActionButton.extended(
+            onPressed: () => _showCreateReturnDialog(context),
+            icon: const Icon(Icons.assignment_return_outlined),
+            label: const Text('سند مرتجع جديد'),
+            backgroundColor: Colors.deepOrange,
+          ),
+        _ => null,
+      },
+    );
+  }
+
+  void _showCreateTransferDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      useSafeArea: false,
+      builder: (_) => TransferVoucherDialog(
+        onSaved: () {
+          ref.invalidate(transferVouchersProvider);
+        },
+      ),
     );
   }
 
