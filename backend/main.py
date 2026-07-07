@@ -262,6 +262,8 @@ async def _init_db():
         "ALTER TABLE recipe_items ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW()",
         # stock_take_items: counted_at timestamp for when item was physically counted
         "ALTER TABLE stock_take_items ADD COLUMN IF NOT EXISTS counted_at TIMESTAMPTZ",
+        # stock_take_sessions: closed_at timestamp for when session was closed
+        "ALTER TABLE stock_take_sessions ADD COLUMN IF NOT EXISTS closed_at TIMESTAMPTZ",
     ]
     for stmt in _col_migrations:
         try:
