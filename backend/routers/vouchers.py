@@ -132,8 +132,8 @@ async def list_receipt_vouchers(status: Optional[str] = Query(None)):
                   COALESCE(array_agg(ri.material_name ORDER BY ri.created_at)
                            FILTER (WHERE ri.id IS NOT NULL), ARRAY[]::text[]) AS item_names,
                   COALESCE(
-                    json_agg(
-                      json_build_object(
+                    jsonb_agg(
+                      jsonb_build_object(
                         'id', ri.id::text,
                         'material_id', ri.material_id::text,
                         'material_name', ri.material_name,
@@ -141,7 +141,7 @@ async def list_receipt_vouchers(status: Optional[str] = Query(None)):
                         'requested_qty', ri.quantity
                       ) ORDER BY ri.created_at
                     ) FILTER (WHERE ri.id IS NOT NULL),
-                    '[]'::json
+                    '[]'::jsonb
                   ) AS items
            FROM receipt_vouchers rv
            LEFT JOIN receipt_voucher_items ri ON ri.voucher_id = rv.id
