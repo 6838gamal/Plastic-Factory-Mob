@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../data/datasources/api_datasource.dart';
 import '../../../../data/models/voucher_models.dart';
 import '../../../../data/models/inventory_summary_model.dart';
+import '../../../../data/models/raw_material_model.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../../core/utils/helpers.dart';
 import '../../../../core/constants/app_constants.dart';
@@ -23,6 +24,10 @@ final transferVouchersProvider = FutureProvider.autoDispose<List<Map<String, dyn
 final _approvedReceiptsProvider = FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
   final ds = ref.read(dataSourceProvider);
   return ds.getReceiptVouchers(status: 'approved');
+});
+
+final _rawMaterialsProvider = FutureProvider.autoDispose<List<RawMaterialModel>>((ref) async {
+  return ref.read(dataSourceProvider).getRawMaterials();
 });
 
 final _summaryProvider = FutureProvider.autoDispose<List<InventorySummaryModel>>((ref) async {
@@ -145,6 +150,10 @@ class _WarehouseManagerPageState extends ConsumerState<WarehouseManagerPage>
         keeperName: widget.keeperName,
         onSaved: () {
           ref.invalidate(_receiptVouchersProvider);
+          // For keeper: switch to "سندات الاستلام" tab (index 1) so the new draft is visible
+          if (widget.keeperName != null) {
+            _tabs.animateTo(1);
+          }
         },
       ),
     );
@@ -1506,14 +1515,15 @@ class _ReceiptVoucherDialogState extends ConsumerState<_ReceiptVoucherDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final summaryAsync = ref.watch(_summaryProvider);
+    final rawMatsAsync = ref.watch(_rawMaterialsProvider);
     final suppliersAsync = ref.watch(_suppliersProvider);
-    final materials = summaryAsync.valueOrNull
-            ?.where((m) => m.warehouseType == 'main')
+    final rawMaterials = rawMatsAsync.valueOrNull
+            ?.where((m) => m.isActive)
             .toList() ??
         [];
     final suppliers = suppliersAsync.valueOrNull ?? [];
     final keeperName = widget.keeperName ?? 'أمين المخزن';
+    final matsLoading = rawMatsAsync.isLoading;
 
     return AlertDialog(
       title: Row(children: [
@@ -1629,18 +1639,25 @@ class _ReceiptVoucherDialogState extends ConsumerState<_ReceiptVoucherDialog> {
                 ],
               ),
               const Divider(),
-              ..._items.asMap().entries.map((e) => _ItemRow(
-                    index: e.key,
-                    entry: e.value,
-                    materials: materials,
-                    onRemove: () => _removeItem(e.key),
-                    onChanged: () => setState(() {}),
-                  )),
-              if (_items.isEmpty)
+              if (matsLoading)
                 const Padding(
                   padding: EdgeInsets.symmetric(vertical: 8),
-                  child: Center(child: Text('اضغط "إضافة بند" لإضافة مادة', style: TextStyle(color: Colors.grey))),
-                ),
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              else ...[
+                ..._items.asMap().entries.map((e) => _RawItemRow(
+                      index: e.key,
+                      entry: e.value,
+                      rawMaterials: rawMaterials,
+                      onRemove: () => _removeItem(e.key),
+                      onChanged: () => setState(() {}),
+                    )),
+                if (_items.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 8),
+                    child: Center(child: Text('اضغط "إضافة بند" لإضافة مادة', style: TextStyle(color: Colors.grey))),
+                  ),
+              ],
             ],
           ),
         ),
