@@ -456,41 +456,29 @@ class _ReceiptVoucherCard extends ConsumerWidget {
               ]),
             ],
 
-            // ── Item details (name + qty + unit per row) ─────────
+            // ── Items as chips (name + qty) ───────────────────────
             if (voucher.items.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                decoration: BoxDecoration(
-                  color: Colors.teal.shade50,
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: Colors.teal.shade100),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('البنود (${voucher.items.length} صنف)',
-                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.teal.shade700)),
-                    const SizedBox(height: 4),
-                    ...voucher.items.map((item) => Padding(
-                      padding: const EdgeInsets.only(top: 3),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.fiber_manual_record, size: 6, color: Colors.teal),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: Text(item.materialName,
-                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
-                          ),
-                          Text(
-                            '${item.requestedQty % 1 == 0 ? item.requestedQty.toInt() : item.requestedQty} ${item.unit}',
-                            style: TextStyle(fontSize: 12, color: Colors.grey[700]),
-                          ),
-                        ],
-                      ),
-                    )),
-                  ],
-                ),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 4,
+                runSpacing: 4,
+                children: voucher.items.map((item) {
+                  final qty = item.requestedQty % 1 == 0
+                      ? item.requestedQty.toInt().toString()
+                      : item.requestedQty.toString();
+                  return Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.shade50,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.blue.shade200, width: 0.8),
+                    ),
+                    child: Text(
+                      '${item.materialName}  $qty ${item.unit}',
+                      style: TextStyle(fontSize: 11, color: Colors.blue.shade800),
+                    ),
+                  );
+                }).toList(),
               ),
             ] else if (voucher.itemNames.isNotEmpty) ...[
               const SizedBox(height: 6),
@@ -501,12 +489,12 @@ class _ReceiptVoucherCard extends ConsumerWidget {
                     .map((name) => Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
-                            color: Colors.teal.shade50,
+                            color: Colors.blue.shade50,
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.teal.shade200, width: 0.8),
+                            border: Border.all(color: Colors.blue.shade200, width: 0.8),
                           ),
                           child: Text(name,
-                              style: TextStyle(fontSize: 11, color: Colors.teal.shade800)),
+                              style: TextStyle(fontSize: 11, color: Colors.blue.shade800)),
                         ))
                     .toList(),
               ),
