@@ -90,7 +90,7 @@ async def create_session(body: SessionCreate):
     # Audit log
     await pool.execute("""
         INSERT INTO audit_log (table_name, record_id, action, description, created_at)
-        VALUES ('stock_take_sessions', $1::text, 'create',
+        VALUES ('stock_take_sessions', $1::uuid, 'create',
                 $2, $3)
     """, str(session_id), f"بدء جرد دوري: {body.session_name}", now)
 
@@ -221,7 +221,7 @@ async def close_session(session_id: str):
                f"{len(diffs)} فروقات")
     await pool.execute("""
         INSERT INTO audit_log (table_name, record_id, action, description, created_at)
-        VALUES ('stock_take_sessions', $1::text, 'close', $2, $3)
+        VALUES ('stock_take_sessions', $1::uuid, 'close', $2, $3)
     """, str(session_id), summary, now)
 
     return {

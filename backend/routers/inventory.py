@@ -265,7 +265,7 @@ async def reset_material(body: ResetMaterialRequest):
         """INSERT INTO audit_log
            (id, action, table_name, record_id, old_values, new_values,
             user_email, description)
-           VALUES (gen_random_uuid(), 'reset', 'inventory', NULL, $1, $2, $3, $4)""",
+           VALUES (gen_random_uuid(), 'reset', 'inventory', NULL, $1::jsonb, $2::jsonb, $3, $4)""",
         _json.dumps({
             "balance": balance_before,
             "material_id": body.material_id,
@@ -334,7 +334,7 @@ async def reset_material_both(body: ResetMaterialBothWarehousesRequest):
                     """INSERT INTO audit_log
                        (id, action, table_name, record_id, old_values, new_values,
                         user_email, description)
-                       VALUES (gen_random_uuid(), 'reset', 'inventory', NULL, $1, $2, $3, $4)""",
+                       VALUES (gen_random_uuid(), 'reset', 'inventory', NULL, $1::jsonb, $2::jsonb, $3, $4)""",
                     _json.dumps({"balance": balance_before, "material_id": body.material_id, "warehouse_type": wh}),
                     _json.dumps({"balance": 0, "total_in": 0, "total_out": 0, "total_transfers": 0, "opening_balance": 0}),
                     body.created_by,
