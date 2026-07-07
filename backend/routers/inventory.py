@@ -253,7 +253,7 @@ async def reset_material(body: ResetMaterialRequest):
 
     row = await pool.fetchrow(
         """INSERT INTO inventory (id, material_id, warehouse_type, balance, updated_at)
-           VALUES (gen_random_uuid(), $1::text, $2, 0, NOW())
+           VALUES (gen_random_uuid(), $1::uuid, $2, 0, NOW())
            ON CONFLICT (material_id, warehouse_type)
            DO UPDATE SET balance=0, updated_at=NOW()
            RETURNING *""",
@@ -324,7 +324,7 @@ async def reset_material_both(body: ResetMaterialBothWarehousesRequest):
                 )
                 row = await conn.fetchrow(
                     """INSERT INTO inventory (id, material_id, warehouse_type, balance, updated_at)
-                       VALUES (gen_random_uuid(), $1::text, $2, 0, NOW())
+                       VALUES (gen_random_uuid(), $1::uuid, $2, 0, NOW())
                        ON CONFLICT (material_id, warehouse_type)
                        DO UPDATE SET balance=0, updated_at=NOW()
                        RETURNING *""",
