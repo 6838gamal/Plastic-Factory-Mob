@@ -94,8 +94,8 @@ class _WarehouseManagerPageState extends ConsumerState<WarehouseManagerPage>
 
     final tabViews = isKeeper
         ? <Widget>[
-            const _IncomingReceiptTab(),
-            _ReceiptTab(isAdmin: false),
+            _IncomingReceiptTab(keeperName: widget.keeperName),
+            _ReceiptTab(isAdmin: false, keeperName: widget.keeperName),
             _WithdrawalTab(isAdmin: false, keeperName: widget.keeperName),
             const SuppliersPage(),
           ]
@@ -191,39 +191,44 @@ class _WarehouseManagerPageState extends ConsumerState<WarehouseManagerPage>
 
 class _ReceiptTab extends ConsumerWidget {
   final bool isAdmin;
-  const _ReceiptTab({required this.isAdmin});
+  final String? keeperName;
+  const _ReceiptTab({required this.isAdmin, this.keeperName});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final vouchers = ref.watch(_receiptVouchersProvider);
 
-    return RefreshIndicator(
-      onRefresh: () async => ref.invalidate(_receiptVouchersProvider),
-      child: vouchers.when(
-        data: (list) {
-          if (list.isEmpty) {
-            return const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.download_outlined, size: 56, color: Colors.grey),
-                  SizedBox(height: 12),
-                  Text('لا توجد سندات استلام', style: TextStyle(color: Colors.grey)),
-                ],
-              ),
-            );
-          }
+    return vouchers.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => Center(child: Text('خطأ: ${Helpers.friendlyError(e)}')),
+      data: (list) {
+        if (list.isEmpty) {
+          return const Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.download_outlined, size: 56, color: Colors.grey),
+                SizedBox(height: 12),
+                Text('لا توجد سندات استلام', style: TextStyle(color: Colors.grey)),
+              ],
+            ),
+          );
+        }
 
-          // Admin: pending_approval first, then approved, then rest
-          final sorted = isAdmin
-              ? [
-                  ...list.where((v) => v['status'] == 'pending_approval'),
-                  ...list.where((v) => v['status'] == 'approved'),
-                  ...list.where((v) => v['status'] != 'pending_approval' && v['status'] != 'approved'),
-                ]
-              : list;
+        // Admin: pending_approval first, then approved, then rest
+        final sorted = isAdmin
+            ? [
+                ...list.where((v) => v['status'] == 'pending_approval'),
+                ...list.where((v) => v['status'] == 'approved'),
+                ...list.where((v) =>
+                    v['status'] != 'pending_approval' &&
+                    v['status'] != 'approved'),
+              ]
+            : list;
 
-          return ListView.builder(
+        return RefreshIndicator(
+          onRefresh: () async => ref.invalidate(_receiptVouchersProvider),
+          child: ListView.builder(
             padding: const EdgeInsets.all(12),
             itemCount: sorted.length,
             itemBuilder: (_, i) {
@@ -231,27 +236,27 @@ class _ReceiptTab extends ConsumerWidget {
                 return _ReceiptVoucherCard(
                   voucher: ReceiptVoucherModel.fromJson(sorted[i]),
                   isAdmin: isAdmin,
+                  keeperName: keeperName,
                   onAction: () => ref.invalidate(_receiptVouchersProvider),
                 );
-              } catch (e) {
+              } catch (e, st) {
+                debugPrint('_ReceiptTab parse error at index $i: $e\n$st');
                 return Card(
                   color: Colors.red.shade50,
                   margin: const EdgeInsets.only(bottom: 8),
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
+                  child: const Padding(
+                    padding: EdgeInsets.all(12),
                     child: Text(
-                      'خطأ في تحليل السند: $e\n\nبيانات خام: ${sorted[i]}',
-                      style: const TextStyle(color: Colors.red, fontSize: 12),
+                      'تعذّر عرض هذا السند',
+                      style: TextStyle(color: Colors.red, fontSize: 12),
                     ),
                   ),
                 );
               }
             },
-          );
-        },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('خطأ: ${Helpers.friendlyError(e)}')),
-      ),
+          ),
+        );
+      },
     );
   }
 }
@@ -261,7 +266,8 @@ class _ReceiptTab extends ConsumerWidget {
 // ══════════════════════════════════════════════════════════════════
 
 class _IncomingReceiptTab extends ConsumerWidget {
-  const _IncomingReceiptTab();
+  final String? keeperName;
+  const _IncomingReceiptTab({this.keeperName});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -333,6 +339,7 @@ class _IncomingReceiptTab extends ConsumerWidget {
                       return _ReceiptVoucherCard(
                         voucher: ReceiptVoucherModel.fromJson(list[i]),
                         isAdmin: false,
+                        keeperName: keeperName,
                         onAction: () => ref.invalidate(_approvedReceiptsProvider),
                       );
                     } catch (e, st) {
@@ -389,8 +396,14 @@ String _receiptStatusText(String? status) {
 class _ReceiptVoucherCard extends ConsumerWidget {
   final ReceiptVoucherModel voucher;
   final bool isAdmin;
+  final String? keeperName;
   final VoidCallback onAction;
-  const _ReceiptVoucherCard({required this.voucher, required this.isAdmin, required this.onAction});
+  const _ReceiptVoucherCard({
+    required this.voucher,
+    required this.isAdmin,
+    this.keeperName,
+    required this.onAction,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -603,7 +616,20 @@ class _ReceiptVoucherCard extends ConsumerWidget {
       return [];
     } else {
       // Keeper
-      if (status == 'posted' || status == 'rejected') return [];
+      if (status == 'posted') return [];
+      if (status == 'rejected') {
+        return [
+          const Divider(height: 16),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              icon: const Icon(Icons.delete_outline, size: 16, color: Colors.red),
+              label: const Text('حذف', style: TextStyle(color: Colors.red, fontSize: 12)),
+              onPressed: () => _deleteVoucher(context, ref),
+            ),
+          ),
+        ];
+      }
       if (status == 'approved') {
         return [
           const Divider(height: 16),
@@ -698,6 +724,7 @@ class _ReceiptVoucherCard extends ConsumerWidget {
                 context: context,
                 builder: (_) => _ReceiptVoucherDialog(
                   voucherId: voucher.id,
+                  keeperName: keeperName,
                   onSaved: onAction,
                 ),
               ),
@@ -733,7 +760,8 @@ class _ReceiptVoucherCard extends ConsumerWidget {
     );
     if (confirmed != true || !context.mounted) return;
     try {
-      await ref.read(dataSourceProvider).submitReceiptVoucher(voucher.id!);
+      final name = keeperName ?? 'أمين المخزن';
+      await ref.read(dataSourceProvider).submitReceiptVoucher(voucher.id!, submittedBy: name);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('تم إرسال السند للإدارة بنجاح'), backgroundColor: Colors.indigo),
@@ -806,7 +834,8 @@ class _ReceiptVoucherCard extends ConsumerWidget {
     );
     if (confirmed != true || !context.mounted) return;
     try {
-      await ref.read(dataSourceProvider).postReceiptVoucher(voucher.id!);
+      final name = keeperName ?? 'أمين المخزن';
+      await ref.read(dataSourceProvider).postReceiptVoucher(voucher.id!, performedBy: name);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(

@@ -623,8 +623,8 @@ class ApiDataSource {
     return Map<String, dynamic>.from(jsonDecode(res.body) as Map);
   }
 
-  Future<Map<String, dynamic>> postReceiptVoucher(String id) async {
-    final res = await _post('/api/vouchers/receipt/$id/post', {});
+  Future<Map<String, dynamic>> postReceiptVoucher(String id, {String performedBy = 'keeper'}) async {
+    final res = await _post('/api/vouchers/receipt/$id/post?performed_by=${Uri.encodeComponent(performedBy)}', {});
     return Map<String, dynamic>.from(res as Map);
   }
 
