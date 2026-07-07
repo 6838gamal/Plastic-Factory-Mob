@@ -198,9 +198,7 @@ class _ReceiptTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final vouchers = ref.watch(_receiptVouchersProvider);
 
-    return ColoredBox(
-      color: Colors.white,
-      child: vouchers.when(
+    return vouchers.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('خطأ: ${Helpers.friendlyError(e)}')),
         data: (list) {
@@ -259,8 +257,7 @@ class _ReceiptTab extends ConsumerWidget {
           ),
         );
       },
-    ),
-  );
+    );
   }
 }
 
