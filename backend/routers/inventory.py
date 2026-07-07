@@ -225,7 +225,7 @@ async def reset_material(body: ResetMaterialRequest):
     pool = await get_pool()
 
     inv = await pool.fetchrow(
-        "SELECT balance FROM inventory WHERE material_id=$1::uuid AND warehouse_type=$2",
+        "SELECT balance FROM inventory WHERE material_id::text=$1::text AND warehouse_type=$2",
         body.material_id, body.warehouse_type,
     )
     balance_before = float(inv["balance"]) if inv else 0.0
@@ -236,7 +236,7 @@ async def reset_material(body: ResetMaterialRequest):
     deleted_tx = await pool.fetchval(
         """WITH deleted AS (
              DELETE FROM inventory_transactions
-             WHERE material_id=$1::uuid AND warehouse_type=$2
+             WHERE material_id::text=$1::text AND warehouse_type=$2
              RETURNING id
            ) SELECT COUNT(*) FROM deleted""",
         body.material_id, body.warehouse_type,
@@ -245,7 +245,7 @@ async def reset_material(body: ResetMaterialRequest):
     deleted_ob = await pool.fetchval(
         """WITH deleted AS (
              DELETE FROM opening_balances
-             WHERE material_id=$1::uuid AND warehouse_type=$2
+             WHERE material_id::text=$1::text AND warehouse_type=$2
              RETURNING id
            ) SELECT COUNT(*) FROM deleted""",
         body.material_id, body.warehouse_type,
@@ -253,7 +253,7 @@ async def reset_material(body: ResetMaterialRequest):
 
     row = await pool.fetchrow(
         """INSERT INTO inventory (id, material_id, warehouse_type, balance, updated_at)
-           VALUES (gen_random_uuid(), $1::uuid, $2, 0, NOW())
+           VALUES (gen_random_uuid(), $1::text, $2, 0, NOW())
            ON CONFLICT (material_id, warehouse_type)
            DO UPDATE SET balance=0, updated_at=NOW()
            RETURNING *""",
@@ -307,24 +307,24 @@ async def reset_material_both(body: ResetMaterialBothWarehousesRequest):
             results = {}
             for wh in warehouses:
                 inv = await conn.fetchrow(
-                    "SELECT balance FROM inventory WHERE material_id=$1::uuid AND warehouse_type=$2",
+                    "SELECT balance FROM inventory WHERE material_id::text=$1::text AND warehouse_type=$2",
                     body.material_id, wh,
                 )
                 balance_before = float(inv["balance"]) if inv else 0.0
 
                 await conn.execute(
                     """DELETE FROM inventory_transactions
-                       WHERE material_id=$1::uuid AND warehouse_type=$2""",
+                       WHERE material_id::text=$1::text AND warehouse_type=$2""",
                     body.material_id, wh,
                 )
                 await conn.execute(
                     """DELETE FROM opening_balances
-                       WHERE material_id=$1::uuid AND warehouse_type=$2""",
+                       WHERE material_id::text=$1::text AND warehouse_type=$2""",
                     body.material_id, wh,
                 )
                 row = await conn.fetchrow(
                     """INSERT INTO inventory (id, material_id, warehouse_type, balance, updated_at)
-                       VALUES (gen_random_uuid(), $1::uuid, $2, 0, NOW())
+                       VALUES (gen_random_uuid(), $1::text, $2, 0, NOW())
                        ON CONFLICT (material_id, warehouse_type)
                        DO UPDATE SET balance=0, updated_at=NOW()
                        RETURNING *""",

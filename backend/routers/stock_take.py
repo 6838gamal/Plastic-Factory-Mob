@@ -77,13 +77,14 @@ async def create_session(body: SessionCreate):
         ORDER BY rm.name
     """, body.warehouse_type)
 
+    session_id_str = str(session_id)  # stock_take_items.session_id is TEXT
     for it in items:
         await pool.execute("""
             INSERT INTO stock_take_items
               (session_id, material_id, material_name, warehouse_type,
                unit, system_qty, created_at)
             VALUES ($1, $2, $3, $4, $5, $6, $7)
-        """, session_id, it["material_id"], it["material_name"],
+        """, session_id_str, str(it["material_id"]), it["material_name"],
             it["warehouse_type"], it["unit"], float(it["balance"]), now)
 
     # Audit log
