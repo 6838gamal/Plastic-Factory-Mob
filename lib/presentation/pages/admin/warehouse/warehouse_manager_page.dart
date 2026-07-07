@@ -354,6 +354,25 @@ class _ReceiptVoucherCard extends ConsumerWidget {
               ],
             ),
 
+            // ── Audit trail link ─────────────────────────────────
+            const SizedBox(height: 2),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                style: TextButton.styleFrom(
+                  foregroundColor: Colors.grey[600],
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                ),
+                icon: const Icon(Icons.history_outlined, size: 14),
+                label: const Text('سجل التدقيق', style: TextStyle(fontSize: 11)),
+                onPressed: () => showDialog(
+                  context: context,
+                  builder: (_) => _ReceiptAuditDialog(voucher: voucher),
+                ),
+              ),
+            ),
+
             // ── Action buttons (role + status aware) ─────────────
             ..._buildActions(context, ref, status),
           ],
@@ -692,6 +711,165 @@ class _ReceiptVoucherCard extends ConsumerWidget {
       }
     }
   }
+}
+
+// ══════════════════════════════════════════════════════════════════
+// Receipt Audit Trail Dialog
+// ══════════════════════════════════════════════════════════════════
+
+class _ReceiptAuditDialog extends StatelessWidget {
+  final ReceiptVoucherModel voucher;
+  const _ReceiptAuditDialog({required this.voucher});
+
+  String _fmt(String? iso) {
+    if (iso == null) return '';
+    try {
+      final dt = DateTime.parse(iso).toLocal();
+      return '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')} '
+          '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+    } catch (_) {
+      return iso.length > 16 ? iso.substring(0, 16) : iso;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final events = <_AuditEvent>[
+      _AuditEvent(
+        icon: Icons.add_circle_outline,
+        color: Colors.blue,
+        title: 'إنشاء السند',
+        by: voucher.createdBy,
+        at: voucher.createdAt,
+        done: true,
+      ),
+      _AuditEvent(
+        icon: Icons.send_outlined,
+        color: Colors.indigo,
+        title: 'إرسال للإدارة',
+        by: voucher.submittedBy,
+        at: voucher.submittedAt,
+        done: voucher.submittedAt != null,
+      ),
+      _AuditEvent(
+        icon: Icons.check_circle_outline,
+        color: Colors.teal,
+        title: 'قبول الإدارة',
+        by: voucher.approvedBy,
+        at: voucher.approvedAt,
+        done: voucher.approvedAt != null,
+      ),
+      _AuditEvent(
+        icon: Icons.warehouse_outlined,
+        color: Colors.green,
+        title: 'ترحيل للمخزن الرئيسي',
+        by: voucher.postedBy,
+        at: voucher.postedAt,
+        done: voucher.postedAt != null,
+      ),
+    ];
+
+    return AlertDialog(
+      title: Row(
+        children: [
+          const Icon(Icons.history_outlined, color: Colors.blueGrey),
+          const SizedBox(width: 8),
+          Text('سجل التدقيق — ${voucher.voucherNumber ?? ""}',
+              style: const TextStyle(fontSize: 15)),
+        ],
+      ),
+      content: SizedBox(
+        width: 360,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (int i = 0; i < events.length; i++) ...[
+              _buildStep(events[i], _fmt),
+              if (i < events.length - 1)
+                Padding(
+                  padding: const EdgeInsets.only(right: 15),
+                  child: Container(
+                    width: 2,
+                    height: 16,
+                    color: i < events.indexWhere((e) => !e.done)
+                        ? Colors.green.shade200
+                        : Colors.grey.shade300,
+                  ),
+                ),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('إغلاق'),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStep(_AuditEvent e, String Function(String?) fmt) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Column(
+          children: [
+            CircleAvatar(
+              radius: 14,
+              backgroundColor: e.done ? e.color : Colors.grey.shade300,
+              child: Icon(e.icon, size: 14,
+                  color: e.done ? Colors.white : Colors.grey.shade500),
+            ),
+          ],
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 4),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(e.title,
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                      color: e.done ? Colors.black87 : Colors.grey,
+                    )),
+                if (e.done) ...[
+                  if (e.by?.isNotEmpty == true)
+                    Text('بواسطة: ${e.by}',
+                        style: TextStyle(fontSize: 11, color: Colors.grey[700])),
+                  if (e.at?.isNotEmpty == true)
+                    Text(fmt(e.at),
+                        style: const TextStyle(fontSize: 11, color: Colors.blueGrey)),
+                ] else
+                  Text('لم يتم بعد',
+                      style: TextStyle(fontSize: 11, color: Colors.grey.shade400)),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _AuditEvent {
+  final IconData icon;
+  final Color color;
+  final String title;
+  final String? by;
+  final String? at;
+  final bool done;
+  const _AuditEvent({
+    required this.icon,
+    required this.color,
+    required this.title,
+    this.by,
+    this.at,
+    required this.done,
+  });
 }
 
 // ══════════════════════════════════════════════════════════════════

@@ -97,11 +97,12 @@ async def _next_voucher_number(pool, prefix: str) -> str:
 async def _write_audit(pool, action: str, entity_type: str, entity_id: str,
                        performed_by: str, details: dict):
     import json
+    desc = f"{action} — {json.dumps(details, ensure_ascii=False)}"
     try:
         await pool.execute(
-            """INSERT INTO audit_log (entity_type, entity_id, action, performed_by, details)
+            """INSERT INTO audit_log (action, table_name, record_id, user_email, description)
                VALUES ($1, $2, $3, $4, $5)""",
-            entity_type, entity_id, action, performed_by, json.dumps(details, ensure_ascii=False),
+            action, entity_type, entity_id, performed_by, desc,
         )
     except Exception as exc:
         logger.warning(f"[audit] Could not write audit log: {exc}")
@@ -232,9 +233,12 @@ async def submit_receipt_voucher(voucher_id: str, submitted_by: str = "keeper"):
     )
     if not items:
         raise HTTPException(400, "لا يوجد بنود في السند — أضف بنوداً قبل الإرسال")
+    now = datetime.now(timezone.utc)
     await pool.execute(
-        "UPDATE receipt_vouchers SET status='pending_approval', updated_at=NOW() WHERE id=$1::uuid",
-        voucher_id
+        """UPDATE receipt_vouchers
+           SET status='pending_approval', submitted_by=$1, submitted_at=$2, updated_at=NOW()
+           WHERE id=$3::uuid""",
+        submitted_by, now, voucher_id
     )
     await _write_audit(pool, "submit", "receipt_voucher", voucher_id, submitted_by,
                        {"voucher_number": v["voucher_number"]})
@@ -259,9 +263,12 @@ async def approve_receipt_voucher(voucher_id: str, approved_by: str = "admin"):
     if not items:
         raise HTTPException(400, "لا يوجد بنود في السند")
 
+    now = datetime.now(timezone.utc)
     await pool.execute(
-        "UPDATE receipt_vouchers SET status='approved', updated_at=NOW() WHERE id=$1::uuid",
-        voucher_id
+        """UPDATE receipt_vouchers
+           SET status='approved', approved_by=$1, approved_at=$2, updated_at=NOW()
+           WHERE id=$3::uuid""",
+        approved_by, now, voucher_id
     )
     await _write_audit(pool, "approve", "receipt_voucher", voucher_id, approved_by,
                        {"voucher_number": v["voucher_number"], "items": len(items)})
@@ -372,9 +379,12 @@ async def post_receipt_voucher(voucher_id: str, performed_by: str = "admin"):
             f"سند استلام رقم {v['voucher_number']}"
         )
 
+    now = datetime.now(timezone.utc)
     await pool.execute(
-        "UPDATE receipt_vouchers SET status='posted', updated_at=NOW() WHERE id=$1::uuid",
-        voucher_id
+        """UPDATE receipt_vouchers
+           SET status='posted', posted_by=$1, posted_at=$2, updated_at=NOW()
+           WHERE id=$3::uuid""",
+        performed_by, now, voucher_id
     )
     await _write_audit(pool, "post", "receipt_voucher", voucher_id, performed_by,
                        {"voucher_number": v["voucher_number"], "items": len(items)})

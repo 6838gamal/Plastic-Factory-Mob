@@ -47,10 +47,16 @@ class ReceiptVoucherModel {
   final String? supplierRef;
   final String? receivedBy;
   final String? date;
-  final String status; // draft | posted
+  final String status;
   final String? notes;
   final String? createdBy;
   final String? createdAt;
+  final String? submittedBy;
+  final String? submittedAt;
+  final String? approvedBy;
+  final String? approvedAt;
+  final String? postedBy;
+  final String? postedAt;
   final int itemCount;
   final List<VoucherItemModel> items;
   final List<String> itemNames;
@@ -67,6 +73,12 @@ class ReceiptVoucherModel {
     this.notes,
     this.createdBy,
     this.createdAt,
+    this.submittedBy,
+    this.submittedAt,
+    this.approvedBy,
+    this.approvedAt,
+    this.postedBy,
+    this.postedAt,
     this.itemCount = 0,
     this.items = const [],
     this.itemNames = const [],
@@ -84,6 +96,12 @@ class ReceiptVoucherModel {
         notes: json['notes'] as String?,
         createdBy: json['created_by'] as String?,
         createdAt: json['created_at'] as String?,
+        submittedBy: json['submitted_by'] as String?,
+        submittedAt: json['submitted_at'] as String?,
+        approvedBy: json['approved_by'] as String?,
+        approvedAt: json['approved_at'] as String?,
+        postedBy: json['posted_by'] as String?,
+        postedAt: json['posted_at'] as String?,
         itemCount: (json['item_count'] as num? ?? 0).toInt(),
         items: (json['items'] as List<dynamic>?)
                 ?.map((e) => VoucherItemModel.fromJson(e as Map<String, dynamic>))

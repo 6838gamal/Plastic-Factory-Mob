@@ -264,6 +264,13 @@ async def _init_db():
         "ALTER TABLE stock_take_items ADD COLUMN IF NOT EXISTS counted_at TIMESTAMPTZ",
         # stock_take_sessions: closed_at timestamp for when session was closed
         "ALTER TABLE stock_take_sessions ADD COLUMN IF NOT EXISTS closed_at TIMESTAMPTZ",
+        # receipt_vouchers: per-step tracking for audit trail
+        "ALTER TABLE receipt_vouchers ADD COLUMN IF NOT EXISTS submitted_by VARCHAR(200)",
+        "ALTER TABLE receipt_vouchers ADD COLUMN IF NOT EXISTS submitted_at TIMESTAMPTZ",
+        "ALTER TABLE receipt_vouchers ADD COLUMN IF NOT EXISTS approved_by VARCHAR(200)",
+        "ALTER TABLE receipt_vouchers ADD COLUMN IF NOT EXISTS approved_at TIMESTAMPTZ",
+        "ALTER TABLE receipt_vouchers ADD COLUMN IF NOT EXISTS posted_by VARCHAR(200)",
+        "ALTER TABLE receipt_vouchers ADD COLUMN IF NOT EXISTS posted_at TIMESTAMPTZ",
     ]
     for stmt in _col_migrations:
         try:
