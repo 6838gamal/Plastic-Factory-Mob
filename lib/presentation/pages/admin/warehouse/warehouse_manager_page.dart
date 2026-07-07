@@ -226,11 +226,27 @@ class _ReceiptTab extends ConsumerWidget {
           return ListView.builder(
             padding: const EdgeInsets.all(12),
             itemCount: sorted.length,
-            itemBuilder: (_, i) => _ReceiptVoucherCard(
-              voucher: ReceiptVoucherModel.fromJson(sorted[i]),
-              isAdmin: isAdmin,
-              onAction: () => ref.invalidate(_receiptVouchersProvider),
-            ),
+            itemBuilder: (_, i) {
+              try {
+                return _ReceiptVoucherCard(
+                  voucher: ReceiptVoucherModel.fromJson(sorted[i]),
+                  isAdmin: isAdmin,
+                  onAction: () => ref.invalidate(_receiptVouchersProvider),
+                );
+              } catch (e) {
+                return Card(
+                  color: Colors.red.shade50,
+                  margin: const EdgeInsets.only(bottom: 8),
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Text(
+                      'خطأ في تحليل السند: $e\n\nبيانات خام: ${sorted[i]}',
+                      style: const TextStyle(color: Colors.red, fontSize: 12),
+                    ),
+                  ),
+                );
+              }
+            },
           );
         },
         loading: () => const Center(child: CircularProgressIndicator()),
