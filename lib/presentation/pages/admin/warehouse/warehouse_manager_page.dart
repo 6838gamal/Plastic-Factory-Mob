@@ -297,7 +297,7 @@ class _IncomingReceiptTab extends ConsumerWidget {
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                color: Colors.teal.shade50,
+                color: Colors.white,
                 child: Row(
                   children: [
                     const Icon(Icons.info_outlined, size: 16, color: Colors.teal),
@@ -322,16 +322,34 @@ class _IncomingReceiptTab extends ConsumerWidget {
                   ],
                 ),
               ),
+              const Divider(height: 1),
               // ── List ────────────────────────────────────────
               Expanded(
                 child: ListView.builder(
                   padding: const EdgeInsets.all(12),
                   itemCount: list.length,
-                  itemBuilder: (_, i) => _ReceiptVoucherCard(
-                    voucher: ReceiptVoucherModel.fromJson(list[i]),
-                    isAdmin: false,
-                    onAction: () => ref.invalidate(_approvedReceiptsProvider),
-                  ),
+                  itemBuilder: (_, i) {
+                    try {
+                      return _ReceiptVoucherCard(
+                        voucher: ReceiptVoucherModel.fromJson(list[i]),
+                        isAdmin: false,
+                        onAction: () => ref.invalidate(_approvedReceiptsProvider),
+                      );
+                    } catch (e, st) {
+                      debugPrint('_IncomingReceiptTab parse error at index $i: $e\n$st');
+                      return Card(
+                        color: Colors.red.shade50,
+                        margin: const EdgeInsets.only(bottom: 8),
+                        child: const Padding(
+                          padding: EdgeInsets.all(12),
+                          child: Text(
+                            'تعذّر عرض هذا السند',
+                            style: TextStyle(color: Colors.red, fontSize: 12),
+                          ),
+                        ),
+                      );
+                    }
+                  },
                 ),
               ),
             ],
