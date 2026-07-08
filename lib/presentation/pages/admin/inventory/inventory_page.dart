@@ -432,8 +432,18 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
                   value: selected,
                   decoration: const InputDecoration(labelText: 'المادة الخام'),
                   items: materials
-                      .map((m) =>
-                          DropdownMenuItem(value: m, child: Text(m.materialName)))
+                      .map((m) => DropdownMenuItem(
+                          value: m,
+                          child: Row(
+                            children: [
+                              Expanded(child: Text(m.materialName)),
+                              Text(
+                                Helpers.formatQuantityInKg(m.currentBalance, m.unit),
+                                style: TextStyle(
+                                    color: Colors.grey[500], fontSize: 11),
+                              ),
+                            ],
+                          )))
                       .toList(),
                   onChanged: (v) => ss(() => selected = v),
                 ),
@@ -466,6 +476,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
                   controller: qtyCtrl,
                   keyboardType:
                       const TextInputType.numberWithOptions(decimal: true),
+                  onChanged: (_) => ss(() {}),
                   decoration: InputDecoration(
                     labelText: 'الكمية (${selected?.unit ?? 'كجم'})',
                     prefixIcon: Icon(
@@ -473,6 +484,10 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
                       color:
                           positiveOnly || isPositive ? Colors.green : Colors.red,
                     ),
+                    helperText: selected != null
+                        ? 'الرصيد الحالي: ${Helpers.formatQuantityInKg(selected!.currentBalance, selected!.unit)}'
+                            '${positiveOnly && (double.tryParse(qtyCtrl.text) ?? 0) > 0 ? '  ←  بعد الاستلام: ${Helpers.formatQuantityInKg(selected!.currentBalance + (double.tryParse(qtyCtrl.text) ?? 0), selected!.unit)}' : ''}'
+                        : null,
                   ),
                 ),
                 const SizedBox(height: 12),
