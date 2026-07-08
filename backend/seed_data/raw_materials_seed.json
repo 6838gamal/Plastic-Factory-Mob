@@ -1,0 +1,35 @@
+[
+  {
+    "id": "395c9e41-9f32-4a38-b6d6-253de13a938e",
+    "name": "سكراب أسود",
+    "code": null,
+    "category": "",
+    "unit": "كجم",
+    "min_stock": "20.000",
+    "cost_per_unit": "0.000",
+    "is_active": true,
+    "notes": null
+  },
+  {
+    "id": "1abcb132-9cd9-4e1c-972c-8fb831350140",
+    "name": "تيتانيوم",
+    "code": null,
+    "category": "كيميائي",
+    "unit": "كجم",
+    "min_stock": "500.000",
+    "cost_per_unit": "0.000",
+    "is_active": true,
+    "notes": null
+  },
+  {
+    "id": "d8ed0b09-20a1-4776-b670-428ba23802d7",
+    "name": "سكراب احمر",
+    "code": null,
+    "category": "سكراب",
+    "unit": "كجم",
+    "min_stock": "100.000",
+    "cost_per_unit": "0.000",
+    "is_active": true,
+    "notes": null
+  }
+]

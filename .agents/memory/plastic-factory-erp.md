@@ -23,3 +23,10 @@ Workers, machines, mixers, products, and mixture types are stored in SharedPrefe
 
 ## Admin auth
 App uses its own JWT-based auth against an `admin_users` table. `JWT_SECRET` is in Replit Secrets. The auth is NOT Replit Auth — it's a custom login screen.
+
+## RENDER_DATABASE_URL as plain env var, not secret
+A prior setup mistakenly stored the credential-bearing `RENDER_DATABASE_URL` as a plain `.replit` shared env var instead of a Secret. A plain env var with the same key always wins over a Secret of that name.
+
+**Why:** Saving a new value via `requestSecrets` silently had no effect until the stale plain env var was deleted with `deleteEnvVars` — the shell kept showing the old DB host even after the secret was confirmed saved.
+
+**How to apply:** If a newly-saved secret doesn't seem to take effect, check `viewEnvVars({ type: "env" })` for a same-named plain env var shadowing it, and delete the plain one. Any credential/connection-string env var should live only in Secrets, never in `.replit`.
