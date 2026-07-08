@@ -517,17 +517,49 @@ from routers import suppliers
 from routers import production_standards, waste_monitoring
 
 
+async def _init_db_background(app: FastAPI):
+    """Runs the DB connect/migrate/seed sequence without blocking the
+    server from opening its port. get_pool() retries forever on failure,
+    so if this ran directly inside `lifespan` (before `yield`), uvicorn
+    would never bind its listening socket while the DB is unreachable —
+    which is exactly what produced 'No open ports detected'. Doing it in
+    a background task lets the HTTP port open immediately; requests that
+    need the DB simply await get_pool() themselves and wait it out."""
+    try:
+        await get_pool()
+        logger.info("✅ Database pool ready")
+        await _init_db()
+        await _seed_default_admin()
+        await _seed_default_settings()
+        app.state.db_ready.set()
+        app.state.scheduler_task = asyncio.create_task(_daily_report_scheduler())
+    except asyncio.CancelledError:
+        raise
+    except Exception:
+        logger.exception("[startup] Background DB initialization failed")
+
+
+async def _cancel_and_await(task: "asyncio.Task | None"):
+    if task is None:
+        return
+    task.cancel()
+    try:
+        await task
+    except asyncio.CancelledError:
+        pass
+    except Exception:
+        logger.exception("[shutdown] Background task raised while being cancelled")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await _validate_startup()
-    pool = await get_pool()
-    logger.info("✅ Database pool ready")
-    await _init_db()
-    await _seed_default_admin()
-    await _seed_default_settings()
-    scheduler_task = asyncio.create_task(_daily_report_scheduler())
+    app.state.scheduler_task = None
+    app.state.db_ready = asyncio.Event()
+    db_init_task = asyncio.create_task(_init_db_background(app))
     yield
-    scheduler_task.cancel()
+    await _cancel_and_await(db_init_task)
+    await _cancel_and_await(app.state.scheduler_task)
     await close_pool()
     logger.info("Database pool closed")
 
