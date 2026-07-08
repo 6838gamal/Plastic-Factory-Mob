@@ -30,6 +30,7 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 from typing import Optional, List, Any
 from database import get_pool
+from materials_seed import export_raw_materials_seed
 
 logger = logging.getLogger("plastic_factory.vouchers")
 router = APIRouter(prefix="/api/vouchers", tags=["vouchers"])
@@ -348,15 +349,31 @@ async def post_receipt_voucher(voucher_id: str, performed_by: str = "admin"):
             )
             if found:
                 mat_id = str(found["id"])
-                await pool.execute(
-                    "UPDATE receipt_voucher_items SET material_id=$1::uuid WHERE id=$2",
-                    mat_id, item["id"],
-                )
             else:
-                logger.warning(
-                    f"[post_receipt] No raw_material found for name='{item['material_name']}' — skipping"
+                # مادة جديدة كتبها أمين المخزن يدوياً في سند التوريد — تُنشأ
+                # في raw_materials فقط الآن، عند ترحيل السند إلى المخزن الرئيسي
+                # (وليس عند إنشاء السند)، فتظهر تلقائياً في شاشات الإدمن وإدخال
+                # الطبخات دون أي تعديل برمجي.
+                created = await pool.fetchrow(
+                    """INSERT INTO raw_materials (name, category, unit, min_stock, is_active)
+                       VALUES ($1, 'مواد أساسية', $2, 0, true)
+                       RETURNING id""",
+                    item["material_name"], item["unit"] or "كجم",
                 )
-                continue
+                mat_id = str(created["id"])
+                logger.info(
+                    f"[post_receipt] Auto-created new raw_material "
+                    f"'{item['material_name']}' (id={mat_id}) from receipt voucher {v['voucher_number']}"
+                )
+                try:
+                    await export_raw_materials_seed()
+                except Exception:
+                    logger.exception("[post_receipt] Failed to export raw materials seed after auto-create")
+
+            await pool.execute(
+                "UPDATE receipt_voucher_items SET material_id=$1::uuid WHERE id=$2",
+                mat_id, item["id"],
+            )
 
         qty = float(item["quantity"])
 

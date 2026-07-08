@@ -4,19 +4,20 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import '../../providers/reference_data_provider.dart';
 import '../../providers/batch_provider.dart';
-import '../../widgets/common/loading_widget.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/utils/helpers.dart';
 import '../../../data/models/reference_models.dart';
-import '../../../data/models/inventory_summary_model.dart';
-import '../../../data/datasources/api_datasource.dart';
+import '../../../data/models/raw_material_model.dart';
 import '../../providers/auth_provider.dart';
 
 // ── نوع رصيد مادة: الرصيد + الوحدة الأصلية من المخزن ───────────────────────
 typedef _BalInfo = ({double balance, String unit});
 
-// ── رصيد مخزن الخلاط: اسم المادة (lowercase) → رصيد + وحدة ────────────────
+// ── رصيد مخزن الخلاط: معرّف المادة → رصيد + وحدة ───────────────────────────
+//
+// مبني حسب material_id (وليس اسم المادة) حتى يبقى صحيحاً بغض النظر عن كيفية
+// كتابة الاسم — ويتوافق تلقائياً مع أي مادة جديدة تُضاف من شاشة الإدارة.
 final _mixerBalanceProvider =
     FutureProvider.autoDispose<Map<String, _BalInfo>>((ref) async {
   final ds = ref.read(dataSourceProvider);
@@ -24,12 +25,45 @@ final _mixerBalanceProvider =
   return {
     for (final item in items)
       if (item.warehouseType == AppConstants.warehouseMixer)
-        item.materialName.toLowerCase().trim(): (
+        item.materialId: (
           balance: item.currentBalance,
           unit: item.unit,
         ),
   };
 });
+
+// ── أسماء المواد ذات الأعمدة الثابتة تاريخياً (لمؤشرات لوحة التحكم/التقارير) ──
+//
+// هذه الأسماء يجب أن تطابق raw_materials.name تماماً. إن أعاد الإدمن تسمية
+// إحدى هذه المواد أو حذفها، سيصبح المؤشر المقابل صفراً في التقارير القديمة
+// (الخصم من المخزون نفسه لا يتأثر، لأنه يعتمد على القائمة العامة materials).
+const String _kNamePvc = 'مواد خام PVC صيني';
+const String _kNameDop = 'DOP زيت';
+const List<String> _kScrapNames = [
+  'سكراب اسود ناعم',
+  'سكراب ازرق ناعم',
+  'سكراب ازرق سكري',
+];
+const String _kNameCalcium = 'كالسيوم باودر عبوة 25 كيلو';
+const String _kNameWax = 'شمع باودر عبوة 25 كيلو';
+const String _kNameStabilizer = 'مثبت استبليزر باودر عبوة 25 كيلو';
+const String _kNameTitanium = 'تيتانيوم';
+
+// ── ترتيب وأيقونات الأقسام حسب فئة المادة ──────────────────────────────────
+const List<String> _kCategoryOrder = ['مواد أساسية', 'أصباغ', 'إضافات'];
+
+IconData _iconForCategory(String category) {
+  switch (category) {
+    case 'مواد أساسية':
+      return Icons.inventory_2_outlined;
+    case 'أصباغ':
+      return Icons.color_lens_outlined;
+    case 'إضافات':
+      return Icons.add_circle_outline;
+    default:
+      return Icons.category_outlined;
+  }
+}
 
 class BatchEntryPage extends ConsumerStatefulWidget {
   const BatchEntryPage({super.key});
@@ -44,39 +78,13 @@ class _BatchEntryPageState extends ConsumerState<BatchEntryPage> {
   final _batchNumberCtrl = TextEditingController();
   final _notesCtrl = TextEditingController();
 
-  // ── المواد الرئيسية ─────────────────────────────────────────
-  final _pvcCtrl             = TextEditingController();
-  final _dopCtrl             = TextEditingController();
-  final _scrapBlackCtrl      = TextEditingController(); // سكراب اسود ناعم
-  final _scrapBlueCtrl       = TextEditingController(); // سكراب ازرق ناعم
-  final _scrapBlueSugarCtrl  = TextEditingController(); // سكراب ازرق سكري
-  final _calciumCtrl         = TextEditingController();
-  final _waxCtrl             = TextEditingController();
-  final _stabilizerCtrl      = TextEditingController();
-  final _titaniumCtrl        = TextEditingController();
-  final _citricAcidCtrl      = TextEditingController(); // سيتريك اسيد
-  final _bicarYellowCtrl     = TextEditingController(); // بيكربونات اصفر
-  final _bicarWhiteCtrl      = TextEditingController(); // بيكربونات ابيض
+  // ── حقول إدخال المواد الخام — تُبنى ديناميكياً حسب قائمة raw_materials ──
+  // مفتاح الخريطة هو material_id، وليس اسماً ثابتاً؛ بذلك تظهر أي مادة جديدة
+  // يضيفها الإدمن أو أمين المخزن تلقائياً دون أي تعديل على هذه الشاشة.
+  final Map<String, TextEditingController> _matCtrls = {};
 
-  // ── الأصباغ (ثابتة) ─────────────────────────────────────────
-  final _pig1Ctrl  = TextEditingController(); // صبغة سوداء باودر
-  final _pig2Ctrl  = TextEditingController(); // صبغة زرقاء باودر رقم-١٠٢٧
-  final _pig3Ctrl  = TextEditingController(); // صبغة زرقاء فاتح رقم-١٢٥٦
-  final _pig4Ctrl  = TextEditingController(); // صبغة ارجواني رقم-F٤٠٩
-  final _pig5Ctrl  = TextEditingController(); // صبغة احمر زهري رقم-F٣٥٨
-  final _pig6Ctrl  = TextEditingController(); // صبغة كاكي بيج رقم-١٠٣٥
-  final _pig7Ctrl  = TextEditingController(); // صبغه خضراء طاووس محلي
-  final _pig8Ctrl  = TextEditingController(); // صبغه برتقالي محلي
-  final _pig9Ctrl  = TextEditingController(); // صبغه زرقاء طاووس محلي
-  final _pig10Ctrl = TextEditingController(); // صبغه سوداء طاووس محلي
-
-  // ── إضافات أخرى (ثابتة) ─────────────────────────────────────
-  final _add1Ctrl = TextEditingController(); // لواصق موديل ۷۰۳
-  final _add2Ctrl = TextEditingController(); // لواصق موديل ۸۰۳۱-٦٠٣١
-  final _add3Ctrl = TextEditingController(); // لواصق موديل ٦٠٢٦-٨٠٢٦
-  final _add4Ctrl = TextEditingController(); // لواصق موديل ٦٠٢٢-٨٠٢٢
-  final _add5Ctrl = TextEditingController(); // خلطه ازرق
-  final _add6Ctrl = TextEditingController(); // راجع مكينه ازرق
+  TextEditingController _ctrlFor(String materialId) =>
+      _matCtrls.putIfAbsent(materialId, () => TextEditingController());
 
   DateTime _selectedDate = DateTime.now();
   String? _selectedShift;
@@ -99,58 +107,33 @@ class _BatchEntryPageState extends ConsumerState<BatchEntryPage> {
   void dispose() {
     _batchNumberCtrl.dispose();
     _notesCtrl.dispose();
-    _pvcCtrl.dispose();
-    _dopCtrl.dispose();
-    _scrapBlackCtrl.dispose();
-    _scrapBlueCtrl.dispose();
-    _scrapBlueSugarCtrl.dispose();
-    _calciumCtrl.dispose();
-    _waxCtrl.dispose();
-    _stabilizerCtrl.dispose();
-    _titaniumCtrl.dispose();
-    _citricAcidCtrl.dispose();
-    _bicarYellowCtrl.dispose();
-    _bicarWhiteCtrl.dispose();
-    _pig1Ctrl.dispose();  _pig2Ctrl.dispose();  _pig3Ctrl.dispose();
-    _pig4Ctrl.dispose();  _pig5Ctrl.dispose();  _pig6Ctrl.dispose();
-    _pig7Ctrl.dispose();  _pig8Ctrl.dispose();  _pig9Ctrl.dispose();
-    _pig10Ctrl.dispose();
-    _add1Ctrl.dispose();  _add2Ctrl.dispose();  _add3Ctrl.dispose();
-    _add4Ctrl.dispose();  _add5Ctrl.dispose();  _add6Ctrl.dispose();
+    for (final c in _matCtrls.values) {
+      c.dispose();
+    }
     super.dispose();
   }
 
-  // ── خريطة الحقول الثابتة بالاسم الكامل ────────────────────────
-  Map<String, TextEditingController> get _fieldByName => {
-    'مواد خام PVC صيني':                         _pvcCtrl,
-    'DOP زيت':                                    _dopCtrl,
-    'سكراب اسود ناعم':                            _scrapBlackCtrl,
-    'سكراب ازرق ناعم':                            _scrapBlueCtrl,
-    'سكراب ازرق سكري':                            _scrapBlueSugarCtrl,
-    'كالسيوم باودر عبوة 25 كيلو':                 _calciumCtrl,
-    'شمع باودر عبوة 25 كيلو':                     _waxCtrl,
-    'مثبت استبليزر باودر عبوة 25 كيلو':           _stabilizerCtrl,
-    'تيتانيوم':                                   _titaniumCtrl,
-    'سيتريك اسيد (ملح الليمون) 490 عبوة 25 كجم': _citricAcidCtrl,
-    'بيكربونات اصفر محلي':                        _bicarYellowCtrl,
-    'بيكربونات ابيض محلي':                        _bicarWhiteCtrl,
-    'صبغة سوداء باودر عبوة 10 كيلو':             _pig1Ctrl,
-    'صبغة زرقاء باودر عبوة 20 كيلو رقم-١٠٢٧':    _pig2Ctrl,
-    'صبغة زرقاء فاتح عبوة 20 كيلو رقم-١٢٥٦':     _pig3Ctrl,
-    'صبغة ارجواني عبوة 25 كيلو رقم-F٤٠٩':        _pig4Ctrl,
-    'صبغة احمر زهري عبوة 25 كيلو رقم-F٣٥٨':      _pig5Ctrl,
-    'صبغة كاكي بيج عبوة 25 كيلو رقم-١٠٣٥':       _pig6Ctrl,
-    'صبغه خضراء طاووس محلي':                     _pig7Ctrl,
-    'صبغه برتقالي محلي':                         _pig8Ctrl,
-    'صبغه زرقاء طاووس محلي':                     _pig9Ctrl,
-    'صبغه سوداء طاووس محلي':                     _pig10Ctrl,
-    'لواصق موديل ۷۰۳ بالحبه':                    _add1Ctrl,
-    'لواصق موديل ۸۰۳۱-٦٠٣١ بالحبه':             _add2Ctrl,
-    'لواصق موديل ٦٠٢٦-٨٠٢٦ بالحبه':             _add3Ctrl,
-    'لواصق موديل ٦٠٢٢-٨٠٢٢ بالحبه':             _add4Ctrl,
-    'خلطه ازرق':                                  _add5Ctrl,
-    'راجع مكينه ازرق':                            _add6Ctrl,
-  };
+  RawMaterialModel? _findByName(List<RawMaterialModel> mats, String name) {
+    for (final m in mats) {
+      if (m.name == name) return m;
+    }
+    return null;
+  }
+
+  double _qtyKgOf(List<RawMaterialModel> mats, String name) {
+    final m = _findByName(mats, name);
+    if (m == null) return 0;
+    final ctrl = _matCtrls[m.id];
+    if (ctrl == null) return 0;
+    final v = double.tryParse(ctrl.text.trim()) ?? 0;
+    return _toKg(v, m.unit);
+  }
+
+  double _toKg(double qty, String unit) {
+    final u = unit.trim();
+    if (u == 'جرام' || u.toLowerCase() == 'gram') return qty / 1000.0;
+    return qty;
+  }
 
   Future<void> _applyRecipe(MixtureTypeModel mixtureType) async {
     setState(() { _loadingRecipe = true; _recipeApplied = false; });
@@ -158,13 +141,14 @@ class _BatchEntryPageState extends ConsumerState<BatchEntryPage> {
       final ds = ref.read(dataSourceProvider);
       final recipe = await ds.getRecipeByMixtureType(mixtureType.id);
       if (recipe == null || !mounted) return;
+      final mats = ref.read(rawMaterialsProvider).valueOrNull ?? [];
       final qtyMap = recipe.qtyMap;
-      final fieldMap = _fieldByName;
       bool anyFilled = false;
       for (final entry in qtyMap.entries) {
-        final ctrl = fieldMap[entry.key];
-        if (ctrl != null && entry.value > 0) {
+        final mat = _findByName(mats, entry.key);
+        if (mat != null && entry.value > 0) {
           final qty = entry.value;
+          final ctrl = _ctrlFor(mat.id);
           ctrl.text = qty == qty.truncateToDouble()
               ? qty.toInt().toString()
               : qty.toString();
@@ -215,12 +199,6 @@ class _BatchEntryPageState extends ConsumerState<BatchEntryPage> {
     if (picked != null) setState(() => _scaleImage = File(picked.path));
   }
 
-  double _kg(TextEditingController c) => double.tryParse(c.text.trim()) ?? 0;
-  double _gToKg(TextEditingController c) {
-    final g = double.tryParse(c.text.trim()) ?? 0;
-    return g / 1000.0;
-  }
-
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     if (_selectedShift == null ||
@@ -237,6 +215,8 @@ class _BatchEntryPageState extends ConsumerState<BatchEntryPage> {
       return;
     }
 
+    final mats = ref.read(rawMaterialsProvider).valueOrNull ?? [];
+
     // Upload image (optional on web)
     String? imageUrl;
     if (_scaleImage != null) {
@@ -251,79 +231,32 @@ class _BatchEntryPageState extends ConsumerState<BatchEntryPage> {
       } catch (_) {}
     }
 
-    // ── مجموع السكراب للحقل المخصص ─────────────────────────
-    final totalScrap = _kg(_scrapBlackCtrl) + _kg(_scrapBlueCtrl) + _kg(_scrapBlueSugarCtrl);
-
-    // ── قائمة الأصباغ ─────────────────────────────────────────
-    final pigmentDefs = [
-      ('صبغة سوداء باودر عبوة 10 كيلو',           _pig1Ctrl,  'جرام'),
-      ('صبغة زرقاء باودر عبوة 20 كيلو رقم-١٠٢٧',  _pig2Ctrl,  'جرام'),
-      ('صبغة زرقاء فاتح عبوة 20 كيلو رقم-١٢٥٦',   _pig3Ctrl,  'جرام'),
-      ('صبغة ارجواني عبوة 25 كيلو رقم-F٤٠٩',       _pig4Ctrl,  'جرام'),
-      ('صبغة احمر زهري عبوة 25 كيلو رقم-F٣٥٨',     _pig5Ctrl,  'جرام'),
-      ('صبغة كاكي بيج عبوة 25 كيلو رقم-١٠٣٥',      _pig6Ctrl,  'جرام'),
-      ('صبغه خضراء طاووس محلي',                     _pig7Ctrl,  'جرام'),
-      ('صبغه برتقالي محلي',                         _pig8Ctrl,  'جرام'),
-      ('صبغه زرقاء طاووس محلي',                     _pig9Ctrl,  'جرام'),
-      ('صبغه سوداء طاووس محلي',                     _pig10Ctrl, 'جرام'),
-    ];
-
-    // ── قائمة الإضافات ─────────────────────────────────────────
-    final additiveDefs = [
-      ('لواصق موديل ۷۰۳ بالحبه',        _add1Ctrl, 'قطعة'),
-      ('لواصق موديل ۸۰۳۱-٦٠٣١ بالحبه', _add2Ctrl, 'قطعة'),
-      ('لواصق موديل ٦٠٢٦-٨٠٢٦ بالحبه', _add3Ctrl, 'قطعة'),
-      ('لواصق موديل ٦٠٢٢-٨٠٢٢ بالحبه', _add4Ctrl, 'قطعة'),
-      ('خلطه ازرق',                      _add5Ctrl, 'كجم'),
-      ('راجع مكينه ازرق',                _add6Ctrl, 'كجم'),
-    ];
-
-    // ── بناء قائمة المواد للخصم من المخزن ──────────────────────
+    // ── بناء قائمة المواد للخصم من المخزن — من كل مادة نشطة تم إدخال كمية لها ──
     final materials = <Map<String, dynamic>>[];
-
-    void addKg(String name, TextEditingController c) {
-      final qty = _kg(c);
-      if (qty > 0) materials.add({'material_name': name, 'quantity': qty, 'unit': 'كجم'});
-    }
-
-    addKg('مواد خام pvc صيني', _pvcCtrl);
-    addKg('DOP زيت', _dopCtrl);
-    if (_kg(_scrapBlackCtrl) > 0)
-      materials.add({'material_name': 'سكراب اسود ناعم', 'quantity': _kg(_scrapBlackCtrl), 'unit': 'كجم'});
-    if (_kg(_scrapBlueCtrl) > 0)
-      materials.add({'material_name': 'سكراب ازرق ناعم', 'quantity': _kg(_scrapBlueCtrl), 'unit': 'كجم'});
-    if (_kg(_scrapBlueSugarCtrl) > 0)
-      materials.add({'material_name': 'سكراب ازرق سكري', 'quantity': _kg(_scrapBlueSugarCtrl), 'unit': 'كجم'});
-    addKg('كالسيوم باودر عبوة 25 كيلو', _calciumCtrl);
-    addKg('شمع باودر عبوة 25 كيلو', _waxCtrl);
-    addKg('مثبت استبليزر باودر عبوة 25 كيلو', _stabilizerCtrl);
-    addKg('تيتانيوم', _titaniumCtrl);
-    addKg('سيتريك اسيد (ملح الليمون) 490 عبوة 25 كجم', _citricAcidCtrl);
-    addKg('بيكربونات اصفر محلي', _bicarYellowCtrl);
-    addKg('بيكربونات ابيض محلي', _bicarWhiteCtrl);
-
-    // الأصباغ — القيم بالجرام تُحوّل لكجم عند الخصم
     final pigmentsList = <Map<String, dynamic>>[];
-    for (final (name, ctrl, unit) in pigmentDefs) {
-      final val = double.tryParse(ctrl.text.trim()) ?? 0;
-      if (val > 0) {
-        pigmentsList.add({'name': name, 'quantity': val, 'unit': unit});
-        materials.add({'material_name': name, 'quantity': val, 'unit': unit});
+    final additivesList = <Map<String, dynamic>>[];
+
+    for (final m in mats) {
+      final ctrl = _matCtrls[m.id];
+      if (ctrl == null) continue;
+      final qty = double.tryParse(ctrl.text.trim()) ?? 0;
+      if (qty <= 0) continue;
+      materials.add({
+        'material_id': m.id,
+        'material_name': m.name,
+        'quantity': qty,
+        'unit': m.unit,
+      });
+      if (m.category == 'أصباغ') {
+        pigmentsList.add({'name': m.name, 'quantity': qty, 'unit': m.unit});
+      } else if (m.category == 'إضافات') {
+        additivesList.add({'name': m.name, 'quantity': qty, 'unit': m.unit});
       }
     }
 
-    // الإضافات الأخرى
-    final additivesList = <Map<String, dynamic>>[];
-    for (final (name, ctrl, unit) in additiveDefs) {
-      final val = double.tryParse(ctrl.text.trim()) ?? 0;
-      if (val > 0) {
-        additivesList.add({'name': name, 'quantity': val, 'unit': unit});
-        materials.add({'material_name': name, 'quantity': val, 'unit': unit});
-      }
-    }
-    // ملاحظة: الأصباغ والإضافات مضافة إلى قائمة materials أعلاه
-    // والـ backend يعتمد فقط على materials إذا كانت غير فارغة
-    // (لمنع الخصم المزدوج من pigments+additives+materials معاً)
+    // ── مؤشرات ثابتة تاريخياً (تُستخدم في لوحة التحكم والتقارير) ─────────
+    final scrapQty = _kScrapNames.fold<double>(
+        0, (s, name) => s + _qtyKgOf(mats, name));
 
     final batchData = {
       'batch_number':      _batchNumberCtrl.text.trim(),
@@ -337,13 +270,13 @@ class _BatchEntryPageState extends ConsumerState<BatchEntryPage> {
       'product_name':      _selectedProduct!.name,
       'mixture_type_id':   _selectedMixtureType!.id,
       'mixture_type_name': _selectedMixtureType!.name,
-      'pvc_qty':           _kg(_pvcCtrl),
-      'dop_qty':           _kg(_dopCtrl),
-      'scrap_qty':         totalScrap,
-      'calcium_qty':       _kg(_calciumCtrl),
-      'wax_qty':           _kg(_waxCtrl),
-      'stabilizer_qty':    _kg(_stabilizerCtrl),
-      'titanium_qty':      _kg(_titaniumCtrl),
+      'pvc_qty':           _qtyKgOf(mats, _kNamePvc),
+      'dop_qty':           _qtyKgOf(mats, _kNameDop),
+      'scrap_qty':         scrapQty,
+      'calcium_qty':       _qtyKgOf(mats, _kNameCalcium),
+      'wax_qty':           _qtyKgOf(mats, _kNameWax),
+      'stabilizer_qty':    _qtyKgOf(mats, _kNameStabilizer),
+      'titanium_qty':      _qtyKgOf(mats, _kNameTitanium),
       'pigments':          pigmentsList,
       'additives':         additivesList,
       'notes':             _notesCtrl.text.trim(),
@@ -374,14 +307,8 @@ class _BatchEntryPageState extends ConsumerState<BatchEntryPage> {
   void _resetForm() {
     _formKey.currentState?.reset();
     _loadNextBatchNumber();
-    for (final c in [
-      _notesCtrl, _pvcCtrl, _dopCtrl, _scrapBlackCtrl, _scrapBlueCtrl,
-      _scrapBlueSugarCtrl, _calciumCtrl, _waxCtrl, _stabilizerCtrl, _titaniumCtrl,
-      _citricAcidCtrl, _bicarYellowCtrl, _bicarWhiteCtrl,
-      _pig1Ctrl, _pig2Ctrl, _pig3Ctrl, _pig4Ctrl, _pig5Ctrl,
-      _pig6Ctrl, _pig7Ctrl, _pig8Ctrl, _pig9Ctrl, _pig10Ctrl,
-      _add1Ctrl, _add2Ctrl, _add3Ctrl, _add4Ctrl, _add5Ctrl, _add6Ctrl,
-    ]) {
+    _notesCtrl.clear();
+    for (final c in _matCtrls.values) {
       c.clear();
     }
     setState(() {
@@ -401,11 +328,11 @@ class _BatchEntryPageState extends ConsumerState<BatchEntryPage> {
     final mixers = ref.watch(mixersProvider);
     final products = ref.watch(productsProvider);
     final mixtureTypes = ref.watch(mixtureTypesProvider);
+    final rawMaterials = ref.watch(rawMaterialsProvider);
     final opsState = ref.watch(batchOperationsProvider);
 
-    // رصيد مخزن الخلاط — Map<اسم المادة (lowercase), (balance, unit)>
+    // رصيد مخزن الخلاط — Map<material_id, (balance, unit)>
     final mixerBal = ref.watch(_mixerBalanceProvider).value ?? {};
-    _BalInfo? _bal(String label) => mixerBal[label.toLowerCase().trim()];
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -576,52 +503,19 @@ class _BatchEntryPageState extends ConsumerState<BatchEntryPage> {
             ),
             const SizedBox(height: 20),
 
-            // ── المواد الخام ─────────────────────────────────────
-            _SectionHeader(title: 'المواد الخام', icon: Icons.inventory_2_outlined),
-            const SizedBox(height: 12),
-
-            _MatRow(label: 'مواد خام PVC صيني',                    ctrl: _pvcCtrl,          balance: _bal('مواد خام PVC صيني')),
-            _MatRow(label: 'DOP زيت',                               ctrl: _dopCtrl,          balance: _bal('DOP زيت')),
-            _MatRow(label: 'سكراب اسود ناعم',                       ctrl: _scrapBlackCtrl,   balance: _bal('سكراب اسود ناعم')),
-            _MatRow(label: 'سكراب ازرق ناعم',                       ctrl: _scrapBlueCtrl,    balance: _bal('سكراب ازرق ناعم')),
-            _MatRow(label: 'سكراب ازرق سكري',                       ctrl: _scrapBlueSugarCtrl, balance: _bal('سكراب ازرق سكري')),
-            _MatRow(label: 'كالسيوم باودر عبوة 25 كيلو',            ctrl: _calciumCtrl,      balance: _bal('كالسيوم باودر عبوة 25 كيلو')),
-            _MatRow(label: 'شمع باودر عبوة 25 كيلو',                ctrl: _waxCtrl,          balance: _bal('شمع باودر عبوة 25 كيلو')),
-            _MatRow(label: 'مثبت استبليزر باودر عبوة 25 كيلو',      ctrl: _stabilizerCtrl,   balance: _bal('مثبت استبليزر باودر عبوة 25 كيلو')),
-            _MatRow(label: 'تيتانيوم',                              ctrl: _titaniumCtrl,     balance: _bal('تيتانيوم')),
-            _MatRow(label: 'سيتريك اسيد (ملح الليمون) 490 عبوة 25 كجم', ctrl: _citricAcidCtrl, balance: _bal('سيتريك اسيد (ملح الليمون) 490 عبوة 25 كجم')),
-            _MatRow(label: 'بيكربونات اصفر محلي',                   ctrl: _bicarYellowCtrl,  balance: _bal('بيكربونات اصفر محلي')),
-            _MatRow(label: 'بيكربونات ابيض محلي',                   ctrl: _bicarWhiteCtrl,   balance: _bal('بيكربونات ابيض محلي')),
-
-            const SizedBox(height: 20),
-
-            // ── الأصباغ ──────────────────────────────────────────
-            _SectionHeader(title: 'الأصباغ', icon: Icons.color_lens_outlined),
-            const SizedBox(height: 12),
-
-            _MatRow(label: 'صبغة سوداء باودر عبوة 10 كيلو',          ctrl: _pig1Ctrl,  unit: 'جرام', balance: _bal('صبغة سوداء باودر عبوة 10 كيلو')),
-            _MatRow(label: 'صبغة زرقاء باودر عبوة 20 كيلو رقم-١٠٢٧', ctrl: _pig2Ctrl,  unit: 'جرام', balance: _bal('صبغة زرقاء باودر عبوة 20 كيلو رقم-١٠٢٧')),
-            _MatRow(label: 'صبغة زرقاء فاتح عبوة 20 كيلو رقم-١٢٥٦',  ctrl: _pig3Ctrl,  unit: 'جرام', balance: _bal('صبغة زرقاء فاتح عبوة 20 كيلو رقم-١٢٥٦')),
-            _MatRow(label: 'صبغة ارجواني عبوة 25 كيلو رقم-F٤٠٩',      ctrl: _pig4Ctrl,  unit: 'جرام', balance: _bal('صبغة ارجواني عبوة 25 كيلو رقم-F٤٠٩')),
-            _MatRow(label: 'صبغة احمر زهري عبوة 25 كيلو رقم-F٣٥٨',    ctrl: _pig5Ctrl,  unit: 'جرام', balance: _bal('صبغة احمر زهري عبوة 25 كيلو رقم-F٣٥٨')),
-            _MatRow(label: 'صبغة كاكي بيج عبوة 25 كيلو رقم-١٠٣٥',     ctrl: _pig6Ctrl,  unit: 'جرام', balance: _bal('صبغة كاكي بيج عبوة 25 كيلو رقم-١٠٣٥')),
-            _MatRow(label: 'صبغه خضراء طاووس محلي',                   ctrl: _pig7Ctrl,  unit: 'جرام', balance: _bal('صبغه خضراء طاووس محلي')),
-            _MatRow(label: 'صبغه برتقالي محلي',                       ctrl: _pig8Ctrl,  unit: 'جرام', balance: _bal('صبغه برتقالي محلي')),
-            _MatRow(label: 'صبغه زرقاء طاووس محلي',                   ctrl: _pig9Ctrl,  unit: 'جرام', balance: _bal('صبغه زرقاء طاووس محلي')),
-            _MatRow(label: 'صبغه سوداء طاووس محلي',                   ctrl: _pig10Ctrl, unit: 'جرام', balance: _bal('صبغه سوداء طاووس محلي')),
-
-            const SizedBox(height: 20),
-
-            // ── إضافات أخرى ─────────────────────────────────────
-            _SectionHeader(title: 'إضافات أخرى', icon: Icons.add_circle_outline),
-            const SizedBox(height: 12),
-
-            _MatRow(label: 'لواصق موديل ۷۰۳ بالحبه',        ctrl: _add1Ctrl, unit: 'قطعة', balance: _bal('لواصق موديل ۷۰۳ بالحبه')),
-            _MatRow(label: 'لواصق موديل ۸۰۳۱-٦٠٣١ بالحبه', ctrl: _add2Ctrl, unit: 'قطعة', balance: _bal('لواصق موديل ۸۰۳۱-٦٠٣١ بالحبه')),
-            _MatRow(label: 'لواصق موديل ٦٠٢٦-٨٠٢٦ بالحبه', ctrl: _add3Ctrl, unit: 'قطعة', balance: _bal('لواصق موديل ٦٠٢٦-٨٠٢٦ بالحبه')),
-            _MatRow(label: 'لواصق موديل ٦٠٢٢-٨٠٢٢ بالحبه', ctrl: _add4Ctrl, unit: 'قطعة', balance: _bal('لواصق موديل ٦٠٢٢-٨٠٢٢ بالحبه')),
-            _MatRow(label: 'خلطه ازرق',                      ctrl: _add5Ctrl, balance: _bal('خلطه ازرق')),
-            _MatRow(label: 'راجع مكينه ازرق',                ctrl: _add6Ctrl, balance: _bal('راجع مكينه ازرق')),
+            // ── المواد الخام — تُبنى ديناميكياً من قائمة raw_materials ──────
+            rawMaterials.when(
+              data: (mats) => _buildMaterialSections(mats, mixerBal),
+              loading: () => const Padding(
+                padding: EdgeInsets.symmetric(vertical: 24),
+                child: Center(child: CircularProgressIndicator()),
+              ),
+              error: (e, _) => Padding(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                child: Text('تعذّر تحميل قائمة المواد الخام: $e',
+                    style: const TextStyle(color: Colors.red)),
+              ),
+            ),
 
             const SizedBox(height: 20),
 
@@ -726,6 +620,48 @@ class _BatchEntryPageState extends ConsumerState<BatchEntryPage> {
       ),
     );
   }
+
+  // ── يبني قسماً لكل فئة مواد (مواد أساسية / أصباغ / إضافات / ...) ─────────
+  Widget _buildMaterialSections(
+      List<RawMaterialModel> mats, Map<String, _BalInfo> mixerBal) {
+    if (mats.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 16),
+        child: Text('لا توجد مواد خام مُعرّفة بعد — أضفها من شاشة إدارة المواد.',
+            style: TextStyle(color: Colors.grey)),
+      );
+    }
+
+    // تجميع حسب الفئة مع الحفاظ على ترتيب معروف، ثم أي فئات إضافية أبجدياً
+    final Map<String, List<RawMaterialModel>> grouped = {};
+    for (final m in mats) {
+      final cat = m.category.trim().isEmpty ? 'أخرى' : m.category.trim();
+      grouped.putIfAbsent(cat, () => []).add(m);
+    }
+    final orderedCategories = <String>[
+      ..._kCategoryOrder.where(grouped.containsKey),
+      ...grouped.keys.where((c) => !_kCategoryOrder.contains(c)).toList()
+        ..sort(),
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (final cat in orderedCategories) ...[
+          _SectionHeader(title: cat, icon: _iconForCategory(cat)),
+          const SizedBox(height: 12),
+          for (final m in grouped[cat]!)
+            _MatRow(
+              label: m.name,
+              ctrl: _ctrlFor(m.id),
+              unit: m.unit,
+              balance: mixerBal[m.id],
+            ),
+          const SizedBox(height: 20),
+        ],
+      ],
+    );
+  }
 }
 
 // ── Section Header ─────────────────────────────────────────────
@@ -758,7 +694,7 @@ class _SectionHeader extends StatelessWidget {
   }
 }
 
-// ── Material Row (fixed label + qty input + mixer balance) ────────
+// ── Material Row (dynamic label + qty input + mixer balance) ────────
 class _MatRow extends StatelessWidget {
   final String label;
   final TextEditingController ctrl;
@@ -774,18 +710,7 @@ class _MatRow extends StatelessWidget {
     this.balance,
   });
 
-  // ── تنسيق رقم (يحذف الكسر إذا كان صفراً) ──────────────────────────────
-  static String _fmt(double v) =>
-      v % 1 == 0 ? v.toInt().toString() : v.toStringAsFixed(2);
-
   // ── بناء نص العرض للرصيد ────────────────────────────────────────────────
-  //
-  // القواعد:
-  //  كيلو / كجم  → "X كجم"                 (نفس الوحدة، يكفي)
-  //  جرام        → "X جرام  (≈ Y كجم)"      (تحويل ÷ 1000)
-  //  لتر         → "X لتر"                  (لا يوجد كثافة ثابتة)
-  //  قطعة        → "X قطعة"                 (لا تحويل)
-  //  غير ذلك     → "X [وحدة]"
   String _buildBalText(double bal, String rawUnit) {
     return 'متاح: ${Helpers.formatQuantityInKg(bal, rawUnit)}';
   }

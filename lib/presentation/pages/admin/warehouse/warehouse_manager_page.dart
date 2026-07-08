@@ -1646,6 +1646,7 @@ class _ReceiptVoucherDialogState extends ConsumerState<_ReceiptVoucherDialog> {
                       materials: materials,
                       onRemove: () => _removeItem(e.key),
                       onChanged: () => setState(() {}),
+                      allowNewMaterial: true,
                     )),
                 if (_items.isEmpty)
                   const Padding(
@@ -1869,6 +1870,10 @@ class _ItemEntry {
   double qty = 0;
   String? materialId;
   double availableQty = 0;
+  // مادة جديدة كتبها أمين المخزن يدوياً (غير موجودة بعد في راw_materials).
+  // لا تُنشأ في قاعدة البيانات إلا بعد قبول وترحيل سند التوريد إلى المخزن
+  // الرئيسي — قبل ذلك لا تظهر في أي شاشة أخرى (بما فيها إدخال الطبخات).
+  bool isNew = false;
 }
 
 class _ItemRow extends StatelessWidget {
@@ -1877,12 +1882,17 @@ class _ItemRow extends StatelessWidget {
   final List<InventorySummaryModel> materials;
   final VoidCallback onRemove;
   final VoidCallback onChanged;
+  // عند true تتم إتاحة خيار "مادة جديدة" لكتابة اسم مادة غير موجودة بعد —
+  // يُستخدم فقط في سند الاستلام (توريد) وليس التحويل أو الصرف، حيث لا معنى
+  // لصرف أو تحويل مادة غير موجودة أصلاً في المخزون.
+  final bool allowNewMaterial;
   const _ItemRow({
     required this.index,
     required this.entry,
     required this.materials,
     required this.onRemove,
     required this.onChanged,
+    this.allowNewMaterial = false,
   });
 
   @override
@@ -1923,38 +1933,99 @@ class _ItemRow extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 8),
-          // ── Material dropdown (full width) ───────────────────
-          DropdownButtonFormField<InventorySummaryModel>(
-            value: selected,
-            decoration: const InputDecoration(
-              labelText: 'اسم المادة *',
-              prefixIcon: Icon(Icons.science_outlined, size: 18),
-              isDense: true,
-              border: OutlineInputBorder(),
-            ),
-            hint: const Text('اختر المادة', style: TextStyle(fontSize: 13)),
-            isExpanded: true,
-            items: materials
-                .map((m) => DropdownMenuItem<InventorySummaryModel>(
-                      value: m,
-                      child: Text(
-                        '${m.materialName}  —  متوفر: ${Helpers.formatQuantityInKg(m.currentBalance, m.unit)}',
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 13),
-                      ),
-                    ))
-                .toList(),
-            onChanged: (m) {
-              if (m != null) {
-                entry.name = m.materialName;
-                entry.unit = m.unit;
-                entry.materialId = m.materialId;
-                entry.availableQty = m.currentBalance;
+          if (allowNewMaterial)
+            InkWell(
+              onTap: () {
+                entry.isNew = !entry.isNew;
+                entry.name = '';
+                entry.materialId = null;
+                entry.availableQty = 0;
                 onChanged();
-              }
-            },
-          ),
-          if (selected != null) ...[
+              },
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Row(
+                  children: [
+                    Icon(
+                      entry.isNew ? Icons.check_box : Icons.check_box_outline_blank,
+                      size: 18,
+                      color: Colors.indigo,
+                    ),
+                    const SizedBox(width: 6),
+                    const Text('مادة جديدة غير موجودة بالقائمة',
+                        style: TextStyle(fontSize: 12.5, color: Colors.indigo)),
+                  ],
+                ),
+              ),
+            ),
+          // ── Material dropdown (full width) — أو حقل اسم مادة جديدة ──
+          if (entry.isNew) ...[
+            TextFormField(
+              key: ValueKey('newmat_name_$index'),
+              initialValue: entry.name,
+              decoration: const InputDecoration(
+                labelText: 'اسم المادة الجديدة *',
+                prefixIcon: Icon(Icons.new_label_outlined, size: 18),
+                isDense: true,
+                border: OutlineInputBorder(),
+                helperText: 'ستُضاف إلى قائمة المواد الخام تلقائياً عند قبول وترحيل السند',
+                helperMaxLines: 2,
+              ),
+              onChanged: (v) {
+                entry.name = v;
+                entry.materialId = null;
+                onChanged();
+              },
+            ),
+            const SizedBox(height: 8),
+            DropdownButtonFormField<String>(
+              value: entry.unit,
+              decoration: const InputDecoration(
+                isDense: true,
+                labelText: 'الوحدة',
+                border: OutlineInputBorder(),
+              ),
+              items: AppConstants.units
+                  .map((u) => DropdownMenuItem(value: u, child: Text(u, style: const TextStyle(fontSize: 13))))
+                  .toList(),
+              onChanged: (v) {
+                if (v != null) entry.unit = v;
+                onChanged();
+              },
+            ),
+          ] else ...[
+            DropdownButtonFormField<InventorySummaryModel>(
+              value: selected,
+              decoration: const InputDecoration(
+                labelText: 'اسم المادة *',
+                prefixIcon: Icon(Icons.science_outlined, size: 18),
+                isDense: true,
+                border: OutlineInputBorder(),
+              ),
+              hint: const Text('اختر المادة', style: TextStyle(fontSize: 13)),
+              isExpanded: true,
+              items: materials
+                  .map((m) => DropdownMenuItem<InventorySummaryModel>(
+                        value: m,
+                        child: Text(
+                          '${m.materialName}  —  متوفر: ${Helpers.formatQuantityInKg(m.currentBalance, m.unit)}',
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 13),
+                        ),
+                      ))
+                  .toList(),
+              onChanged: (m) {
+                if (m != null) {
+                  entry.name = m.materialName;
+                  entry.unit = m.unit;
+                  entry.materialId = m.materialId;
+                  entry.availableQty = m.currentBalance;
+                  onChanged();
+                }
+              },
+            ),
+          ],
+          if (!entry.isNew && selected != null) ...[
             const SizedBox(height: 4),
             Row(
               children: [
