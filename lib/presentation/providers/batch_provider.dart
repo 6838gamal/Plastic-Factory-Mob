@@ -4,7 +4,6 @@ import '../../data/datasources/api_datasource.dart';
 import '../../data/models/batch_model.dart';
 import '../../data/models/machine_production_model.dart';
 import '../../data/models/alert_model.dart';
-import '../../data/models/inventory_model.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/utils/helpers.dart';
 import 'auth_provider.dart';
@@ -142,80 +141,19 @@ class BatchOperationsNotifier extends Notifier<AsyncValue<void>> {
         );
       }
 
-      final materials = batchData['materials'] as List<Map<String, dynamic>>? ?? [];
-      // Only check inventory for materials that have an explicit material_id
-      for (final mat in materials) {
-        final materialId = mat['material_id'] as String?;
-        if (materialId == null) continue;
-        final required = (mat['quantity'] as num).toDouble();
-        final inventory = await ds.getMaterialInventory(materialId, AppConstants.warehouseMixer);
-        if (inventory != null && inventory.balance < required) {
-          await ds.createAlert({
-            'alert_type': 'insufficient_stock',
-            'severity': AppConstants.severityCritical,
-            'material_id': materialId,
-            'material_name': inventory.materialName,
-            'description':
-                'الكمية المطلوبة من ${inventory.materialName} ($required كجم) أكبر من المتوفر (${inventory.balance} كجم)',
-            'status': AppConstants.alertPending,
-            'transaction_id': transactionId,
-          });
-          state = const AsyncValue.data(null);
-          return BatchSaveResult(
-            success: false,
-            error:
-                'الكمية المطلوبة من ${inventory.materialName} ($required ${inventory.unit}) أكبر من المتوفر (${inventory.balance} ${inventory.unit})',
-          );
-        }
-      }
-
+      // ── حفظ الطبخة — الـ backend يتولى كل شيء: ──────────────────────────────
+      // • التحقق من الرصيد الكافي (prevent_negative_stock)
+      // • الخصم من مخزن الخلاط
+      // • تسجيل inventory_transactions
+      // • إنشاء تنبيهات مخزون منخفض / ناضب
+      // • تسجيل audit_log
+      // لا تُكرر هذه العمليات هنا وإلا سيحدث خصم مزدوج.
       final data = {
         ...batchData,
         'transaction_id': transactionId,
         'status': 'saved',
       };
       final batch = await ds.saveBatch(data);
-
-      for (final mat in materials) {
-        final materialId = mat['material_id'] as String?;
-        if (materialId == null) continue;
-        final quantity = (mat['quantity'] as num).toDouble();
-        final inv = await ds.getMaterialInventory(materialId, AppConstants.warehouseMixer);
-        if (inv != null) {
-          final newBalance = inv.balance - quantity;
-          await ds.updateInventoryBalance(materialId, AppConstants.warehouseMixer, newBalance);
-
-          await ds.addInventoryTransaction(InventoryTransactionModel(
-            id: '',
-            materialId: materialId,
-            warehouseType: AppConstants.warehouseMixer,
-            transactionType: 'out',
-            quantity: quantity,
-            batchId: batch.id,
-            transactionRef: transactionId,
-            createdBy: auth.user?.email ?? 'worker',
-            notes: 'خصم من طبخة ${batch.batchNumber}',
-            createdAt: DateTime.now(),
-          ));
-
-          if (newBalance <= inv.minStock) {
-            await ds.createAlert({
-              'alert_type': 'low_stock',
-              'severity': newBalance <= inv.minStock * 0.5
-                  ? AppConstants.severityCritical
-                  : AppConstants.severityHigh,
-              'material_id': materialId,
-              'material_name': inv.materialName,
-              'batch_id': batch.id,
-              'batch_number': batch.batchNumber,
-              'description':
-                  'مخزون ${inv.materialName} منخفض: ${newBalance.toStringAsFixed(2)} ${inv.unit}',
-              'status': AppConstants.alertPending,
-              'transaction_id': transactionId,
-            });
-          }
-        }
-      }
 
       await ds.addAuditLog({
         'action': AppConstants.auditCreate,
