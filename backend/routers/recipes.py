@@ -65,6 +65,21 @@ async def ensure_tables():
         "CREATE UNIQUE INDEX IF NOT EXISTS recipes_mixture_type_id_key ON recipes (mixture_type_id)"
     )
 
+    # Normalized-name uniqueness on raw_materials, so recipe items can never
+    # race-create duplicate materials for the same name (matches the
+    # case-insensitive/trimmed matching used by batch-entry deduction).
+    try:
+        await pool.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS raw_materials_norm_name_key "
+            "ON raw_materials (LOWER(TRIM(name)))"
+        )
+    except Exception:
+        # Existing data already has case/whitespace-variant duplicate names;
+        # leave them as-is (do not delete production data), the ON CONFLICT
+        # insert below simply falls back to relying on the pre-insert
+        # existence check in that case.
+        pass
+
 
 # ── Pydantic models ────────────────────────────────────────────────────────
 class RecipeItemIn(BaseModel):
@@ -138,6 +153,7 @@ async def upsert_recipe(body: RecipeUpsert):
     await ensure_tables()
     pool = await get_pool()
 
+    created_material = False
     async with pool.acquire() as conn:
         async with conn.transaction():
             # Upsert the recipe header
@@ -165,18 +181,43 @@ async def upsert_recipe(body: RecipeUpsert):
                     # up on the warehouse keeper's / admin's raw-materials
                     # screens, so ensure a matching row exists there — this is
                     # also what lets batch-entry deduction resolve the name to
-                    # an actual inventory item. Never overwrite an existing
+                    # an actual inventory item. Matching is case-insensitive +
+                    # trimmed to match the resolution logic in batches.py, and
+                    # relies on the normalized-name unique index (created in
+                    # ensure_tables) plus ON CONFLICT to stay race-safe under
+                    # concurrent recipe upserts. Never overwrite an existing
                     # material; only fill the gap when one is missing.
-                    await conn.execute(
-                        """INSERT INTO raw_materials (id, name, category, unit, min_stock, is_active)
-                           SELECT gen_random_uuid(), $1, 'من الوصفات', $2, 0, true
-                           WHERE NOT EXISTS (
-                               SELECT 1 FROM raw_materials WHERE TRIM(name) = TRIM($1)
-                           )""",
-                        item.material_name, item.unit,
+                    row = await conn.fetchrow(
+                        "SELECT 1 FROM raw_materials WHERE LOWER(TRIM(name)) = LOWER(TRIM($1))",
+                        item.material_name,
                     )
+                    if not row:
+                        # Use a savepoint (nested transaction) for the insert
+                        # attempt: if the normalized-name unique index is
+                        # absent (legacy duplicate data blocked its creation
+                        # in ensure_tables) the ON CONFLICT clause itself can
+                        # raise, and without a savepoint that would abort the
+                        # whole outer recipe-upsert transaction.
+                        try:
+                            async with conn.transaction():
+                                await conn.execute(
+                                    """INSERT INTO raw_materials (id, name, category, unit, min_stock, is_active)
+                                       VALUES (gen_random_uuid(), $1, 'من الوصفات', $2, 0, true)
+                                       ON CONFLICT (LOWER(TRIM(name))) DO NOTHING""",
+                                    item.material_name, item.unit,
+                                )
+                            created_material = True
+                        except Exception:
+                            async with conn.transaction():
+                                await conn.execute(
+                                    """INSERT INTO raw_materials (id, name, category, unit, min_stock, is_active)
+                                       VALUES (gen_random_uuid(), $1, 'من الوصفات', $2, 0, true)""",
+                                    item.material_name, item.unit,
+                                )
+                            created_material = True
 
-    await export_raw_materials_seed()
+    if created_material:
+        await export_raw_materials_seed()
     return await _recipe_with_items(await get_pool(), recipe_id)
 
 
