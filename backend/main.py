@@ -18,6 +18,7 @@ from fastapi.exceptions import RequestValidationError
 
 import settings as cfg
 from database import get_pool, close_pool
+from materials_seed import restore_raw_materials_seed, export_raw_materials_seed
 
 # ─── Logging ──────────────────────────────────────────────────────────────────
 logging.basicConfig(
@@ -529,6 +530,8 @@ async def _init_db_background(app: FastAPI):
         await get_pool()
         logger.info("✅ Database pool ready")
         await _init_db()
+        await restore_raw_materials_seed()
+        await export_raw_materials_seed()
         await _seed_default_admin()
         await _seed_default_settings()
         app.state.db_ready.set()

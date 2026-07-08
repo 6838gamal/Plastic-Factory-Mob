@@ -14,6 +14,7 @@ if not DATABASE_URL:
     )
 
 _pool: asyncpg.Pool | None = None
+_pool_lock: asyncio.Lock | None = None
 
 
 def _resolve_ssl(url: str):
@@ -69,36 +70,50 @@ async def _init_connection(conn: asyncpg.Connection) -> None:
 
 
 async def get_pool() -> asyncpg.Pool:
-    """Return the shared connection pool, creating it with retry logic if needed."""
-    global _pool
+    """Return the shared connection pool, creating it with retry logic if needed.
+
+    Guarded by a lock so that when many requests arrive concurrently while the
+    DB is down, they wait on a single retry loop instead of each spawning its
+    own independent asyncpg.create_pool() attempt (which was flooding the logs
+    with interleaved, reset retry counters and hammering the DB with parallel
+    connection attempts).
+    """
+    global _pool, _pool_lock
     if _pool is not None:
         return _pool
 
-    ssl_mode = _resolve_ssl(DATABASE_URL)
-    attempt = 0
-    while True:
-        attempt += 1
-        try:
-            if attempt == 1:
-                print("⏳ [DB] جاري الاتصال بقاعدة البيانات...")
-            else:
-                print(f"⏳ [DB] إعادة المحاولة رقم {attempt}...")
+    if _pool_lock is None:
+        _pool_lock = asyncio.Lock()
 
-            _pool = await asyncpg.create_pool(
-                DATABASE_URL,
-                ssl=ssl_mode,
-                min_size=1,
-                max_size=10,
-                init=_init_connection,
-            )
-            print("✅ [DB] تم الاتصال بقاعدة البيانات بنجاح")
+    async with _pool_lock:
+        if _pool is not None:
             return _pool
 
-        except Exception as exc:
-            delay = min(5 * attempt, 30)
-            print(f"❌ [DB] فشل الاتصال: {exc}")
-            print(f"⏳ [DB] إعادة المحاولة بعد {delay} ثانية...")
-            await asyncio.sleep(delay)
+        ssl_mode = _resolve_ssl(DATABASE_URL)
+        attempt = 0
+        while True:
+            attempt += 1
+            try:
+                if attempt == 1:
+                    print("⏳ [DB] جاري الاتصال بقاعدة البيانات...")
+                else:
+                    print(f"⏳ [DB] إعادة المحاولة رقم {attempt}...")
+
+                _pool = await asyncpg.create_pool(
+                    DATABASE_URL,
+                    ssl=ssl_mode,
+                    min_size=1,
+                    max_size=10,
+                    init=_init_connection,
+                )
+                print("✅ [DB] تم الاتصال بقاعدة البيانات بنجاح")
+                return _pool
+
+            except Exception as exc:
+                delay = min(5 * attempt, 30)
+                print(f"❌ [DB] فشل الاتصال: {exc}")
+                print(f"⏳ [DB] إعادة المحاولة بعد {delay} ثانية...")
+                await asyncio.sleep(delay)
 
 
 async def close_pool():

@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional
 from database import get_pool
+from materials_seed import export_raw_materials_seed
 
 router = APIRouter(prefix="/api/materials", tags=["materials"])
 
@@ -52,6 +53,7 @@ async def upsert_material(body: MaterialUpsert):
             body.name, body.code, body.category, body.unit, body.min_stock,
             body.cost_per_unit, body.is_active, body.notes,
         )
+    await export_raw_materials_seed()
     return dict(row)
 
 
@@ -61,4 +63,5 @@ async def delete_material(material_id: str):
     await pool.execute(
         "UPDATE raw_materials SET is_active=false, updated_at=NOW() WHERE id=$1", material_id
     )
+    await export_raw_materials_seed()
     return {"success": True}
