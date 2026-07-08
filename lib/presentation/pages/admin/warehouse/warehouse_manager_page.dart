@@ -106,16 +106,23 @@ class _WarehouseManagerPageState extends ConsumerState<WarehouseManagerPage>
           ];
 
     return Scaffold(
+      backgroundColor: Colors.white,
       body: Column(
         children: [
-          TabBar(
-            controller: _tabs,
-            isScrollable: true,
-            tabAlignment: TabAlignment.start,
-            tabs: tabs,
+          ColoredBox(
+            color: Colors.white,
+            child: TabBar(
+              controller: _tabs,
+              isScrollable: true,
+              tabAlignment: TabAlignment.start,
+              tabs: tabs,
+            ),
           ),
           Expanded(
-            child: TabBarView(controller: _tabs, children: tabViews),
+            child: ColoredBox(
+              color: Colors.white,
+              child: TabBarView(controller: _tabs, children: tabViews),
+            ),
           ),
         ],
       ),
