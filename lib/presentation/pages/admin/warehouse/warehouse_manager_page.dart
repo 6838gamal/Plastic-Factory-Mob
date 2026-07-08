@@ -4,6 +4,7 @@ import '../../../../data/datasources/api_datasource.dart';
 import '../../../../data/models/voucher_models.dart';
 import '../../../../data/models/inventory_summary_model.dart';
 import '../../../providers/auth_provider.dart';
+import '../../../providers/reference_data_provider.dart' show inventorySummaryProvider;
 import '../../../../core/utils/helpers.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../suppliers/suppliers_page.dart';
@@ -25,10 +26,7 @@ final _approvedReceiptsProvider = FutureProvider.autoDispose<List<Map<String, dy
   return ds.getReceiptVouchers(status: 'approved');
 });
 
-final _summaryProvider = FutureProvider.autoDispose<List<InventorySummaryModel>>((ref) async {
-  final ds = ref.read(dataSourceProvider);
-  return ds.getInventorySummary();
-});
+// ملخص المخزون: يُستخدم inventorySummaryProvider المشترك من reference_data_provider.dart
 
 final _suppliersProvider = FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
   return ref.read(dataSourceProvider).getSuppliers();
@@ -772,6 +770,7 @@ class _ReceiptVoucherCard extends ConsumerWidget {
     try {
       final name = isAdmin ? (keeperName ?? 'المدير') : (keeperName ?? 'أمين المخزن');
       await ref.read(dataSourceProvider).postReceiptVoucher(voucher.id!, performedBy: name);
+      ref.invalidate(inventorySummaryProvider); // السند أضاف كمية للمخزن الرئيسي — حدّث الكروت
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -1367,6 +1366,7 @@ class TransferVoucherCard extends ConsumerWidget {
     try {
       final ds = ref.read(dataSourceProvider);
       await ds.confirmTransferVoucher(voucher.id!, {'confirmed_by': 'مشرف الخلطات'});
+      ref.invalidate(inventorySummaryProvider); // نقل كمية من الرئيسي إلى الخلاط — حدّث الكروت في كل الشاشات
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('✅ تم تأكيد الاستلام وتحديث المخزون'), backgroundColor: Colors.green),
@@ -1510,7 +1510,7 @@ class _ReceiptVoucherDialogState extends ConsumerState<_ReceiptVoucherDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final summaryAsync = ref.watch(_summaryProvider);
+    final summaryAsync = ref.watch(inventorySummaryProvider);
     final suppliersAsync = ref.watch(_suppliersProvider);
     final materials = summaryAsync.valueOrNull
             ?.where((m) => m.warehouseType == 'main')
@@ -1782,7 +1782,7 @@ class _TransferVoucherDialogState extends ConsumerState<TransferVoucherDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final summaryAsync = ref.watch(_summaryProvider);
+    final summaryAsync = ref.watch(inventorySummaryProvider);
     final materials = summaryAsync.valueOrNull
             ?.where((m) => m.warehouseType == 'main')
             .toList() ??
@@ -2375,6 +2375,7 @@ class _WithdrawalVoucherCard extends ConsumerWidget {
     if (confirmed != true || !context.mounted) return;
     try {
       await ref.read(dataSourceProvider).approveWithdrawalVoucher(voucher.id!);
+      ref.invalidate(inventorySummaryProvider); // خصم من المخزن الرئيسي — حدّث الكروت
       onAction();
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -2566,7 +2567,7 @@ class _WithdrawalVoucherDialogState extends ConsumerState<_WithdrawalVoucherDial
 
   @override
   Widget build(BuildContext context) {
-    final summaryAsync = ref.watch(_summaryProvider);
+    final summaryAsync = ref.watch(inventorySummaryProvider);
     final materials = summaryAsync.valueOrNull
             ?.where((m) => m.warehouseType == 'main')
             .toList() ??

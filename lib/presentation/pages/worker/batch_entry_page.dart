@@ -18,10 +18,11 @@ typedef _BalInfo = ({double balance, String unit});
 //
 // مبني حسب material_id (وليس اسم المادة) حتى يبقى صحيحاً بغض النظر عن كيفية
 // كتابة الاسم — ويتوافق تلقائياً مع أي مادة جديدة تُضاف من شاشة الإدارة.
+// مبني فوق inventorySummaryProvider المشترك (وليس نسخة محلية منفصلة) حتى يتحدّث
+// تلقائياً عند أي عملية تُغيّر المخزون من شاشات أخرى (ترحيل سند، تحويل، إلخ)
 final _mixerBalanceProvider =
     FutureProvider.autoDispose<Map<String, _BalInfo>>((ref) async {
-  final ds = ref.read(dataSourceProvider);
-  final items = await ds.getInventorySummary();
+  final items = await ref.watch(inventorySummaryProvider.future);
   return {
     for (final item in items)
       if (item.warehouseType == AppConstants.warehouseMixer)
@@ -291,6 +292,7 @@ class _BatchEntryPageState extends ConsumerState<BatchEntryPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text(AppStrings.saveSuccess), backgroundColor: Colors.green),
       );
+      ref.invalidate(inventorySummaryProvider); // خصم من مخزن الخلاط — حدّث الكروت في كل الشاشات
       ref.invalidate(_mixerBalanceProvider); // تحديث رصيد مخزن الخلاط بعد الحفظ
       _resetForm();
     } else {

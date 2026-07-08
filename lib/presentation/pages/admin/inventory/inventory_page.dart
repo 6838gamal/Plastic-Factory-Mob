@@ -4,16 +4,16 @@ import '../../../../data/datasources/api_datasource.dart';
 import '../../../../data/models/inventory_model.dart';
 import '../../../../data/models/inventory_summary_model.dart';
 import '../../../providers/auth_provider.dart';
+import '../../../providers/reference_data_provider.dart' show inventorySummaryProvider;
 import '../../../../core/constants/app_constants.dart';
 import '../../../widgets/common/loading_widget.dart';
 import '../../../../core/utils/helpers.dart';
 
 // ── Providers ────────────────────────────────────────────────────────────────
-
-final _summaryProvider = FutureProvider.autoDispose<List<InventorySummaryModel>>((ref) async {
-  final ds = ref.read(dataSourceProvider);
-  return ds.getInventorySummary();
-});
+//
+// ملخص المخزون يأتي من inventorySummaryProvider المشترك (وليس نسخة محلية)
+// حتى تنعكس أي عملية تُغيّر المخزون من أي شاشة أخرى (ترحيل سند، تحويل، طبخة)
+// فوراً على كروت المواد هنا دون الحاجة لإعادة فتح الصفحة.
 
 final _txProvider = FutureProvider.autoDispose.family<List<InventoryTransactionModel>, String>(
   (ref, materialId) async {
@@ -279,7 +279,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
 
   Future<void> _showResetBalanceDialog(BuildContext context,
       {required String defaultWarehouse}) async {
-    final summaryAsync = ref.read(_summaryProvider);
+    final summaryAsync = ref.read(inventorySummaryProvider);
     final all = summaryAsync.value ?? [];
     // Deduplicate by materialId — we reset both warehouses regardless of which tab is active
     final seen = <String>{};
@@ -364,7 +364,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
                     selected!.materialId,
                     createdBy: email,
                   );
-                  ref.invalidate(_summaryProvider);
+                  ref.invalidate(inventorySummaryProvider);
                   ref.invalidate(_txProvider(''));
                   if (ctx.mounted) {
                     Navigator.pop(ctx);
@@ -398,7 +398,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
     required Color iconColor,
     required String defaultWarehouse,
   }) async {
-    final summaryAsync = ref.read(_summaryProvider);
+    final summaryAsync = ref.read(inventorySummaryProvider);
     final all = summaryAsync.value ?? [];
     final materials = all.where((m) => m.warehouseType == defaultWarehouse).toList();
 
@@ -522,7 +522,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
                         : notesCtrl.text.trim(),
                     createdAt: DateTime.now(),
                   ));
-                  ref.invalidate(_summaryProvider);
+                  ref.invalidate(inventorySummaryProvider);
                   ref.invalidate(_txProvider(''));
                   if (ctx.mounted) {
                     Navigator.pop(ctx);
@@ -549,7 +549,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
 
   Future<void> _showTransferDialog(BuildContext context,
       {required String fromWarehouse, required String toWarehouse}) async {
-    final summaryAsync = ref.read(_summaryProvider);
+    final summaryAsync = ref.read(inventorySummaryProvider);
     final all = summaryAsync.value ?? [];
     final materials = all.where((m) => m.warehouseType == fromWarehouse).toList();
 
@@ -680,7 +680,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
                         : notesCtrl.text.trim(),
                     createdBy: authState.user?.email ?? 'admin',
                   );
-                  ref.invalidate(_summaryProvider);
+                  ref.invalidate(inventorySummaryProvider);
                   ref.invalidate(_txProvider(''));
                   if (ctx.mounted) {
                     Navigator.pop(ctx);
@@ -710,7 +710,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
 
   Future<void> _showOpeningBalanceDialog(BuildContext context,
       {required String defaultWarehouse}) async {
-    final summaryAsync = ref.read(_summaryProvider);
+    final summaryAsync = ref.read(inventorySummaryProvider);
     final all = summaryAsync.value ?? [];
     // Show ALL materials (not filtered) for opening balance since material may not exist in this warehouse yet
     final uniqueMaterials = <String, InventorySummaryModel>{};
@@ -800,7 +800,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
                         : reasonCtrl.text.trim(),
                     'created_by': 'admin',
                   });
-                  ref.invalidate(_summaryProvider);
+                  ref.invalidate(inventorySummaryProvider);
                   if (ctx.mounted) {
                     Navigator.pop(ctx);
                     ScaffoldMessenger.of(ctx).showSnackBar(
@@ -844,7 +844,7 @@ class _WarehouseTab extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final summary = ref.watch(_summaryProvider);
+    final summary = ref.watch(inventorySummaryProvider);
 
     return summary.when(
       data: (all) {
@@ -858,7 +858,7 @@ class _WarehouseTab extends ConsumerWidget {
                 .toList();
 
         return RefreshIndicator(
-          onRefresh: () async => ref.invalidate(_summaryProvider),
+          onRefresh: () async => ref.invalidate(inventorySummaryProvider),
           child: CustomScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
             slivers: [
@@ -915,7 +915,7 @@ class _WarehouseTab extends ConsumerWidget {
       loading: () => const ShimmerList(),
       error: (e, _) => ErrorWidget2(
         message: Helpers.friendlyError(e),
-        onRetry: () => ref.invalidate(_summaryProvider),
+        onRetry: () => ref.invalidate(inventorySummaryProvider),
       ),
     );
   }

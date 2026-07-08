@@ -4,6 +4,7 @@ import '../../../../data/datasources/api_datasource.dart';
 import '../../../../data/models/voucher_models.dart';
 import '../../../../core/utils/helpers.dart';
 import '../../../providers/auth_provider.dart' show dataSourceProvider;
+import '../../../providers/reference_data_provider.dart' show inventorySummaryProvider;
 import 'warehouse_manager_page.dart'
     show TransferVoucherCard, StatusBadge, TransferTab, TransferVoucherDialog, transferVouchersProvider;
 
@@ -413,6 +414,7 @@ class _ReturnVoucherCard extends ConsumerWidget {
     try {
       final ds = ref.read(dataSourceProvider);
       await ds.postReturnVoucher(voucher.id!);
+      ref.invalidate(inventorySummaryProvider); // مرتجع من الخلاط إلى الرئيسي — حدّث الكروت
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('تم ترحيل المرتجع وتحديث المخزون'), backgroundColor: Colors.deepOrange),
