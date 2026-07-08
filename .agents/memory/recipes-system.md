@@ -14,4 +14,4 @@ Recipes are keyed by `mixture_type_id` (UNIQUE constraint). The `recipe_items` t
 - `dataSourceProvider` lives in `auth_provider.dart` — do NOT redefine it elsewhere.
 - Service worker cache key: bump to `flutter-app-cache-v20260609d` (last known value after this session's builds).
 - Seed key is `lref_seeded_v3` — next bump must use `v4`.
-- DB has exactly 28 materials (10 أصباغ, 2 خلطات, 3 سكراب, 4 لواصق, 9 مواد رئيسية). Test materials deleted.
+- `raw_materials` must contain a row whose `name` exactly matches every hardcoded Arabic label used in `batch_entry_page.dart`'s `_fieldByName`/`pigmentDefs`/`additiveDefs` — otherwise that material is invisible on the admin/warehouse-keeper materials screens (which read from `/api/materials`) even though batch entry still accepts and saves it. When adding a new hardcoded field there, also insert a matching `raw_materials` row (and re-run `materials_seed.export_raw_materials_seed()` to refresh the durable JSON backup).
