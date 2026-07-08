@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional, List
 from database import get_pool
+from materials_seed import export_raw_materials_seed
 
 router = APIRouter(prefix="/api/recipes", tags=["recipes"])
 
@@ -159,7 +160,23 @@ async def upsert_recipe(body: RecipeUpsert):
                            VALUES (gen_random_uuid(), $1, $2, $3, $4)""",
                         recipe_id, item.material_name, item.standard_qty, item.unit,
                     )
+                    # Recipes only carry a free-text material_name, with no FK
+                    # to raw_materials. Any material used in a recipe must show
+                    # up on the warehouse keeper's / admin's raw-materials
+                    # screens, so ensure a matching row exists there — this is
+                    # also what lets batch-entry deduction resolve the name to
+                    # an actual inventory item. Never overwrite an existing
+                    # material; only fill the gap when one is missing.
+                    await conn.execute(
+                        """INSERT INTO raw_materials (id, name, category, unit, min_stock, is_active)
+                           SELECT gen_random_uuid(), $1, 'من الوصفات', $2, 0, true
+                           WHERE NOT EXISTS (
+                               SELECT 1 FROM raw_materials WHERE TRIM(name) = TRIM($1)
+                           )""",
+                        item.material_name, item.unit,
+                    )
 
+    await export_raw_materials_seed()
     return await _recipe_with_items(await get_pool(), recipe_id)
 
 
