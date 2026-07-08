@@ -1,4 +1,5 @@
 import asyncio
+import json
 import asyncpg
 from urllib.parse import urlparse, parse_qs
 
@@ -37,6 +38,36 @@ def _resolve_ssl(url: str):
         return None
 
 
+def _jsonb_encode(value) -> str:
+    """Many routers already call json.dumps(...) before passing a value in
+    for a json/jsonb column (e.g. batches.py, audit.py, reports.py). Passing
+    those pre-serialized strings straight through avoids double-encoding
+    them into a quoted JSON string; anything that isn't already a string
+    (a raw dict/list) gets serialized here instead."""
+    if isinstance(value, str):
+        return value
+    return json.dumps(value, default=str)
+
+
+async def _init_connection(conn: asyncpg.Connection) -> None:
+    """Decode json/jsonb columns straight into Python objects (dict/list)
+    instead of leaving them as raw JSON strings — otherwise every
+    jsonb_agg(...) result (e.g. voucher items) comes back to the client
+    as a string, breaking Flutter's `as List<dynamic>?` casts."""
+    await conn.set_type_codec(
+        "json",
+        encoder=_jsonb_encode,
+        decoder=json.loads,
+        schema="pg_catalog",
+    )
+    await conn.set_type_codec(
+        "jsonb",
+        encoder=_jsonb_encode,
+        decoder=json.loads,
+        schema="pg_catalog",
+    )
+
+
 async def get_pool() -> asyncpg.Pool:
     """Return the shared connection pool, creating it with retry logic if needed."""
     global _pool
@@ -58,6 +89,7 @@ async def get_pool() -> asyncpg.Pool:
                 ssl=ssl_mode,
                 min_size=1,
                 max_size=10,
+                init=_init_connection,
             )
             print("✅ [DB] تم الاتصال بقاعدة البيانات بنجاح")
             return _pool
