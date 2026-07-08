@@ -789,6 +789,7 @@ file:///home/runner/workspace/lib/data/models/batch_model.dart
 file:///home/runner/workspace/lib/data/models/inventory_model.dart
 file:///home/runner/workspace/lib/data/models/inventory_summary_model.dart
 file:///home/runner/workspace/lib/data/models/machine_production_model.dart
+file:///home/runner/workspace/lib/data/models/production_standard_model.dart
 file:///home/runner/workspace/lib/data/models/raw_material_model.dart
 file:///home/runner/workspace/lib/data/models/reference_models.dart
 file:///home/runner/workspace/lib/data/models/voucher_models.dart
@@ -804,6 +805,7 @@ file:///home/runner/workspace/lib/presentation/pages/admin/inventory/stock_take_
 file:///home/runner/workspace/lib/presentation/pages/admin/machines/machines_page.dart
 file:///home/runner/workspace/lib/presentation/pages/admin/materials/materials_page.dart
 file:///home/runner/workspace/lib/presentation/pages/admin/production/production_page.dart
+file:///home/runner/workspace/lib/presentation/pages/admin/production_standards/production_standards_page.dart
 file:///home/runner/workspace/lib/presentation/pages/admin/recipes/recipe_management_page.dart
 file:///home/runner/workspace/lib/presentation/pages/admin/reports/reports_page.dart
 file:///home/runner/workspace/lib/presentation/pages/admin/settings/settings_page.dart
@@ -811,6 +813,7 @@ file:///home/runner/workspace/lib/presentation/pages/admin/shift_handover/shift_
 file:///home/runner/workspace/lib/presentation/pages/admin/suppliers/suppliers_page.dart
 file:///home/runner/workspace/lib/presentation/pages/admin/warehouse/mixing_warehouse_page.dart
 file:///home/runner/workspace/lib/presentation/pages/admin/warehouse/warehouse_manager_page.dart
+file:///home/runner/workspace/lib/presentation/pages/admin/waste_monitoring/waste_monitoring_page.dart
 file:///home/runner/workspace/lib/presentation/pages/admin/workers/workers_page.dart
 file:///home/runner/workspace/lib/presentation/pages/splash/splash_page.dart
 file:///home/runner/workspace/lib/presentation/pages/warehouse/warehouse_home_page.dart

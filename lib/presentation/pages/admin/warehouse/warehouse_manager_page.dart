@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../data/datasources/api_datasource.dart';
 import '../../../../data/models/voucher_models.dart';
 import '../../../../data/models/inventory_summary_model.dart';
-import '../../../../data/models/raw_material_model.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../../core/utils/helpers.dart';
 import '../../../../core/constants/app_constants.dart';
@@ -24,10 +23,6 @@ final transferVouchersProvider = FutureProvider.autoDispose<List<Map<String, dyn
 final _approvedReceiptsProvider = FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
   final ds = ref.read(dataSourceProvider);
   return ds.getReceiptVouchers(status: 'approved');
-});
-
-final _rawMaterialsProvider = FutureProvider.autoDispose<List<RawMaterialModel>>((ref) async {
-  return ref.read(dataSourceProvider).getRawMaterials();
 });
 
 final _summaryProvider = FutureProvider.autoDispose<List<InventorySummaryModel>>((ref) async {
@@ -1515,12 +1510,15 @@ class _ReceiptVoucherDialogState extends ConsumerState<_ReceiptVoucherDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final rawMatsAsync = ref.watch(_rawMaterialsProvider);
+    final summaryAsync = ref.watch(_summaryProvider);
     final suppliersAsync = ref.watch(_suppliersProvider);
-    final rawMaterials = rawMatsAsync.valueOrNull ?? [];
+    final materials = summaryAsync.valueOrNull
+            ?.where((m) => m.warehouseType == 'main')
+            .toList() ??
+        [];
     final suppliers = suppliersAsync.valueOrNull ?? [];
     final keeperName = widget.keeperName ?? 'أمين المخزن';
-    final matsLoading = rawMatsAsync.isLoading;
+    final matsLoading = summaryAsync.isLoading;
 
     return AlertDialog(
       title: Row(children: [
@@ -1642,10 +1640,10 @@ class _ReceiptVoucherDialogState extends ConsumerState<_ReceiptVoucherDialog> {
                   child: Center(child: CircularProgressIndicator()),
                 )
               else ...[
-                ..._items.asMap().entries.map((e) => _RawItemRow(
+                ..._items.asMap().entries.map((e) => _ItemRow(
                       index: e.key,
                       entry: e.value,
-                      rawMaterials: rawMaterials,
+                      materials: materials,
                       onRemove: () => _removeItem(e.key),
                       onChanged: () => setState(() {}),
                     )),
@@ -1870,6 +1868,7 @@ class _ItemEntry {
   String unit = 'كجم';
   double qty = 0;
   String? materialId;
+  double availableQty = 0;
 }
 
 class _ItemRow extends StatelessWidget {
@@ -1889,6 +1888,15 @@ class _ItemRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final itemNo = index + 1;
+    final selected = entry.name.isNotEmpty
+        ? materials
+            .where((m) =>
+                (entry.materialId != null && entry.materialId!.isNotEmpty)
+                    ? m.materialId == entry.materialId
+                    : m.materialName == entry.name)
+            .firstOrNull
+        : null;
+    final availableQty = selected?.currentBalance ?? entry.availableQty;
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(10),
@@ -1917,14 +1925,7 @@ class _ItemRow extends StatelessWidget {
           const SizedBox(height: 8),
           // ── Material dropdown (full width) ───────────────────
           DropdownButtonFormField<InventorySummaryModel>(
-            value: entry.name.isNotEmpty
-                ? materials
-                    .where((m) =>
-                        (entry.materialId != null && entry.materialId!.isNotEmpty)
-                            ? m.materialId == entry.materialId
-                            : m.materialName == entry.name)
-                    .firstOrNull
-                : null,
+            value: selected,
             decoration: const InputDecoration(
               labelText: 'اسم المادة *',
               prefixIcon: Icon(Icons.science_outlined, size: 18),
@@ -1937,7 +1938,7 @@ class _ItemRow extends StatelessWidget {
                 .map((m) => DropdownMenuItem<InventorySummaryModel>(
                       value: m,
                       child: Text(
-                        m.materialName,
+                        '${m.materialName}  —  متوفر: ${Helpers.formatQuantityInKg(m.currentBalance, m.unit)}',
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(fontSize: 13),
                       ),
@@ -1948,10 +1949,42 @@ class _ItemRow extends StatelessWidget {
                 entry.name = m.materialName;
                 entry.unit = m.unit;
                 entry.materialId = m.materialId;
+                entry.availableQty = m.currentBalance;
                 onChanged();
               }
             },
           ),
+          if (selected != null) ...[
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                const Icon(Icons.inventory_2_outlined, size: 13, color: Colors.grey),
+                const SizedBox(width: 4),
+                Text(
+                  'المتوفر حالياً: ${Helpers.formatQuantityInKg(availableQty, entry.unit)}',
+                  style: TextStyle(color: Colors.grey[600], fontSize: 11.5),
+                ),
+                const SizedBox(width: 10),
+                InkWell(
+                  onTap: availableQty > 0
+                      ? () {
+                          entry.qty = availableQty;
+                          onChanged();
+                        }
+                      : null,
+                  child: Text(
+                    'استخدام القيمة المتوفرة',
+                    style: TextStyle(
+                      color: availableQty > 0 ? Colors.teal : Colors.grey.shade400,
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w600,
+                      decoration: TextDecoration.underline,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
           const SizedBox(height: 8),
           // ── Qty + Unit side by side ──────────────────────────
           Row(
@@ -1959,6 +1992,7 @@ class _ItemRow extends StatelessWidget {
               Expanded(
                 flex: 3,
                 child: TextFormField(
+                  key: ValueKey('qty_${entry.materialId}_${entry.qty}'),
                   initialValue: entry.qty > 0 ? entry.qty.toString() : '',
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   decoration: const InputDecoration(
@@ -1985,148 +2019,6 @@ class _ItemRow extends StatelessWidget {
                   ),
                   items: AppConstants.units
                       .map((u) => DropdownMenuItem(value: u, child: Text(u, style: const TextStyle(fontSize: 13))))
-                      .toList(),
-                  onChanged: (v) {
-                    if (v != null) entry.unit = v;
-                    onChanged();
-                  },
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ══════════════════════════════════════════════════════════════════
-// Raw Material Item Row — used in Receipt Voucher Dialog
-// ══════════════════════════════════════════════════════════════════
-
-class _RawItemRow extends StatelessWidget {
-  final int index;
-  final _ItemEntry entry;
-  final List<RawMaterialModel> rawMaterials;
-  final VoidCallback onRemove;
-  final VoidCallback onChanged;
-  const _RawItemRow({
-    required this.index,
-    required this.entry,
-    required this.rawMaterials,
-    required this.onRemove,
-    required this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final itemNo = index + 1;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey.shade300),
-        borderRadius: BorderRadius.circular(8),
-        color: Colors.grey.shade50,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // ── Header: item number + remove ─────────────────────
-          Row(
-            children: [
-              Text(
-                'البند $itemNo',
-                style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 13,
-                    color: Colors.teal),
-              ),
-              const Spacer(),
-              InkWell(
-                onTap: onRemove,
-                child: const Icon(Icons.remove_circle_outline,
-                    color: Colors.red, size: 20),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          // ── Material dropdown ─────────────────────────────────
-          DropdownButtonFormField<RawMaterialModel>(
-            value: entry.name.isNotEmpty
-                ? rawMaterials
-                    .where((m) =>
-                        (entry.materialId != null &&
-                                entry.materialId!.isNotEmpty)
-                            ? m.id == entry.materialId
-                            : m.name == entry.name)
-                    .firstOrNull
-                : null,
-            decoration: const InputDecoration(
-              labelText: 'اسم المادة *',
-              prefixIcon: Icon(Icons.science_outlined, size: 18),
-              isDense: true,
-              border: OutlineInputBorder(),
-            ),
-            hint: const Text('اختر المادة',
-                style: TextStyle(fontSize: 13)),
-            isExpanded: true,
-            items: rawMaterials
-                .map((m) => DropdownMenuItem<RawMaterialModel>(
-                      value: m,
-                      child: Text(
-                        m.name,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 13),
-                      ),
-                    ))
-                .toList(),
-            onChanged: (m) {
-              if (m != null) {
-                entry.name = m.name;
-                entry.unit = m.unit;
-                entry.materialId = m.id;
-                onChanged();
-              }
-            },
-          ),
-          const SizedBox(height: 8),
-          // ── Qty + Unit side by side ───────────────────────────
-          Row(
-            children: [
-              Expanded(
-                flex: 3,
-                child: TextFormField(
-                  initialValue: entry.qty > 0 ? entry.qty.toString() : '',
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(
-                    labelText: 'الكمية *',
-                    isDense: true,
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.scale_outlined, size: 18),
-                  ),
-                  onChanged: (v) {
-                    entry.qty = double.tryParse(v) ?? 0;
-                    onChanged();
-                  },
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                flex: 2,
-                child: DropdownButtonFormField<String>(
-                  value: entry.unit,
-                  decoration: const InputDecoration(
-                    isDense: true,
-                    labelText: 'الوحدة',
-                    border: OutlineInputBorder(),
-                  ),
-                  items: AppConstants.units
-                      .map((u) => DropdownMenuItem(
-                          value: u,
-                          child: Text(u,
-                              style: const TextStyle(fontSize: 13))))
                       .toList(),
                   onChanged: (v) {
                     if (v != null) entry.unit = v;
