@@ -90,6 +90,20 @@ def _to_kg(qty: float, unit: str) -> float:
     return qty
 
 
+def _from_kg(qty_kg: float, unit: str) -> float:
+    """Convert a KG quantity back to the material's native storage unit.
+
+    inventory.balance / inventory_transactions.quantity are stored in the
+    material's own unit (e.g. grams for pigments), not always KG — matching
+    how the Flutter opening-balance/receive/transfer screens read and write
+    them (they label the field with the material's unit and store the raw
+    number as-is). Gram-based units are multiplied by 1000.
+    """
+    if unit and unit.strip().lower() in _GRAM_UNITS:
+        return qty_kg * 1000.0
+    return qty_kg
+
+
 def _extract_materials(batch: BatchCreate) -> list:
     """Return a flat list of {material_id, name, quantity_kg, unit} for ALL
     materials in the batch that have qty > 0.
@@ -230,7 +244,7 @@ async def _apply_deductions(pool, batch_id: str, batch_number: str,
 
             logger.info(f"[deduct DEBUG] checking material_id={item['material_id']!r} name={item.get('name')!r} qty={item.get('quantity')}")
             inv = await pool.fetchrow(
-                """SELECT i.balance, rm.min_stock, i.material_id::text AS resolved_id
+                """SELECT i.balance, rm.min_stock, rm.unit, i.material_id::text AS resolved_id
                    FROM inventory i
                    JOIN raw_materials rm ON rm.id::text = i.material_id::text
                    WHERE i.material_id=$1::uuid AND i.warehouse_type='mixer'""",
@@ -245,7 +259,7 @@ async def _apply_deductions(pool, batch_id: str, batch_number: str,
             #   1. exact match  2. DB-name is prefix of request-name  3. reverse
             if inv is None and item.get("name"):
                 inv = await pool.fetchrow(
-                    """SELECT i.balance, rm.min_stock, i.material_id::text AS resolved_id
+                    """SELECT i.balance, rm.min_stock, rm.unit, i.material_id::text AS resolved_id
                        FROM inventory i
                        JOIN raw_materials rm ON rm.id::text = i.material_id::text
                        WHERE (LOWER(TRIM(rm.name)) = LOWER(TRIM($1))
@@ -268,20 +282,38 @@ async def _apply_deductions(pool, batch_id: str, batch_number: str,
                     item["_resolved_id"] = inv["resolved_id"]
             # effective_id is the authoritative ID for this inventory row
             effective_id_check = item.get("_resolved_id") or item["material_id"]
+            # inventory.balance is stored in the material's own unit (kg or
+            # gram — same convention the Flutter opening-balance/receive/
+            # transfer screens use). item["quantity"] is always KG (see
+            # _extract_materials). Convert the KG requirement into the
+            # material's native unit before comparing, so gram-based
+            # materials (pigments) aren't compared kg-vs-gram.
+            # Resolution order: inventory-row unit → raw_materials.unit by
+            # id (covers the "no inventory row yet" case) → payload unit →
+            # default kg.
+            item_unit = inv["unit"] if inv else None
+            if not item_unit:
+                rm_row = await pool.fetchrow(
+                    "SELECT unit FROM raw_materials WHERE id=$1::uuid",
+                    effective_id_check,
+                )
+                item_unit = rm_row["unit"] if rm_row else None
+            item_unit = item_unit or item.get("unit") or "كجم"
+            needed_native = _from_kg(item["quantity"], item_unit)
             available = float(inv["balance"]) if inv else 0.0
-            if available < item["quantity"]:
+            if available < needed_native:
                 # Check main warehouse balance using the resolved id
                 main_inv = await pool.fetchrow(
                     """SELECT balance FROM inventory
                        WHERE material_id=$1::uuid AND warehouse_type='main'""",
                     effective_id_check,
                 )
-                main_balance = float(main_inv["balance"]) if main_inv else 0.0
+                main_balance_native = float(main_inv["balance"]) if main_inv else 0.0
                 insufficient.append({
                     **item,
                     "material_id": effective_id_check,   # use resolved id in alert
-                    "available": available,
-                    "main_balance": main_balance,
+                    "available": _to_kg(available, item_unit),
+                    "main_balance": _to_kg(main_balance_native, item_unit),
                 })
 
         if insufficient:
@@ -346,7 +378,7 @@ async def _apply_deductions(pool, batch_id: str, batch_number: str,
         effective_id = item.get("_resolved_id") or item["material_id"]
 
         inv = await pool.fetchrow(
-            """SELECT i.balance, rm.min_stock
+            """SELECT i.balance, rm.min_stock, rm.unit
                FROM inventory i
                JOIN raw_materials rm ON rm.id::text = i.material_id::text
                WHERE i.material_id=$1::uuid AND i.warehouse_type='mixer'""",
@@ -356,7 +388,7 @@ async def _apply_deductions(pool, batch_id: str, batch_number: str,
         # Same resolution order as _resolve_names_to_ids: exact → DB-prefix → Flutter-prefix
         if inv is None and item.get("name") and not item.get("_resolved_id"):
             inv_fallback = await pool.fetchrow(
-                """SELECT i.balance, rm.min_stock, i.material_id::text AS resolved_id
+                """SELECT i.balance, rm.min_stock, rm.unit, i.material_id::text AS resolved_id
                    FROM inventory i
                    JOIN raw_materials rm ON rm.id::text = i.material_id::text
                    WHERE (LOWER(TRIM(rm.name)) = LOWER(TRIM($1))
@@ -376,9 +408,25 @@ async def _apply_deductions(pool, batch_id: str, batch_number: str,
                 inv = inv_fallback
                 logger.info(f"[deduct step4] name fallback for '{item['name']}' → {effective_id}")
 
+        # inventory.balance / inventory_transactions.quantity are stored in
+        # the material's own unit (kg or gram), same as item["quantity"] is
+        # always KG — convert before touching the balance column so gram-
+        # based materials (pigments) are never subtracted using a raw KG
+        # number against a gram-denominated balance.
+        # Resolution order: inventory-row unit → raw_materials.unit by id
+        # (covers the "no inventory row yet" case) → payload unit → kg.
+        item_unit = inv["unit"] if inv else None
+        if not item_unit:
+            rm_row = await pool.fetchrow(
+                "SELECT unit FROM raw_materials WHERE id=$1::uuid", effective_id,
+            )
+            item_unit = rm_row["unit"] if rm_row else None
+        item_unit = item_unit or item.get("unit") or "كجم"
+        native_qty = _from_kg(item["quantity"], item_unit)
+
         balance_before = float(inv["balance"]) if inv else 0.0
         min_stock = float(inv["min_stock"]) if inv else 0.0
-        balance_after = balance_before - item["quantity"]
+        balance_after = balance_before - native_qty
 
         # Upsert inventory row, subtracting qty
         await pool.execute(
@@ -386,7 +434,7 @@ async def _apply_deductions(pool, batch_id: str, batch_number: str,
                VALUES (gen_random_uuid(), $1::uuid, 'mixer', -$2::decimal, NOW())
                ON CONFLICT (material_id, warehouse_type)
                DO UPDATE SET balance = inventory.balance - $2::decimal, updated_at = NOW()""",
-            effective_id, item["quantity"],
+            effective_id, native_qty,
         )
 
         # Transaction record
@@ -395,18 +443,20 @@ async def _apply_deductions(pool, batch_id: str, batch_number: str,
                (id, material_id, warehouse_type, transaction_type, quantity,
                 batch_id, transaction_ref, created_by, balance_before, balance_after)
                VALUES (gen_random_uuid(),$1::uuid,'mixer','out',$2,$3,$4,$5,$6,$7)""",
-            effective_id, item["quantity"],
+            effective_id, native_qty,
             batch_id, transaction_id, created_by,
             balance_before, balance_after,
         )
 
-        # Low / zero stock alerts
+        # Low / zero stock alerts (message shown in KG for readability)
+        balance_after_kg = _to_kg(balance_after, item_unit)
+        min_stock_kg = _to_kg(min_stock, item_unit)
         if balance_after <= 0:
             sev = "critical"
-            msg = f"نفاد المخزون: {item['name']} — الرصيد {balance_after:.3f} كجم"
+            msg = f"نفاد المخزون: {item['name']} — الرصيد {balance_after_kg:.3f} كجم"
         elif min_stock > 0 and balance_after <= min_stock:
             sev = "high"
-            msg = f"مخزون منخفض: {item['name']} — الرصيد {balance_after:.3f} كجم (الحد الأدنى {min_stock:.0f})"
+            msg = f"مخزون منخفض: {item['name']} — الرصيد {balance_after_kg:.3f} كجم (الحد الأدنى {min_stock_kg:.0f})"
         else:
             sev = None
 
