@@ -82,11 +82,14 @@ async def get_standard_by_product(name: str = Query(...)):
 async def get_standard(standard_id: str):
     pool = await get_pool()
     await _ensure_table(pool)
-    row = await pool.fetchrow(
-        "SELECT *, (standard_gram_per_pair / 1000.0) AS standard_kg_per_pair "
-        "FROM production_standards WHERE id=$1",
-        standard_id,
-    )
+    try:
+        row = await pool.fetchrow(
+            "SELECT *, (standard_gram_per_pair / 1000.0) AS standard_kg_per_pair "
+            "FROM production_standards WHERE id=$1::uuid",
+            standard_id,
+        )
+    except Exception:
+        raise HTTPException(status_code=400, detail="معرّف معيار غير صالح")
     if not row:
         raise HTTPException(status_code=404, detail="المعيار غير موجود")
     return dict(row)
@@ -117,9 +120,12 @@ async def create_standard(body: StandardCreate):
 async def update_standard(standard_id: str, body: StandardCreate):
     pool = await get_pool()
     await _ensure_table(pool)
-    old = await pool.fetchrow(
-        "SELECT * FROM production_standards WHERE id=$1", standard_id
-    )
+    try:
+        old = await pool.fetchrow(
+            "SELECT * FROM production_standards WHERE id=$1::uuid", standard_id
+        )
+    except Exception:
+        raise HTTPException(status_code=400, detail="معرّف معيار غير صالح")
     if not old:
         raise HTTPException(status_code=404, detail="المعيار غير موجود")
 
@@ -127,7 +133,7 @@ async def update_standard(standard_id: str, body: StandardCreate):
         """UPDATE production_standards SET
            product_name=$1, product_code=$2, standard_gram_per_pair=$3,
            is_active=$4, notes=$5, updated_at=NOW()
-           WHERE id=$6
+           WHERE id=$6::uuid
            RETURNING *, (standard_gram_per_pair / 1000.0) AS standard_kg_per_pair""",
         body.product_name, body.product_code, body.standard_gram_per_pair,
         body.is_active, body.notes, standard_id,
@@ -163,9 +169,12 @@ async def delete_standard(standard_id: str):
     pool = await get_pool()
     await _ensure_table(pool)
     # Check usage in production records — do NOT swallow errors (silent 0 is unsafe)
-    used = await pool.fetchval(
-        "SELECT COUNT(*) FROM machine_production WHERE standard_id=$1", standard_id
-    )
+    try:
+        used = await pool.fetchval(
+            "SELECT COUNT(*) FROM machine_production WHERE standard_id=$1::uuid", standard_id
+        )
+    except Exception:
+        raise HTTPException(status_code=400, detail="معرّف معيار غير صالح")
     if used and used > 0:
         raise HTTPException(
             status_code=400,
@@ -175,11 +184,11 @@ async def delete_standard(standard_id: str):
             ),
         )
     std = await pool.fetchrow(
-        "SELECT product_name FROM production_standards WHERE id=$1", standard_id
+        "SELECT product_name FROM production_standards WHERE id=$1::uuid", standard_id
     )
     if not std:
         raise HTTPException(status_code=404, detail="المعيار غير موجود")
-    await pool.execute("DELETE FROM production_standards WHERE id=$1", standard_id)
+    await pool.execute("DELETE FROM production_standards WHERE id=$1::uuid", standard_id)
     await pool.execute(
         """INSERT INTO audit_log (id, action, table_name, record_id, description)
            VALUES (gen_random_uuid(), 'delete', 'production_standards', $1, $2)""",
