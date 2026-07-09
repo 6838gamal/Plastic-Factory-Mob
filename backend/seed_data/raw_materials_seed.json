@@ -33,28 +33,6 @@
     "notes": null
   },
   {
-    "id": "4b980301-e285-448e-8f1c-6d42032e5ff9",
-    "name": "بيكربونات اصفر محلي",
-    "code": null,
-    "category": "مواد أساسية",
-    "unit": "كجم",
-    "min_stock": "0.000",
-    "cost_per_unit": "0.000",
-    "is_active": true,
-    "notes": null
-  },
-  {
-    "id": "55e4bffa-b191-4cd1-96b1-cdd0569e364c",
-    "name": "سيتريك اسيد (ملح الليمون) 490 عبوة 25 كجم",
-    "code": null,
-    "category": "مواد أساسية",
-    "unit": "كجم",
-    "min_stock": "0.000",
-    "cost_per_unit": "0.000",
-    "is_active": true,
-    "notes": null
-  },
-  {
     "id": "df2d2860-7956-4a77-a654-91a57aa0926e",
     "name": "DOP زيت",
     "code": null,
@@ -132,17 +110,6 @@
     "notes": null
   },
   {
-    "id": "ebdf02cd-1ca1-400b-bc29-ac178af94f2a",
-    "name": "كالسيوم باودر عبوة 25 كيلو",
-    "code": null,
-    "category": "مواد أساسية",
-    "unit": "كجم",
-    "min_stock": "0.000",
-    "cost_per_unit": "0.000",
-    "is_active": true,
-    "notes": null
-  },
-  {
     "id": "5a77527d-df9d-479e-a1cb-38d4b1a8f1b5",
     "name": "شمع باودر عبوة 25 كيلو",
     "code": null,
@@ -154,19 +121,41 @@
     "notes": null
   },
   {
-    "id": "84e33a9e-a935-4521-a94a-0e1b5335a696",
-    "name": "صبغه سوداء طاووس محلي",
+    "id": "ebdf02cd-1ca1-400b-bc29-ac178af94f2a",
+    "name": "كالسيوم باودر عبوة 25 كيلو",
     "code": null,
-    "category": "أصباغ",
-    "unit": "جرام",
+    "category": "مواد أساسية",
+    "unit": "كجم",
     "min_stock": "0.000",
     "cost_per_unit": "0.000",
     "is_active": true,
     "notes": null
   },
   {
-    "id": "f2d6dd81-cd88-4bb3-9152-82d0498c60bd",
-    "name": "صبغة ارجواني عبوة 25 كيلو رقم-F٤٠٩",
+    "id": "4b980301-e285-448e-8f1c-6d42032e5ff9",
+    "name": "بيكربونات اصفر محلي",
+    "code": null,
+    "category": "مواد أساسية",
+    "unit": "كجم",
+    "min_stock": "0.000",
+    "cost_per_unit": "0.000",
+    "is_active": true,
+    "notes": null
+  },
+  {
+    "id": "55e4bffa-b191-4cd1-96b1-cdd0569e364c",
+    "name": "سيتريك اسيد (ملح الليمون) 490 عبوة 25 كجم",
+    "code": null,
+    "category": "مواد أساسية",
+    "unit": "كجم",
+    "min_stock": "0.000",
+    "cost_per_unit": "0.000",
+    "is_active": true,
+    "notes": null
+  },
+  {
+    "id": "84e33a9e-a935-4521-a94a-0e1b5335a696",
+    "name": "صبغه سوداء طاووس محلي",
     "code": null,
     "category": "أصباغ",
     "unit": "جرام",
@@ -264,14 +253,14 @@
     "notes": null
   },
   {
-    "id": "ad2a9859-39aa-4671-a065-f3655a1980a6",
-    "name": "لواصق موديل ٦٠٢٢-٨٠٢٢ بالحبه",
+    "id": "f2d6dd81-cd88-4bb3-9152-82d0498c60bd",
+    "name": "صبغة ارجواني عبوة 25 كيلو رقم-F٤٠٩",
     "code": null,
-    "category": "إضافات",
-    "unit": "قطعة",
+    "category": "أصباغ",
+    "unit": "جرام",
     "min_stock": "0.000",
     "cost_per_unit": "0.000",
-    "is_active": true,
+    "is_active": false,
     "notes": null
   },
   {
@@ -280,6 +269,17 @@
     "code": null,
     "category": "إضافات",
     "unit": "كجم",
+    "min_stock": "0.000",
+    "cost_per_unit": "0.000",
+    "is_active": true,
+    "notes": null
+  },
+  {
+    "id": "ad2a9859-39aa-4671-a065-f3655a1980a6",
+    "name": "لواصق موديل ٦٠٢٢-٨٠٢٢ بالحبه",
+    "code": null,
+    "category": "إضافات",
+    "unit": "قطعة",
     "min_stock": "0.000",
     "cost_per_unit": "0.000",
     "is_active": true,
@@ -436,7 +436,7 @@
     "unit": "كجم",
     "min_stock": "50.000",
     "cost_per_unit": "0.000",
-    "is_active": true,
+    "is_active": false,
     "notes": null
   },
   {
@@ -579,7 +579,7 @@
     "unit": "كجم",
     "min_stock": "10.000",
     "cost_per_unit": "0.000",
-    "is_active": true,
+    "is_active": false,
     "notes": null
   },
   {
@@ -788,7 +788,7 @@
     "unit": "كجم",
     "min_stock": "50.000",
     "cost_per_unit": "0.000",
-    "is_active": true,
+    "is_active": false,
     "notes": null
   },
   {
@@ -865,7 +865,7 @@
     "unit": "كجم",
     "min_stock": "25.000",
     "cost_per_unit": "0.000",
-    "is_active": true,
+    "is_active": false,
     "notes": null
   },
   {
@@ -931,7 +931,7 @@
     "unit": "كجم",
     "min_stock": "10.000",
     "cost_per_unit": "0.000",
-    "is_active": true,
+    "is_active": false,
     "notes": null
   },
   {
