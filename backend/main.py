@@ -455,6 +455,7 @@ JOIN raw_materials rm ON rm.id = i.material_id
         logger.warning(f"[init_db] inventory_summary VIEW migration skipped: {exc}")
 
 
+
 async def _seed_default_admin():
     """Ensure a default admin user always exists on startup."""
     pool = await get_pool()
@@ -475,7 +476,7 @@ async def _seed_default_settings():
     """Seed required settings rows if they don't exist yet."""
     pool = await get_pool()
     defaults = [
-        ("prevent_negative_stock",    "true",  "منع الخصم عند نقص المخزون"),
+        ("prevent_negative_stock",    "false", "منع الخصم عند نقص المخزون"),
         ("deviation_alert_threshold", "2.0",   "نسبة الانحراف لإنشاء تنبيه (%)"),
         ("deviation_notes_threshold", "5.0",   "نسبة الانحراف لإلزام الملاحظة (%)"),
         ("scrap_material_id",         "",      "معرف مادة الهالك"),
