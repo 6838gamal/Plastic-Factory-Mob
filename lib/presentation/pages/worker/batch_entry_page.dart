@@ -216,7 +216,17 @@ class _BatchEntryPageState extends ConsumerState<BatchEntryPage> {
       return;
     }
 
-    final mats = ref.read(rawMaterialsProvider).valueOrNull ?? [];
+    final rawMaterialsState = ref.read(rawMaterialsProvider);
+    if (rawMaterialsState.isLoading) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('يتم تحديث قائمة المواد الخام، حاول مرة أخرى بعد لحظة'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+    final mats = rawMaterialsState.valueOrNull ?? [];
 
     // Upload image (optional on web)
     String? imageUrl;
@@ -294,6 +304,7 @@ class _BatchEntryPageState extends ConsumerState<BatchEntryPage> {
       );
       ref.invalidate(inventorySummaryProvider); // خصم من مخزن الخلاط — حدّث الكروت في كل الشاشات
       ref.invalidate(_mixerBalanceProvider); // تحديث رصيد مخزن الخلاط بعد الحفظ
+      ref.invalidate(rawMaterialsProvider); // إعادة جلب قائمة المواد الخام من الخادم (تجنّب الكاش القديمة)
       _resetForm();
     } else {
       ScaffoldMessenger.of(context).showSnackBar(

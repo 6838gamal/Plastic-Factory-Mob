@@ -6,7 +6,11 @@ import '../../data/models/production_standard_model.dart';
 import '../../data/models/inventory_summary_model.dart';
 import 'auth_provider.dart';
 
-final rawMaterialsProvider = FutureProvider<List<RawMaterialModel>>((ref) async {
+// autoDispose: تُعاد قراءة القائمة من الخادم عند كل دخول للشاشة بدل الاحتفاظ
+// بنسخة قديمة في الذاكرة طوال عمر التطبيق (كانت هذه هي "الكاش القديمة" التي
+// تسببت في إرسال معرّف مادة محذوفة/معطّلة من شاشة إدخال الطبخات).
+final rawMaterialsProvider =
+    FutureProvider.autoDispose<List<RawMaterialModel>>((ref) async {
   final ds = ref.read(dataSourceProvider);
   return ds.getRawMaterials();
 });
