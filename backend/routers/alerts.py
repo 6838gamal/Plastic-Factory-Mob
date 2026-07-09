@@ -93,3 +93,15 @@ async def delete_alert(alert_id: str):
         raise HTTPException(status_code=409, detail="Only resolved alerts can be deleted")
     row = await pool.fetchrow("DELETE FROM alerts WHERE id=$1 RETURNING id", alert_id)
     return {"success": True}
+
+
+@router.delete("")
+async def delete_all_alerts(status: Optional[str] = Query(None)):
+    """Bulk-clear alerts. Optionally restrict to a single status; otherwise clears all."""
+    pool = await get_pool()
+    if status:
+        result = await pool.execute("DELETE FROM alerts WHERE status=$1", status)
+    else:
+        result = await pool.execute("DELETE FROM alerts")
+    deleted = int(result.split()[-1]) if result else 0
+    return {"success": True, "deleted": deleted}

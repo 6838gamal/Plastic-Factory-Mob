@@ -71,6 +71,28 @@ async def get_audit_logs(
     return [dict(r) for r in rows]
 
 
+@router.delete("")
+async def delete_audit_logs(
+    table_name: Optional[str] = Query(None),
+    from_: Optional[str] = Query(None, alias="from"),
+    to: Optional[str] = Query(None),
+):
+    """Bulk-clear audit log entries. Optionally restrict by table/date range; otherwise clears all."""
+    pool = await get_pool()
+    conditions = ["1=1"]
+    params = []
+    i = 1
+    if table_name:
+        conditions.append(f"table_name=${i}"); params.append(table_name); i += 1
+    if from_:
+        conditions.append(f"created_at>=${i}"); params.append(_parse_dt(from_)); i += 1
+    if to:
+        conditions.append(f"created_at<${i}"); params.append(_parse_dt(to, end_of_day=True)); i += 1
+    result = await pool.execute(f"DELETE FROM audit_log WHERE {' AND '.join(conditions)}", *params)
+    deleted = int(result.split()[-1]) if result else 0
+    return {"success": True, "deleted": deleted}
+
+
 @router.post("")
 async def add_audit_log(body: AuditCreate):
     pool = await get_pool()

@@ -102,12 +102,14 @@ class ApiDataSource {
     return jsonDecode(res.body);
   }
 
-  Future<void> _delete(String path) async {
+  Future<dynamic> _delete(String path) async {
     final uri = Uri.parse('$_baseUrl$path');
     final res = await http.delete(uri, headers: _headers);
     if (res.statusCode >= 400) {
       throw Exception(_extractError(jsonDecode(res.body)));
     }
+    if (res.body.isEmpty) return null;
+    return jsonDecode(res.body);
   }
 
   // ==================== GENERIC RAW CALLS ====================
@@ -524,6 +526,22 @@ class ApiDataSource {
       'to': to?.toIso8601String(),
     });
     return (res as List).map((e) => AuditLogModel.fromJson(e)).toList();
+  }
+
+  Future<int> deleteAuditLogs() async {
+    final res = await _delete('/api/audit');
+    return (res as Map<String, dynamic>)['deleted'] as int? ?? 0;
+  }
+
+  // ==================== DANGER ZONE (bulk clear) ====================
+  Future<int> deleteAllAlerts() async {
+    final res = await _delete('/api/alerts');
+    return (res as Map<String, dynamic>)['deleted'] as int? ?? 0;
+  }
+
+  Future<int> deleteAllDailyReports() async {
+    final res = await _delete('/api/reports/daily');
+    return (res as Map<String, dynamic>)['deleted'] as int? ?? 0;
   }
 
   // ==================== IMAGES ====================

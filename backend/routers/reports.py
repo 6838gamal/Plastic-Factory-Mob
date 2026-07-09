@@ -83,6 +83,25 @@ async def get_daily_report(report_date: str):
     return d
 
 
+@router.delete("/daily")
+async def delete_daily_reports(
+    from_: Optional[str] = Query(None, alias="from"),
+    to: Optional[str] = Query(None),
+):
+    """Bulk-clear daily reports. Optionally restrict to a date range; otherwise clears all."""
+    pool = await get_pool()
+    conditions = ["1=1"]
+    params: list = []
+    i = 1
+    if from_:
+        conditions.append(f"report_date >= ${i}"); params.append(_parse_date(from_)); i += 1
+    if to:
+        conditions.append(f"report_date <= ${i}"); params.append(_parse_date(to)); i += 1
+    result = await pool.execute(f"DELETE FROM daily_reports WHERE {' AND '.join(conditions)}", *params)
+    deleted = int(result.split()[-1]) if result else 0
+    return {"success": True, "deleted": deleted}
+
+
 @router.post("/daily/generate")
 async def generate_daily_report(
     report_date: Optional[str] = Query(None, description="YYYY-MM-DD — defaults to today"),

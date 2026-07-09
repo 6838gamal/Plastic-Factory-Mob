@@ -6,6 +6,8 @@ import '../../../../data/datasources/api_datasource.dart';
 import '../../../../data/models/reference_models.dart';
 import '../../../../data/models/raw_material_model.dart';
 import '../../../providers/auth_provider.dart';
+import '../../../providers/batch_provider.dart';
+import '../audit/audit_log_page.dart' show auditLogProvider;
 
 final _smsSettingsProvider = FutureProvider<Map<String, dynamic>>((ref) async {
   final ds = ref.read(dataSourceProvider);
@@ -254,6 +256,90 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 trailing: ElevatedButton(
                   onPressed: () => _showAddProductDialog(context),
                   child: const Text('إضافة'),
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 16),
+
+        // ── منطقة الخطر ──────────────────────────────────────────
+        _SectionTitle('منطقة الخطر'),
+        Card(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+            side: BorderSide(color: Colors.red.withOpacity(0.4)),
+          ),
+          child: Column(
+            children: [
+              const Padding(
+                padding: EdgeInsets.fromLTRB(16, 12, 16, 4),
+                child: Row(
+                  children: [
+                    Icon(Icons.warning_amber_rounded, color: Colors.red),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'هذه الإجراءات تحذف البيانات نهائيًا من قاعدة البيانات ولا يمكن التراجع عنها',
+                        style: TextStyle(color: Colors.red, fontSize: 12),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 0),
+              ListTile(
+                leading: const Icon(Icons.notifications_off_outlined, color: Colors.red),
+                title: const Text('تصفير التحذيرات'),
+                subtitle: const Text('حذف جميع التحذيرات (معلقة/مؤكدة/محلولة)'),
+                trailing: TextButton(
+                  onPressed: () => _confirmAndClear(
+                    context: context,
+                    title: 'تصفير التحذيرات',
+                    message: 'سيتم حذف جميع التحذيرات نهائيًا من قاعدة البيانات. هل أنت متأكد؟',
+                    action: () => ref.read(dataSourceProvider).deleteAllAlerts(),
+                    onDone: () {
+                      ref.invalidate(alertsProvider(const AlertFilters(status: 'pending')));
+                      ref.invalidate(alertsProvider(const AlertFilters(status: 'acknowledged')));
+                      ref.invalidate(alertsProvider(const AlertFilters(status: 'resolved')));
+                    },
+                  ),
+                  style: TextButton.styleFrom(foregroundColor: Colors.red),
+                  child: const Text('تصفير'),
+                ),
+              ),
+              const Divider(height: 0),
+              ListTile(
+                leading: const Icon(Icons.summarize_outlined, color: Colors.red),
+                title: const Text('تصفير التقارير اليومية'),
+                subtitle: const Text('حذف جميع التقارير اليومية المُنشأة'),
+                trailing: TextButton(
+                  onPressed: () => _confirmAndClear(
+                    context: context,
+                    title: 'تصفير التقارير',
+                    message: 'سيتم حذف جميع التقارير اليومية نهائيًا من قاعدة البيانات. هل أنت متأكد؟',
+                    action: () => ref.read(dataSourceProvider).deleteAllDailyReports(),
+                  ),
+                  style: TextButton.styleFrom(foregroundColor: Colors.red),
+                  child: const Text('تصفير'),
+                ),
+              ),
+              const Divider(height: 0),
+              ListTile(
+                leading: const Icon(Icons.history_toggle_off, color: Colors.red),
+                title: const Text('تصفير سجل العمليات'),
+                subtitle: const Text('حذف جميع سجلات التدقيق (Audit Log)'),
+                trailing: TextButton(
+                  onPressed: () => _confirmAndClear(
+                    context: context,
+                    title: 'تصفير سجل العمليات',
+                    message: 'سيتم حذف جميع سجلات التدقيق نهائيًا من قاعدة البيانات. هل أنت متأكد؟',
+                    action: () => ref.read(dataSourceProvider).deleteAuditLogs(),
+                    onDone: () => ref.invalidate(auditLogProvider),
+                  ),
+                  style: TextButton.styleFrom(foregroundColor: Colors.red),
+                  child: const Text('تصفير'),
                 ),
               ),
             ],
@@ -898,6 +984,93 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         ],
       ),
     );
+  }
+
+  // ── منطقة الخطر: تأكيد مزدوج قبل أي حذف نهائي ──────────────────
+  Future<void> _confirmAndClear({
+    required BuildContext context,
+    required String title,
+    required String message,
+    required Future<int> Function() action,
+    VoidCallback? onDone,
+  }) async {
+    final confirmCtrl = TextEditingController();
+    bool confirmedFirst = false;
+
+    final firstStep = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(children: [
+          const Icon(Icons.warning_amber_rounded, color: Colors.red),
+          const SizedBox(width: 8),
+          Expanded(child: Text(title)),
+        ]),
+        content: Text(message),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('إلغاء')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('متابعة'),
+          ),
+        ],
+      ),
+    );
+    if (firstStep != true) return;
+    confirmedFirst = true;
+
+    if (!confirmedFirst || !context.mounted) return;
+
+    final finalConfirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, ss) => AlertDialog(
+          title: const Text('تأكيد نهائي'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('اكتب "حذف" لتأكيد العملية:'),
+              const SizedBox(height: 8),
+              TextField(
+                controller: confirmCtrl,
+                decoration: const InputDecoration(border: OutlineInputBorder()),
+                onChanged: (_) => ss(() {}),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('إلغاء')),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+              onPressed: confirmCtrl.text.trim() == 'حذف'
+                  ? () => Navigator.pop(ctx, true)
+                  : null,
+              child: const Text('حذف نهائيًا'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (finalConfirm != true) return;
+
+    try {
+      final deleted = await action();
+      onDone?.call();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('تم الحذف بنجاح ($deleted سجل)'),
+          backgroundColor: Colors.green,
+        ));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('خطأ: $e'),
+          backgroundColor: Colors.red,
+        ));
+      }
+    }
   }
 }
 
