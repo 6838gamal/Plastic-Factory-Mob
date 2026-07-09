@@ -105,11 +105,11 @@ def _from_kg(qty_kg: float, unit: str) -> float:
 
 
 def _extract_materials(batch: BatchCreate) -> list:
-    """Return a flat list of {material_id, name, quantity_kg, unit} for ALL
+    """Return a flat list of {material_id, code, name, quantity_kg, unit} for ALL
     materials in the batch that have qty > 0.
 
-    Items without material_id will have material_id=None and will be resolved
-    by name via _resolve_names_to_ids() before deduction.
+    Items without material_id will be resolved via _resolve_to_ids() which tries
+    (in order): UUID → material_code → name. Name-based lookup is the last resort.
 
     Quantities are automatically converted to KG (gram units ÷ 1000).
 
@@ -135,6 +135,7 @@ def _extract_materials(batch: BatchCreate) -> list:
             if not isinstance(item, dict):
                 continue
             mid = item.get("material_id") or item.get("id") or None
+            code = (item.get("material_code") or item.get("code") or "").strip() or None
             # Accept both 'name' and 'material_name' keys (Flutter sends material_name)
             name = (item.get("name") or item.get("material_name") or "").strip()
             qty_raw = float(item.get("quantity", 0) or 0)
@@ -142,16 +143,17 @@ def _extract_materials(batch: BatchCreate) -> list:
             qty_kg = _to_kg(qty_raw, unit)
             if qty_kg <= 0:
                 continue
-            if not mid and not name:
+            if not mid and not code and not name:
                 continue
             # Aggregate duplicates within the same list only
-            key = str(mid) if mid else name.lower()
+            key = str(mid) if mid else (code or name.lower())
             if key in seen:
                 seen[key]["quantity"] += qty_kg
                 seen[key]["quantity_original"] += qty_raw
             else:
                 entry = {
                     "material_id": str(mid) if mid else None,
+                    "code": code,
                     "name": name,
                     "quantity": qty_kg,          # always KG for deduction
                     "quantity_original": qty_raw,
@@ -162,26 +164,42 @@ def _extract_materials(batch: BatchCreate) -> list:
     return items
 
 
-async def _resolve_names_to_ids(pool, materials: list) -> list:
-    """For items that have no material_id, look up the id by name in raw_materials.
+async def _resolve_to_ids(pool, materials: list) -> list:
+    """للعناصر التي لا تحمل material_id، يبحث عن UUID المادة بهذا الترتيب:
 
-    Resolution order (most specific first):
-      1. Exact match (case-insensitive, trimmed)
-      2. DB name is a prefix of the Flutter name  (e.g. 'كالسيوم باودر' ⊂ 'كالسيوم باودر عبوة 25 كيلو')
-      3. Flutter name is a prefix of the DB name  (reverse prefix)
+      1. material_id موجود مسبقاً → يُستخدم مباشرة (بدون DB query)
+      2. material_code (الكود المختصر مثل OIL-003) → بحث دقيق في raw_materials.code
+      3. name (الاسم) → بحث نصي تقريبي (آخر ملجأ فقط)
 
-    Items that cannot be resolved are kept with material_id=None and will be
-    skipped by _apply_deductions (no crash, no silent data loss).
+    العناصر التي لا تُحل تبقى بـ material_id=None وتُتجاهل في الخصم.
     """
     if not materials:
         return materials
     resolved = []
     for item in materials:
+        # ── 1. UUID موجود ──────────────────────────────────────────────────────
         if item.get("material_id"):
             resolved.append(item)
             continue
+
+        # ── 2. بحث بالكود المختصر ──────────────────────────────────────────────
+        code = (item.get("code") or "").strip()
+        if code:
+            row = await pool.fetchrow(
+                "SELECT id::text FROM raw_materials WHERE UPPER(TRIM(code)) = UPPER(TRIM($1))",
+                code,
+            )
+            if row:
+                logger.info(f"[resolve] تم حل المادة '{item.get('name')}' بالكود '{code}' → {row['id']}")
+                resolved.append({**item, "material_id": row["id"]})
+                continue
+            else:
+                logger.warning(f"[resolve] الكود '{code}' غير موجود في DB — سيُجرب الاسم")
+
+        # ── 3. بحث بالاسم (ملجأ أخير) ─────────────────────────────────────────
         name = item.get("name", "").strip()
         if not name:
+            resolved.append(item)
             continue
         row = await pool.fetchrow(
             """SELECT id::text FROM raw_materials
@@ -196,11 +214,19 @@ async def _resolve_names_to_ids(pool, materials: list) -> list:
             name,
         )
         if row:
+            logger.warning(
+                f"[resolve] المادة '{name}' حُلَّت بالاسم (لا كود) → {row['id']}. "
+                "يُنصح بإضافة الكود في بيانات الطبخة."
+            )
             resolved.append({**item, "material_id": row["id"]})
         else:
-            logger.warning(f"[resolve_names] لم يُعثر على مادة في DB بالاسم: '{name}'")
+            logger.warning(f"[resolve] لم يُعثر على مادة بالكود أو الاسم: code='{code}' name='{name}'")
             resolved.append(item)
     return resolved
+
+
+# للتوافق مع الكود القديم الذي يستدعي هذا الاسم
+_resolve_names_to_ids = _resolve_to_ids
 
 
 async def _apply_deductions(pool, batch_id: str, batch_number: str,

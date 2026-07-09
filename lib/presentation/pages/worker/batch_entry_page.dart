@@ -254,6 +254,7 @@ class _BatchEntryPageState extends ConsumerState<BatchEntryPage> {
       if (qty <= 0) continue;
       materials.add({
         'material_id': m.id,
+        'material_code': m.code,   // الكود المختصر — يُستخدم في الخصم بدلاً من الاسم
         'material_name': m.name,
         'quantity': qty,
         'unit': m.unit,
