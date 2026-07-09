@@ -200,11 +200,20 @@ class _AlertCard extends ConsumerWidget {
   }
 
   Future<void> _updateStatus(BuildContext context, WidgetRef ref, String status) async {
-    final ds = ref.read(dataSourceProvider);
-    await ds.updateAlertStatus(alert.id, status);
-    ref.invalidate(alertsProvider(const AlertFilters(status: 'pending')));
-    ref.invalidate(alertsProvider(const AlertFilters(status: 'acknowledged')));
-    ref.invalidate(alertsProvider(const AlertFilters(status: 'resolved')));
+    try {
+      final ds = ref.read(dataSourceProvider);
+      await ds.updateAlertStatus(alert.id, status);
+      ref.invalidate(alertsProvider(const AlertFilters(status: 'pending')));
+      ref.invalidate(alertsProvider(const AlertFilters(status: 'acknowledged')));
+      ref.invalidate(alertsProvider(const AlertFilters(status: 'resolved')));
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(e.toString().replaceFirst('Exception: ', '')),
+          backgroundColor: Colors.red,
+        ));
+      }
+    }
   }
 
   Future<void> _deleteAlert(BuildContext context, WidgetRef ref) async {
@@ -218,17 +227,32 @@ class _AlertCard extends ConsumerWidget {
             onPressed: () => Navigator.pop(ctx, false),
             child: const Text('إلغاء'),
           ),
-          TextButton(
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('حذف', style: TextStyle(color: Colors.red)),
+            child: const Text('حذف', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
     );
     if (confirmed != true) return;
-    final ds = ref.read(dataSourceProvider);
-    await ds.deleteAlert(alert.id);
-    ref.invalidate(alertsProvider(const AlertFilters(status: 'resolved')));
+    try {
+      final ds = ref.read(dataSourceProvider);
+      await ds.deleteAlert(alert.id);
+      ref.invalidate(alertsProvider(const AlertFilters(status: 'resolved')));
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('تم حذف التحذير'), backgroundColor: Colors.green),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(e.toString().replaceFirst('Exception: ', '')),
+          backgroundColor: Colors.red,
+        ));
+      }
+    }
   }
 }
 

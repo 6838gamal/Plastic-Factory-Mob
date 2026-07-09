@@ -68,16 +68,19 @@ async def create_alert(body: AlertCreate):
 @router.put("/{alert_id}/status")
 async def update_status(alert_id: str, body: AlertStatusUpdate):
     pool = await get_pool()
-    if body.status == "resolved":
-        row = await pool.fetchrow(
-            "UPDATE alerts SET status=$1, resolved_at=NOW(), updated_at=NOW() WHERE id=$2 RETURNING *",
-            body.status, alert_id,
-        )
-    else:
-        row = await pool.fetchrow(
-            "UPDATE alerts SET status=$1, updated_at=NOW() WHERE id=$2 RETURNING *",
-            body.status, alert_id,
-        )
+    try:
+        if body.status == "resolved":
+            row = await pool.fetchrow(
+                "UPDATE alerts SET status=$1, resolved_at=NOW(), updated_at=NOW() WHERE id=$2::uuid RETURNING *",
+                body.status, alert_id,
+            )
+        else:
+            row = await pool.fetchrow(
+                "UPDATE alerts SET status=$1, updated_at=NOW() WHERE id=$2::uuid RETURNING *",
+                body.status, alert_id,
+            )
+    except Exception:
+        raise HTTPException(status_code=400, detail="معرّف تحذير غير صالح")
     if not row:
         raise HTTPException(status_code=404, detail="Alert not found")
     return dict(row)
@@ -86,12 +89,20 @@ async def update_status(alert_id: str, body: AlertStatusUpdate):
 @router.delete("/{alert_id}")
 async def delete_alert(alert_id: str):
     pool = await get_pool()
-    existing = await pool.fetchrow("SELECT status FROM alerts WHERE id=$1", alert_id)
+    try:
+        existing = await pool.fetchrow(
+            "SELECT status FROM alerts WHERE id=$1::uuid", alert_id
+        )
+    except Exception:
+        raise HTTPException(status_code=400, detail="معرّف تحذير غير صالح")
     if not existing:
-        raise HTTPException(status_code=404, detail="Alert not found")
+        raise HTTPException(status_code=404, detail="التحذير غير موجود")
     if existing["status"] != "resolved":
-        raise HTTPException(status_code=409, detail="Only resolved alerts can be deleted")
-    row = await pool.fetchrow("DELETE FROM alerts WHERE id=$1 RETURNING id", alert_id)
+        raise HTTPException(status_code=409, detail="لا يمكن حذف التحذير إلا بعد حله")
+    try:
+        await pool.execute("DELETE FROM alerts WHERE id=$1::uuid", alert_id)
+    except Exception:
+        raise HTTPException(status_code=500, detail="فشل حذف التحذير")
     return {"success": True}
 
 
