@@ -228,6 +228,7 @@ async def _apply_deductions(pool, batch_id: str, batch_number: str,
                 )
                 continue
 
+            logger.info(f"[deduct DEBUG] checking material_id={item['material_id']!r} name={item.get('name')!r} qty={item.get('quantity')}")
             inv = await pool.fetchrow(
                 """SELECT i.balance, rm.min_stock, i.material_id::text AS resolved_id
                    FROM inventory i
@@ -235,6 +236,7 @@ async def _apply_deductions(pool, batch_id: str, batch_number: str,
                    WHERE i.material_id=$1::uuid AND i.warehouse_type='mixer'""",
                 item["material_id"],
             )
+            logger.info(f"[deduct DEBUG] UUID lookup result: {dict(inv) if inv else None}")
             # ── Fallback: if UUID not found in mixer, try by name ──────────
             # This handles the case where a material exists in the DB under
             # two different UUIDs (duplicate names from different seed runs).
