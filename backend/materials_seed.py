@@ -87,8 +87,24 @@ async def restore_raw_materials_seed() -> None:
 
     pool = await get_pool()
     restored = 0
+    skipped_dup = 0
     for m in data:
         try:
+            # First check: skip by exact UUID (standard idempotency)
+            # Second check: skip if a material with the exact same name already exists —
+            # this prevents duplicate rows when the seed file was built on a DB that
+            # had differently-named variants of the same physical material.
+            existing = await pool.fetchval(
+                """SELECT id FROM raw_materials
+                   WHERE id = $1::uuid
+                      OR LOWER(TRIM(name)) = LOWER(TRIM($2))
+                   LIMIT 1""",
+                m["id"], m["name"],
+            )
+            if existing:
+                skipped_dup += 1
+                continue
+
             result = await pool.execute(
                 """INSERT INTO raw_materials
                        (id, name, code, category, unit, min_stock, cost_per_unit, is_active, notes)
@@ -105,3 +121,5 @@ async def restore_raw_materials_seed() -> None:
 
     if restored:
         logger.info(f"[materials_seed] Restored {restored} raw material(s) from seed file")
+    if skipped_dup:
+        logger.info(f"[materials_seed] Skipped {skipped_dup} seed material(s) already present by UUID or name")

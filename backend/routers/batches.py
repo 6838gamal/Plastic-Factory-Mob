@@ -229,23 +229,55 @@ async def _apply_deductions(pool, batch_id: str, batch_number: str,
                 continue
 
             inv = await pool.fetchrow(
-                """SELECT i.balance, rm.min_stock
+                """SELECT i.balance, rm.min_stock, i.material_id::text AS resolved_id
                    FROM inventory i
                    JOIN raw_materials rm ON rm.id::text = i.material_id::text
                    WHERE i.material_id=$1::uuid AND i.warehouse_type='mixer'""",
                 item["material_id"],
             )
+            # ── Fallback: if UUID not found in mixer, try by name ──────────
+            # This handles the case where a material exists in the DB under
+            # two different UUIDs (duplicate names from different seed runs).
+            # The Flutter sends one UUID; the inventory was built with another.
+            # Uses the same resolution order as _resolve_names_to_ids:
+            #   1. exact match  2. DB-name is prefix of request-name  3. reverse
+            if inv is None and item.get("name"):
+                inv = await pool.fetchrow(
+                    """SELECT i.balance, rm.min_stock, i.material_id::text AS resolved_id
+                       FROM inventory i
+                       JOIN raw_materials rm ON rm.id::text = i.material_id::text
+                       WHERE (LOWER(TRIM(rm.name)) = LOWER(TRIM($1))
+                              OR LOWER(TRIM($1)) LIKE (LOWER(TRIM(rm.name)) || '%')
+                              OR LOWER(TRIM(rm.name)) LIKE (LOWER(TRIM($1)) || '%'))
+                         AND i.warehouse_type = 'mixer'
+                       ORDER BY
+                         CASE WHEN LOWER(TRIM(rm.name)) = LOWER(TRIM($1)) THEN 1
+                              WHEN LOWER(TRIM($1)) LIKE (LOWER(TRIM(rm.name)) || '%') THEN 2
+                              ELSE 3 END,
+                         i.balance DESC
+                       LIMIT 1""",
+                    item["name"],
+                )
+                if inv:
+                    logger.info(
+                        f"[deduct check] UUID mismatch for '{item['name']}' — resolved via name to {inv['resolved_id']}"
+                    )
+                    # Store resolved id so step 4 uses the correct inventory row
+                    item["_resolved_id"] = inv["resolved_id"]
+            # effective_id is the authoritative ID for this inventory row
+            effective_id_check = item.get("_resolved_id") or item["material_id"]
             available = float(inv["balance"]) if inv else 0.0
             if available < item["quantity"]:
-                # Check main warehouse balance to give a helpful hint
+                # Check main warehouse balance using the resolved id
                 main_inv = await pool.fetchrow(
                     """SELECT balance FROM inventory
                        WHERE material_id=$1::uuid AND warehouse_type='main'""",
-                    item["material_id"],
+                    effective_id_check,
                 )
                 main_balance = float(main_inv["balance"]) if main_inv else 0.0
                 insufficient.append({
                     **item,
+                    "material_id": effective_id_check,   # use resolved id in alert
                     "available": available,
                     "main_balance": main_balance,
                 })
@@ -308,13 +340,40 @@ async def _apply_deductions(pool, batch_id: str, batch_number: str,
         if not item.get("material_id"):
             continue
 
+        # Use resolved_id if name-based fallback found a different inventory row
+        effective_id = item.get("_resolved_id") or item["material_id"]
+
         inv = await pool.fetchrow(
             """SELECT i.balance, rm.min_stock
                FROM inventory i
                JOIN raw_materials rm ON rm.id::text = i.material_id::text
                WHERE i.material_id=$1::uuid AND i.warehouse_type='mixer'""",
-            item["material_id"],
+            effective_id,
         )
+        # Name-based fallback for deduction step (in case step 3 was skipped, e.g. prevent_neg=false)
+        # Same resolution order as _resolve_names_to_ids: exact → DB-prefix → Flutter-prefix
+        if inv is None and item.get("name") and not item.get("_resolved_id"):
+            inv_fallback = await pool.fetchrow(
+                """SELECT i.balance, rm.min_stock, i.material_id::text AS resolved_id
+                   FROM inventory i
+                   JOIN raw_materials rm ON rm.id::text = i.material_id::text
+                   WHERE (LOWER(TRIM(rm.name)) = LOWER(TRIM($1))
+                          OR LOWER(TRIM($1)) LIKE (LOWER(TRIM(rm.name)) || '%')
+                          OR LOWER(TRIM(rm.name)) LIKE (LOWER(TRIM($1)) || '%'))
+                     AND i.warehouse_type = 'mixer'
+                   ORDER BY
+                     CASE WHEN LOWER(TRIM(rm.name)) = LOWER(TRIM($1)) THEN 1
+                          WHEN LOWER(TRIM($1)) LIKE (LOWER(TRIM(rm.name)) || '%') THEN 2
+                          ELSE 3 END,
+                     i.balance DESC
+                   LIMIT 1""",
+                item["name"],
+            )
+            if inv_fallback:
+                effective_id = inv_fallback["resolved_id"]
+                inv = inv_fallback
+                logger.info(f"[deduct step4] name fallback for '{item['name']}' → {effective_id}")
+
         balance_before = float(inv["balance"]) if inv else 0.0
         min_stock = float(inv["min_stock"]) if inv else 0.0
         balance_after = balance_before - item["quantity"]
@@ -325,7 +384,7 @@ async def _apply_deductions(pool, batch_id: str, batch_number: str,
                VALUES (gen_random_uuid(), $1::uuid, 'mixer', -$2::decimal, NOW())
                ON CONFLICT (material_id, warehouse_type)
                DO UPDATE SET balance = inventory.balance - $2::decimal, updated_at = NOW()""",
-            item["material_id"], item["quantity"],
+            effective_id, item["quantity"],
         )
 
         # Transaction record
@@ -334,7 +393,7 @@ async def _apply_deductions(pool, batch_id: str, batch_number: str,
                (id, material_id, warehouse_type, transaction_type, quantity,
                 batch_id, transaction_ref, created_by, balance_before, balance_after)
                VALUES (gen_random_uuid(),$1::uuid,'mixer','out',$2,$3,$4,$5,$6,$7)""",
-            item["material_id"], item["quantity"],
+            effective_id, item["quantity"],
             batch_id, transaction_id, created_by,
             balance_before, balance_after,
         )
@@ -356,8 +415,8 @@ async def _apply_deductions(pool, batch_id: str, batch_number: str,
                    (id, alert_type, severity, material_id, material_name,
                     batch_number, description, status, transaction_id)
                    VALUES (gen_random_uuid(),$1,$2,$3,$4,$5,$6,'pending',$7)""",
-                alert_type, sev, item["material_id"], item["name"],
-                batch_number, msg, f"stock_{transaction_id}_{item['material_id']}",
+                alert_type, sev, effective_id, item["name"],
+                batch_number, msg, f"stock_{transaction_id}_{effective_id}",
             )
 
     # ── 5. Log deduction ──────────────────────────────────────

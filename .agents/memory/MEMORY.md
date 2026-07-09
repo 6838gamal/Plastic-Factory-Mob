@@ -29,3 +29,4 @@
 - [Inventory full reset](inventory-full-reset.md) — summary columns are computed from transactions/opening_balances, not stored; must delete rows to truly zero them, not just set balance=0.
 - [Yield standards import pattern](yield-standards-import-pattern.md) — dataSourceProvider is in auth_provider.dart; new pages must import it + UUID cast needed for standard_id lookups.
 - [Inventory summary provider consolidation](inventory-summary-provider-consolidation.md) — always use shared inventorySummaryProvider (reference_data_provider.dart) for balance cards, never a screen-local copy; invalidate it after every inventory mutation.
+- [Deduction UUID fallback](deduction-uuid-fallback.md) — _apply_deductions falls back to name lookup if UUID finds no mixer row; fixes 400 from duplicate-material UUID mismatch caused by seed restore inserting old+new IDs.
