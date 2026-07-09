@@ -399,6 +399,28 @@ async def confirm_handover(handover_id: str, body: ShiftHandoverConfirm):
     }
 
 
+@router.delete("")
+async def delete_all_handovers():
+    """Bulk delete — يحذف جميع عمليات التسليم والمديونيات."""
+    pool = await get_pool()
+    await pool.execute("DELETE FROM custody_debts")
+    result = await pool.execute("DELETE FROM shift_handovers")
+    deleted = int(result.split()[-1]) if result else 0
+    return {"success": True, "deleted": deleted}
+
+
+@router.delete("/{handover_id}")
+async def delete_handover(handover_id: str):
+    """حذف عملية تسليم وردية واحدة مع مديونيتها إن وجدت."""
+    pool = await get_pool()
+    row = await pool.fetchrow("SELECT id FROM shift_handovers WHERE id=$1", handover_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="عملية التسليم غير موجودة")
+    await pool.execute("DELETE FROM custody_debts WHERE handover_id=$1", handover_id)
+    await pool.execute("DELETE FROM shift_handovers WHERE id=$1", handover_id)
+    return {"success": True}
+
+
 @router.get("/{handover_id}")
 async def get_handover(handover_id: str):
     pool = await get_pool()

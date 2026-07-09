@@ -34,6 +34,42 @@ class _ShiftHandoversAdminPageState
     super.dispose();
   }
 
+  Future<void> _deleteHandover(String handoverId) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          title: const Row(children: [
+            Icon(Icons.warning_amber_rounded, color: Colors.red),
+            SizedBox(width: 8),
+            Text('حذف عملية التسليم'),
+          ]),
+          content: const Text(
+              'هل أنت متأكد من حذف هذه العملية؟ سيتم حذف المديونية المرتبطة بها أيضاً إن وجدت.'),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('إلغاء')),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('حذف', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await _ds.deleteShiftHandover(handoverId);
+      if (mounted) _showSnack('تم حذف عملية التسليم');
+      _loadData();
+    } catch (e) {
+      if (mounted) _showSnack(e.toString().replaceFirst('Exception: ', ''), isError: true);
+    }
+  }
+
   Future<void> _loadData() async {
     setState(() => _loading = true);
     try {
@@ -260,6 +296,16 @@ class _ShiftHandoversAdminPageState
                               color: _statusColor(status),
                               fontWeight: FontWeight.w600,
                               fontSize: 12)),
+                    ),
+                    const SizedBox(width: 4),
+                    IconButton(
+                      icon: const Icon(Icons.delete_outline,
+                          color: Colors.red, size: 20),
+                      tooltip: 'حذف',
+                      constraints: const BoxConstraints(),
+                      padding: const EdgeInsets.all(6),
+                      onPressed: () =>
+                          _deleteHandover(h['id'] as String),
                     ),
                   ]),
                   const Divider(height: 14),

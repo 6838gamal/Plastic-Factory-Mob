@@ -342,7 +342,145 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   child: const Text('تصفير'),
                 ),
               ),
+              const Divider(height: 0),
+              ListTile(
+                leading: const Icon(Icons.blender_outlined, color: Colors.red),
+                title: const Text('تصفير الطبخات'),
+                subtitle: const Text('حذف جميع الطبخات وسجلات الخصومات'),
+                trailing: TextButton(
+                  onPressed: () => _confirmAndClear(
+                    context: context,
+                    title: 'تصفير الطبخات',
+                    message: 'سيتم حذف جميع الطبخات وخصومات المخزون المرتبطة بها. هل أنت متأكد؟',
+                    action: () => ref.read(dataSourceProvider).deleteAllBatches(),
+                    onDone: () => ref.invalidate(batchesProvider),
+                  ),
+                  style: TextButton.styleFrom(foregroundColor: Colors.red),
+                  child: const Text('تصفير'),
+                ),
+              ),
+              const Divider(height: 0),
+              ListTile(
+                leading: const Icon(Icons.precision_manufacturing_outlined, color: Colors.red),
+                title: const Text('تصفير سجلات الإنتاج'),
+                subtitle: const Text('حذف جميع سجلات إنتاج الماكينات'),
+                trailing: TextButton(
+                  onPressed: () => _confirmAndClear(
+                    context: context,
+                    title: 'تصفير سجلات الإنتاج',
+                    message: 'سيتم حذف جميع سجلات إنتاج الماكينات نهائيًا. هل أنت متأكد؟',
+                    action: () => ref.read(dataSourceProvider).deleteAllProduction(),
+                    onDone: () => ref.invalidate(machineProductionsProvider),
+                  ),
+                  style: TextButton.styleFrom(foregroundColor: Colors.red),
+                  child: const Text('تصفير'),
+                ),
+              ),
+              const Divider(height: 0),
+              ListTile(
+                leading: const Icon(Icons.swap_horiz, color: Colors.red),
+                title: const Text('تصفير تسليم الورديات'),
+                subtitle: const Text('حذف جميع عمليات التسليم والمديونيات'),
+                trailing: TextButton(
+                  onPressed: () => _confirmAndClear(
+                    context: context,
+                    title: 'تصفير تسليم الورديات',
+                    message: 'سيتم حذف جميع عمليات تسليم الورديات والمديونيات نهائيًا. هل أنت متأكد؟',
+                    action: () => ref.read(dataSourceProvider).deleteAllShiftHandovers(),
+                  ),
+                  style: TextButton.styleFrom(foregroundColor: Colors.red),
+                  child: const Text('تصفير'),
+                ),
+              ),
+              const Divider(height: 0),
+              ListTile(
+                leading: const Icon(Icons.inventory_2_outlined, color: Colors.red),
+                title: const Text('تصفير حركات المخزون'),
+                subtitle: const Text('حذف جميع حركات المخزون وتصفير الأرصدة'),
+                trailing: TextButton(
+                  onPressed: () => _confirmAndClear(
+                    context: context,
+                    title: 'تصفير حركات المخزون',
+                    message: 'سيتم حذف جميع حركات المخزون وتصفير الأرصدة إلى صفر. هل أنت متأكد؟',
+                    action: () => ref.read(dataSourceProvider).deleteAllInventoryTransactions(),
+                    onDone: () => ref.invalidate(inventorySummaryProvider),
+                  ),
+                  style: TextButton.styleFrom(foregroundColor: Colors.red),
+                  child: const Text('تصفير'),
+                ),
+              ),
             ],
+          ),
+        ),
+
+        const SizedBox(height: 12),
+
+        // ── تنظيف شامل ───────────────────────────────────────────
+        Card(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+            side: const BorderSide(color: Colors.red, width: 1.5),
+          ),
+          color: Colors.red.shade50,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.delete_forever, color: Colors.red, size: 22),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'تنظيف شامل',
+                        style: TextStyle(
+                          color: Colors.red,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  'يحذف جميع البيانات التشغيلية دفعةً واحدة:\nالطبخات • الإنتاج • الورديات • المخزون • التحذيرات • التقارير • السجلات\n\nتبقى البيانات المرجعية (المواد، العمال، الماكينات، المنتجات).',
+                  style: TextStyle(fontSize: 12, color: Colors.red),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    icon: const Icon(Icons.delete_sweep, color: Colors.white),
+                    label: const Text(
+                      'تنظيف شامل للبيانات',
+                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    onPressed: () => _confirmAndClear(
+                      context: context,
+                      title: 'تنظيف شامل للبيانات',
+                      message:
+                          'سيتم حذف جميع البيانات التشغيلية نهائيًا:\n\n• جميع الطبخات\n• سجلات الإنتاج\n• عمليات تسليم الورديات\n• حركات المخزون وأرصدتها\n• التحذيرات والتقارير والسجلات\n\nهذا الإجراء لا يمكن التراجع عنه.',
+                      action: () => ref.read(dataSourceProvider).fullReset(),
+                      onDone: () {
+                        ref.invalidate(batchesProvider);
+                        ref.invalidate(machineProductionsProvider);
+                        ref.invalidate(inventorySummaryProvider);
+                        ref.invalidate(alertsProvider(const AlertFilters(status: 'pending')));
+                        ref.invalidate(alertsProvider(const AlertFilters(status: 'acknowledged')));
+                        ref.invalidate(alertsProvider(const AlertFilters(status: 'resolved')));
+                        ref.invalidate(auditLogProvider);
+                      },
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
 

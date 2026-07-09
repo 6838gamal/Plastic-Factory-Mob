@@ -552,6 +552,43 @@ class ApiDataSource {
     return (res as Map<String, dynamic>)['deleted'] as int? ?? 0;
   }
 
+  Future<int> deleteAllBatches() async {
+    final res = await _delete('/api/batches');
+    return (res as Map<String, dynamic>)['deleted'] as int? ?? 0;
+  }
+
+  Future<int> deleteAllProduction() async {
+    final res = await _delete('/api/production');
+    return (res as Map<String, dynamic>)['deleted'] as int? ?? 0;
+  }
+
+  Future<int> deleteAllShiftHandovers() async {
+    final res = await _delete('/api/shift-handover');
+    return (res as Map<String, dynamic>)['deleted'] as int? ?? 0;
+  }
+
+  Future<void> deleteShiftHandover(String id) async {
+    await _delete('/api/shift-handover/$id');
+  }
+
+  Future<int> deleteAllInventoryTransactions() async {
+    final res = await _delete('/api/inventory/transactions');
+    return (res as Map<String, dynamic>)['deleted'] as int? ?? 0;
+  }
+
+  /// تنظيف شامل — يحذف جميع البيانات التشغيلية مع الاحتفاظ بالبيانات المرجعية.
+  Future<int> fullReset() async {
+    int total = 0;
+    total += await deleteAllBatches();
+    total += await deleteAllProduction();
+    total += await deleteAllShiftHandovers();
+    total += await deleteAllInventoryTransactions();
+    total += await deleteAllAlerts();
+    total += await deleteAllDailyReports();
+    total += await deleteAuditLogs();
+    return total;
+  }
+
   // ==================== IMAGES ====================
   Future<String?> uploadImage(String bucket, String path, List<int> bytes) async {
     final uri = Uri.parse('$_baseUrl/api/upload/$bucket');

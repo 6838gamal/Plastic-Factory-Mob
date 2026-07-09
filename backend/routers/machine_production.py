@@ -602,6 +602,15 @@ async def update_production(production_id: str, body: ProductionCreate):
     return dict(row)
 
 
+@router.delete("")
+async def delete_all_productions():
+    """Bulk delete — يحذف جميع سجلات إنتاج الماكينات."""
+    pool = await get_pool()
+    result = await pool.execute("DELETE FROM machine_production")
+    deleted = int(result.split()[-1]) if result else 0
+    return {"success": True, "deleted": deleted}
+
+
 @router.delete("/{production_id}")
 async def delete_production(production_id: str):
     pool = await get_pool()

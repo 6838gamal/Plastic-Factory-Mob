@@ -928,6 +928,16 @@ async def update_batch(batch_id: str, body: BatchUpdate):
     return result
 
 
+@router.delete("")
+async def delete_all_batches():
+    """Bulk delete — يحذف جميع الطبخات وسجلات الخصومات."""
+    pool = await get_pool()
+    await pool.execute("DELETE FROM deduction_log")
+    result = await pool.execute("DELETE FROM batches")
+    deleted = int(result.split()[-1]) if result else 0
+    return {"success": True, "deleted": deleted}
+
+
 @router.delete("/{batch_id}")
 async def delete_batch(batch_id: str):
     pool = await get_pool()

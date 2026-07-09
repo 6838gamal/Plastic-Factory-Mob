@@ -458,6 +458,16 @@ async def transfer_inventory(body: TransferRequest):
     }
 
 
+@router.delete("/transactions")
+async def delete_all_transactions():
+    """Bulk delete — يحذف جميع حركات المخزون ويصفّر الأرصدة."""
+    pool = await get_pool()
+    result = await pool.execute("DELETE FROM inventory_transactions")
+    await pool.execute("UPDATE inventory SET balance = 0, updated_at = NOW()")
+    deleted = int(result.split()[-1]) if result else 0
+    return {"success": True, "deleted": deleted}
+
+
 @router.delete("/transactions/{tx_id}")
 async def delete_transaction(tx_id: str):
     """Delete a single inventory transaction and reverse its effect on the stored
