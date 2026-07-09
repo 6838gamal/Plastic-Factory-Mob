@@ -183,6 +183,14 @@ class _AlertCard extends ConsumerWidget {
                     onPressed: () => _updateStatus(context, ref, 'resolved'),
                     child: const Text('تم الحل', style: TextStyle(color: Colors.green)),
                   ),
+                if (alert.status == 'resolved')
+                  IconButton(
+                    onPressed: () => _deleteAlert(context, ref),
+                    icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
+                    tooltip: 'حذف',
+                    constraints: const BoxConstraints(),
+                    padding: const EdgeInsets.all(6),
+                  ),
               ],
             ),
           ],
@@ -196,6 +204,30 @@ class _AlertCard extends ConsumerWidget {
     await ds.updateAlertStatus(alert.id, status);
     ref.invalidate(alertsProvider(const AlertFilters(status: 'pending')));
     ref.invalidate(alertsProvider(const AlertFilters(status: 'acknowledged')));
+    ref.invalidate(alertsProvider(const AlertFilters(status: 'resolved')));
+  }
+
+  Future<void> _deleteAlert(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('حذف التحذير'),
+        content: const Text('هل أنت متأكد من حذف هذا التحذير؟ لا يمكن التراجع عن هذا الإجراء.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('إلغاء'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('حذف', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    final ds = ref.read(dataSourceProvider);
+    await ds.deleteAlert(alert.id);
     ref.invalidate(alertsProvider(const AlertFilters(status: 'resolved')));
   }
 }

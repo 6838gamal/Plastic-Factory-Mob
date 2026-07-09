@@ -814,13 +814,17 @@ if WEB_DIR.exists():
     async def flutter_bootstrap():
         return FileResponse(str(WEB_DIR / "flutter_bootstrap.js"), headers=_NO_CACHE)
 
+    @app.get("/main.dart.js")
+    async def main_dart_js():
+        return FileResponse(str(WEB_DIR / "main.dart.js"), headers=_NO_CACHE)
+
     # SPA catch-all: serve index.html for any path not matched by API or static files
     @app.get("/{full_path:path}")
     async def spa_fallback(full_path: str):
         # Try serving the exact static file first
         static_file = WEB_DIR / full_path
         if static_file.exists() and static_file.is_file():
-            return FileResponse(str(static_file))
+            return FileResponse(str(static_file), headers=_NO_CACHE)
         # For API paths, return 404
         if full_path.startswith("api/"):
             from fastapi import HTTPException as _HTTPException

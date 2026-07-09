@@ -497,6 +497,10 @@ class ApiDataSource {
     await _put('/api/alerts/$id/status', {'status': status});
   }
 
+  Future<void> deleteAlert(String id) async {
+    await _delete('/api/alerts/$id');
+  }
+
   Future<int> getPendingAlertsCount() async {
     final res = await _get('/api/alerts/pending-count');
     return (res as Map<String, dynamic>)['count'] as int;

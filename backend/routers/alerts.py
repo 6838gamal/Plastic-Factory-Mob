@@ -81,3 +81,15 @@ async def update_status(alert_id: str, body: AlertStatusUpdate):
     if not row:
         raise HTTPException(status_code=404, detail="Alert not found")
     return dict(row)
+
+
+@router.delete("/{alert_id}")
+async def delete_alert(alert_id: str):
+    pool = await get_pool()
+    existing = await pool.fetchrow("SELECT status FROM alerts WHERE id=$1", alert_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Alert not found")
+    if existing["status"] != "resolved":
+        raise HTTPException(status_code=409, detail="Only resolved alerts can be deleted")
+    row = await pool.fetchrow("DELETE FROM alerts WHERE id=$1 RETURNING id", alert_id)
+    return {"success": True}
