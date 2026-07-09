@@ -367,6 +367,93 @@ async def _init_db():
 
     logger.info("[init_db] Column migrations applied")
 
+    # ── إعادة بناء VIEW: inventory_summary ────────────────────────────────────
+    # total_in يشمل الآن transfer_in (تحويل من الرئيسي → الخلاط)
+    # total_out يشمل الآن transfer_out (خصم الطبخات + التحويل الصادر)
+    # هذا يجعل كارت مخزن الخلاط يعرض "وارد" عند التحويل و"منصرف" عند استخدام الطبخات
+    try:
+        await pool.execute("DROP VIEW IF EXISTS inventory_summary CASCADE")
+        await pool.execute("""
+CREATE VIEW inventory_summary AS
+SELECT
+    i.id,
+    i.material_id,
+    rm.name          AS material_name,
+    rm.category,
+    rm.unit,
+    rm.min_stock,
+    COALESCE(rm.code, '') AS code,
+    i.warehouse_type,
+    i.balance        AS current_balance,
+    i.balance,
+    i.updated_at,
+    COALESCE(rm.cost_per_unit, 0) AS cost_per_unit,
+    -- رصيد الافتتاحية
+    COALESCE((
+        SELECT ob.balance FROM opening_balances ob
+        WHERE ob.material_id::text = i.material_id::text
+          AND ob.warehouse_type::text = i.warehouse_type::text
+        ORDER BY ob.balance_date DESC, ob.created_at DESC
+        LIMIT 1
+    ), 0) AS opening_balance,
+    -- الوارد: استلام مباشر + مرتجع + تحويل وارد (transfer_in)
+    COALESCE((
+        SELECT SUM(it.quantity)
+        FROM inventory_transactions it
+        WHERE it.material_id::text = i.material_id::text
+          AND it.warehouse_type::text = i.warehouse_type::text
+          AND it.transaction_type = ANY(ARRAY['in','return','transfer_in'])
+    ), 0) AS total_in,
+    -- المنصرف: خصم الطبخات (out) + تحويل صادر (transfer_out)
+    COALESCE((
+        SELECT SUM(it.quantity)
+        FROM inventory_transactions it
+        WHERE it.material_id::text = i.material_id::text
+          AND it.warehouse_type::text = i.warehouse_type::text
+          AND it.transaction_type = ANY(ARRAY['out','transfer_out'])
+    ), 0) AS total_out,
+    -- صافي التحويلات (للتوافق مع الكود القديم)
+    COALESCE((
+        SELECT SUM(CASE
+            WHEN it.transaction_type = 'transfer_in'  THEN  it.quantity
+            WHEN it.transaction_type = 'transfer_out' THEN -it.quantity
+            ELSE 0
+        END)
+        FROM inventory_transactions it
+        WHERE it.material_id::text = i.material_id::text
+          AND it.warehouse_type::text = i.warehouse_type::text
+          AND it.transaction_type = ANY(ARRAY['transfer_in','transfer_out'])
+    ), 0) AS total_transfers,
+    -- تسويات موجبة
+    COALESCE((
+        SELECT SUM(it.quantity)
+        FROM inventory_transactions it
+        WHERE it.material_id::text = i.material_id::text
+          AND it.warehouse_type::text = i.warehouse_type::text
+          AND it.transaction_type = 'adjustment'
+          AND COALESCE(it.balance_after, 0) >= COALESCE(it.balance_before, 0)
+    ), 0) AS total_adjustments_pos,
+    -- تسويات سالبة
+    COALESCE((
+        SELECT SUM(it.quantity)
+        FROM inventory_transactions it
+        WHERE it.material_id::text = i.material_id::text
+          AND it.warehouse_type::text = i.warehouse_type::text
+          AND it.transaction_type = 'adjustment'
+          AND COALESCE(it.balance_after, 0) < COALESCE(it.balance_before, 0)
+    ), 0) AS total_adjustments_neg,
+    CASE
+        WHEN i.balance <= 0          THEN 'out_of_stock'
+        WHEN rm.min_stock > 0 AND i.balance <= rm.min_stock THEN 'low'
+        ELSE 'normal'
+    END AS stock_status
+FROM inventory i
+JOIN raw_materials rm ON rm.id = i.material_id
+""")
+        logger.info("[init_db] inventory_summary VIEW recreated (transfer_in/out now in total_in/total_out)")
+    except Exception as exc:
+        logger.warning(f"[init_db] inventory_summary VIEW migration skipped: {exc}")
+
 
 async def _seed_default_admin():
     """Ensure a default admin user always exists on startup."""
