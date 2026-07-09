@@ -265,6 +265,8 @@ async def _init_db():
         "ALTER TABLE shift_handovers ADD COLUMN IF NOT EXISTS unknown_waste_kg DECIMAL(12,3) NOT NULL DEFAULT 0",
         "ALTER TABLE shift_handovers ADD COLUMN IF NOT EXISTS received_from_main_kg DECIMAL(12,3) NOT NULL DEFAULT 0",
         "ALTER TABLE raw_materials ADD COLUMN IF NOT EXISTS code VARCHAR(50)",
+        # فهرس فريد جزئي على code (يتجاهل القيم NULL والفارغة)
+        "CREATE UNIQUE INDEX IF NOT EXISTS raw_materials_code_unique ON raw_materials (code) WHERE code IS NOT NULL AND TRIM(code) != ''",
         "ALTER TABLE raw_materials ADD COLUMN IF NOT EXISTS cost_per_unit NUMERIC(12,4) NOT NULL DEFAULT 0",
         "ALTER TABLE inventory_transactions ADD COLUMN IF NOT EXISTS balance_before DECIMAL(12,3)",
         "ALTER TABLE inventory_transactions ADD COLUMN IF NOT EXISTS balance_after DECIMAL(12,3)",
@@ -534,6 +536,8 @@ async def _init_db_background(app: FastAPI):
         await export_raw_materials_seed()
         await _seed_default_admin()
         await _seed_default_settings()
+        from routers.materials import ensure_material_codes
+        await ensure_material_codes()
         app.state.db_ready.set()
         app.state.scheduler_task = asyncio.create_task(_daily_report_scheduler())
     except asyncio.CancelledError:

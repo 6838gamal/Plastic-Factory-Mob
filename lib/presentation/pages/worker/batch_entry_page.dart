@@ -666,6 +666,7 @@ class _BatchEntryPageState extends ConsumerState<BatchEntryPage> {
           for (final m in grouped[cat]!)
             _MatRow(
               label: m.name,
+              code: m.code,
               ctrl: _ctrlFor(m.id),
               unit: m.unit,
               balance: mixerBal[m.id],
@@ -710,6 +711,9 @@ class _SectionHeader extends StatelessWidget {
 // ── Material Row (dynamic label + qty input + mixer balance) ────────
 class _MatRow extends StatelessWidget {
   final String label;
+
+  /// الكود المختصر للمادة (مثل OIL-003) — يُعرض كـ tag صغير
+  final String? code;
   final TextEditingController ctrl;
   final String unit;
 
@@ -718,6 +722,7 @@ class _MatRow extends StatelessWidget {
 
   const _MatRow({
     required this.label,
+    this.code,
     required this.ctrl,
     this.unit = 'كجم',
     this.balance,
@@ -741,16 +746,45 @@ class _MatRow extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // ── اسم المادة + رصيد متاح ─────────────────────────
+          // ── اسم المادة + كودها + رصيد متاح ───────────────────
           Expanded(
             flex: 3,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(label,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w500, fontSize: 13)),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    if (code != null && code!.isNotEmpty) ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 5, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: Colors.indigo.shade50,
+                          border: Border.all(
+                              color: Colors.indigo.shade200, width: 0.8),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          code!,
+                          style: TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.indigo.shade700,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 5),
+                    ],
+                    Expanded(
+                      child: Text(label,
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w500, fontSize: 13)),
+                    ),
+                  ],
+                ),
                 if (hasBalance) ...[
                   const SizedBox(height: 3),
                   Row(

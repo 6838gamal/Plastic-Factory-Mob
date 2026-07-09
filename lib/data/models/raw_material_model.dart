@@ -1,6 +1,10 @@
 class RawMaterialModel {
   final String id;
   final String name;
+  /// كود مختصر فريد يُولَّد تلقائياً من الخادم (مثل OIL-003 أو DYE-001).
+  /// يُعرض كـ tag صغير بجانب الاسم — يُستخدم داخلياً لتمييز المادة
+  /// بمعزل عن طول اسمها أو أي تغيير مستقبلي عليه.
+  final String? code;
   final String category;
   final String unit;
   final double minStock;
@@ -10,6 +14,7 @@ class RawMaterialModel {
   const RawMaterialModel({
     required this.id,
     required this.name,
+    this.code,
     required this.category,
     required this.unit,
     required this.minStock,
@@ -20,6 +25,7 @@ class RawMaterialModel {
   factory RawMaterialModel.fromJson(Map<String, dynamic> json) => RawMaterialModel(
         id: json['id'] as String,
         name: json['name'] as String,
+        code: json['code'] as String?,
         category: json['category'] as String? ?? '',
         unit: json['unit'] as String? ?? 'كجم',
         minStock: (json['min_stock'] as num?)?.toDouble() ?? 0,
@@ -30,6 +36,7 @@ class RawMaterialModel {
   Map<String, dynamic> toJson() => {
         'id': id,
         'name': name,
+        if (code != null) 'code': code,
         'category': category,
         'unit': unit,
         'min_stock': minStock,
@@ -40,6 +47,7 @@ class RawMaterialModel {
   RawMaterialModel copyWith({
     String? id,
     String? name,
+    String? code,
     String? category,
     String? unit,
     double? minStock,
@@ -48,6 +56,7 @@ class RawMaterialModel {
       RawMaterialModel(
         id: id ?? this.id,
         name: name ?? this.name,
+        code: code ?? this.code,
         category: category ?? this.category,
         unit: unit ?? this.unit,
         minStock: minStock ?? this.minStock,

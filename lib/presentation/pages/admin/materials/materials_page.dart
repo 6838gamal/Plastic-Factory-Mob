@@ -126,6 +126,27 @@ class _MaterialsPageState extends ConsumerState<MaterialsPage> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                // كود المادة — للقراءة فقط، يُولَّد تلقائياً
+                if (material?.code != null && material!.code!.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: InputDecorator(
+                      decoration: InputDecoration(
+                        labelText: 'معرّف المادة (تلقائي)',
+                        prefixIcon: const Icon(Icons.qr_code_2_outlined),
+                        filled: true,
+                        fillColor: Colors.indigo.shade50,
+                      ),
+                      child: Text(
+                        material.code!,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          color: Colors.indigo.shade700,
+                          letterSpacing: 1,
+                        ),
+                      ),
+                    ),
+                  ),
                 TextFormField(
                   controller: nameCtrl,
                   decoration: const InputDecoration(labelText: 'الاسم *'),
@@ -191,12 +212,45 @@ class _MaterialCard extends ConsumerWidget {
         leading: CircleAvatar(
           backgroundColor: Theme.of(context).primaryColor.withOpacity(0.1),
           child: Text(
-            material.name.isNotEmpty ? material.name[0] : '?',
+            (material.code != null && material.code!.isNotEmpty)
+                ? material.code!.split('-').first
+                : (material.name.isNotEmpty ? material.name[0] : '?'),
             style: TextStyle(
-                color: Theme.of(context).primaryColor, fontWeight: FontWeight.bold),
+                color: Theme.of(context).primaryColor,
+                fontWeight: FontWeight.bold,
+                fontSize: 11),
           ),
         ),
-        title: Text(material.name, style: const TextStyle(fontWeight: FontWeight.w600)),
+        title: Row(
+          children: [
+            if (material.code != null && material.code!.isNotEmpty) ...[
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.indigo.shade50,
+                  border: Border.all(
+                      color: Colors.indigo.shade200, width: 0.8),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  material.code!,
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.indigo.shade700,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+            ],
+            Expanded(
+              child: Text(material.name,
+                  style: const TextStyle(fontWeight: FontWeight.w600)),
+            ),
+          ],
+        ),
         subtitle: Text(
           '${material.category} • الحد الأدنى: ${Helpers.formatQuantityInKg(material.minStock.toDouble(), material.unit)}',
           style: const TextStyle(fontSize: 12),
@@ -276,6 +330,27 @@ class _MaterialCard extends ConsumerWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                // كود المادة — للقراءة فقط
+                if (material.code != null && material.code!.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: InputDecorator(
+                      decoration: InputDecoration(
+                        labelText: 'معرّف المادة (تلقائي)',
+                        prefixIcon: const Icon(Icons.qr_code_2_outlined),
+                        filled: true,
+                        fillColor: Colors.indigo.shade50,
+                      ),
+                      child: Text(
+                        material.code!,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          color: Colors.indigo.shade700,
+                          letterSpacing: 1,
+                        ),
+                      ),
+                    ),
+                  ),
                 TextFormField(
                     controller: nameCtrl,
                     decoration: const InputDecoration(labelText: 'الاسم')),
