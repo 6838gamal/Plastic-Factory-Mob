@@ -385,17 +385,6 @@
     "notes": null
   },
   {
-    "id": "8555808b-86f9-4e12-ba97-a3e64a79b0d8",
-    "name": "DOP زيت",
-    "code": null,
-    "category": "زيوت وإضافات",
-    "unit": "كجم",
-    "min_stock": "200.000",
-    "cost_per_unit": "0.000",
-    "is_active": true,
-    "notes": null
-  },
-  {
     "id": "6fd2bb19-d40b-445b-b14c-7b9b3cba5867",
     "name": "مثبت استبليزر باودر 25 كجم",
     "code": null,
@@ -420,17 +409,6 @@
   {
     "id": "b7bc56d6-a7a5-414b-b3e9-bc8adae22343",
     "name": "شمع باودر 25 كجم",
-    "code": null,
-    "category": "زيوت وإضافات",
-    "unit": "كجم",
-    "min_stock": "50.000",
-    "cost_per_unit": "0.000",
-    "is_active": true,
-    "notes": null
-  },
-  {
-    "id": "846859f2-feb9-46de-ad2b-1d87e2e94edc",
-    "name": "تيتانيوم",
     "code": null,
     "category": "زيوت وإضافات",
     "unit": "كجم",
