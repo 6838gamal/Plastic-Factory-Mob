@@ -1,6 +1,6 @@
 import json
 from datetime import datetime
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, HTTPException
 from pydantic import BaseModel
 from typing import Optional, Any
 from database import get_pool
@@ -69,6 +69,19 @@ async def get_audit_logs(
     query = f"SELECT * FROM audit_log WHERE {' AND '.join(conditions)} ORDER BY created_at DESC LIMIT 200"
     rows = await pool.fetch(query, *params)
     return [dict(r) for r in rows]
+
+
+@router.delete("/{log_id}")
+async def delete_audit_log(log_id: str):
+    pool = await get_pool()
+    try:
+        row = await pool.fetchrow("SELECT id FROM audit_log WHERE id=$1::uuid", log_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="معرّف سجل غير صالح")
+    if not row:
+        raise HTTPException(status_code=404, detail="السجل غير موجود")
+    await pool.execute("DELETE FROM audit_log WHERE id=$1::uuid", log_id)
+    return {"success": True}
 
 
 @router.delete("")

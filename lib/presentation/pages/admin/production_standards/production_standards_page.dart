@@ -349,17 +349,17 @@ class _ProductionStandardsPageState
   Future<void> _confirmDelete(String id, String name) async {
     final confirm = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (ctx) => AlertDialog(
         title: const Text('تأكيد الحذف'),
         content: Text('حذف معيار "$name"؟\n\nلا يمكن حذف معيار مستخدم في سجلات الإنتاج.'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, false),
+            onPressed: () => Navigator.pop(ctx, false),
             child: const Text('إلغاء'),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            onPressed: () => Navigator.pop(context, true),
+            onPressed: () => Navigator.pop(ctx, true),
             child: const Text('حذف', style: TextStyle(color: Colors.white)),
           ),
         ],

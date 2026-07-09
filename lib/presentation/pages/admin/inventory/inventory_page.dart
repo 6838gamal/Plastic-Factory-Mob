@@ -1286,6 +1286,49 @@ class _TransactionsTabState extends ConsumerState<_TransactionsTab> {
   String _warehouseFilter = 'all';
   String _typeFilter = 'all';
 
+  Future<void> _deleteTx(BuildContext context, WidgetRef ref,
+      InventoryTransactionModel tx) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('تأكيد حذف الحركة'),
+        content: Text(
+          'حذف حركة "${tx.materialName}" بقيمة ${tx.quantity.toStringAsFixed(2)}؟\n\n'
+          'سيتم عكس أثرها على رصيد المخزون تلقائياً.',
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('إلغاء')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('حذف', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+    try {
+      final ds = ref.read(dataSourceProvider);
+      await ds.deleteInventoryTransaction(tx.id);
+      ref.invalidate(_txProvider(''));
+      ref.invalidate(inventorySummaryProvider);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('تم حذف الحركة'), backgroundColor: Colors.green),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(e.toString().replaceFirst('Exception: ', '')),
+          backgroundColor: Colors.red,
+        ));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final txs = ref.watch(_txProvider(''));
@@ -1391,7 +1434,10 @@ class _TransactionsTabState extends ConsumerState<_TransactionsTab> {
                   padding: const EdgeInsets.symmetric(
                       horizontal: 12, vertical: 4),
                   itemCount: filtered.length,
-                  itemBuilder: (_, i) => _TxCard(tx: filtered[i]),
+                  itemBuilder: (_, i) => _TxCard(
+                    tx: filtered[i],
+                    onDelete: () => _deleteTx(context, ref, filtered[i]),
+                  ),
                 ),
               );
             },
@@ -1452,7 +1498,8 @@ class _FilterChip2 extends StatelessWidget {
 
 class _TxCard extends StatelessWidget {
   final InventoryTransactionModel tx;
-  const _TxCard({required this.tx});
+  final VoidCallback onDelete;
+  const _TxCard({required this.tx, required this.onDelete});
 
   @override
   Widget build(BuildContext context) {
@@ -1507,19 +1554,29 @@ class _TxCard extends StatelessWidget {
                   style: TextStyle(fontSize: 11, color: Colors.grey[600])),
           ],
         ),
-        trailing: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.end,
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              '${_isNegative(tx.transactionType) ? '-' : '+'}${tx.quantity.toStringAsFixed(2)}',
-              style: TextStyle(
-                color: _isNegative(tx.transactionType)
-                    ? Colors.red
-                    : Colors.green,
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
-              ),
+            Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  '${_isNegative(tx.transactionType) ? '-' : '+'}${tx.quantity.toStringAsFixed(2)}',
+                  style: TextStyle(
+                    color: _isNegative(tx.transactionType)
+                        ? Colors.red
+                        : Colors.green,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
+              ],
+            ),
+            IconButton(
+              icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
+              tooltip: 'حذف',
+              onPressed: onDelete,
             ),
           ],
         ),

@@ -458,6 +458,46 @@ async def transfer_inventory(body: TransferRequest):
     }
 
 
+@router.delete("/transactions/{tx_id}")
+async def delete_transaction(tx_id: str):
+    """Delete a single inventory transaction and reverse its effect on the stored
+    inventory.balance (balance is NOT recomputed from history — it is a running
+    total updated on every write, so deleting a row must undo its delta)."""
+    pool = await get_pool()
+    try:
+        tx = await pool.fetchrow(
+            "SELECT * FROM inventory_transactions WHERE id=$1::uuid", tx_id
+        )
+    except Exception:
+        raise HTTPException(status_code=400, detail="معرّف حركة غير صالح")
+    if not tx:
+        raise HTTPException(status_code=404, detail="الحركة غير موجودة")
+
+    # Use the persisted before/after balance snapshot as the source of truth for
+    # the reversal delta — do NOT infer sign from transaction_type, since
+    # 'adjustment'/'opening' rows can move balance in either direction.
+    if tx["balance_before"] is not None and tx["balance_after"] is not None:
+        delta = float(tx["balance_after"]) - float(tx["balance_before"])
+    else:
+        delta = float(tx["quantity"]) if tx["transaction_type"] in ("in", "transfer_in") \
+            else -float(tx["quantity"])
+    reversal = -delta
+
+    await pool.execute(
+        """UPDATE inventory SET balance = balance + $1, updated_at = NOW()
+           WHERE material_id=$2::uuid AND warehouse_type=$3""",
+        reversal, tx["material_id"], tx["warehouse_type"],
+    )
+    await pool.execute("DELETE FROM inventory_transactions WHERE id=$1::uuid", tx_id)
+    await pool.execute(
+        """INSERT INTO audit_log (id, action, table_name, record_id, description)
+           VALUES (gen_random_uuid(), 'delete', 'inventory_transactions', $1, $2)""",
+        tx_id,
+        f"حذف حركة مخزون: {tx['transaction_type']} — {tx['quantity']}",
+    )
+    return {"success": True}
+
+
 @router.post("/transactions")
 async def add_transaction(body: TransactionCreate):
     """Manual transaction entry — updates inventory balance accordingly."""

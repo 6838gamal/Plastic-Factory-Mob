@@ -99,7 +99,7 @@ class _BatchesAdminPageState extends ConsumerState<BatchesAdminPage> {
   Future<void> _deleteBatch(BatchModel batch) async {
     final confirm = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (ctx) => AlertDialog(
         title: const Text('تأكيد حذف الطبخة'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -133,11 +133,11 @@ class _BatchesAdminPageState extends ConsumerState<BatchesAdminPage> {
         ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(context, false),
+              onPressed: () => Navigator.pop(ctx, false),
               child: const Text('إلغاء')),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            onPressed: () => Navigator.pop(context, true),
+            onPressed: () => Navigator.pop(ctx, true),
             child: const Text('حذف', style: TextStyle(color: Colors.white)),
           ),
         ],

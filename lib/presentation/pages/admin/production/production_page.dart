@@ -200,16 +200,16 @@ class _ProductionPageState extends ConsumerState<ProductionPage> {
   Future<void> _deleteProduction(MachineProductionModel p) async {
     final confirm = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (ctx) => AlertDialog(
         title: const Text('تأكيد الحذف'),
         content: Text('حذف سجل إنتاج ماكينة ${p.machineName} للطبخة #${p.batchNumber}؟'),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(context, false),
+              onPressed: () => Navigator.pop(ctx, false),
               child: const Text('إلغاء')),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            onPressed: () => Navigator.pop(context, true),
+            onPressed: () => Navigator.pop(ctx, true),
             child: const Text('حذف', style: TextStyle(color: Colors.white)),
           ),
         ],

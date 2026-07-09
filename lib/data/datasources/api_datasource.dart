@@ -375,6 +375,10 @@ class ApiDataSource {
     return (res as List).map((e) => InventoryTransactionModel.fromJson(e)).toList();
   }
 
+  Future<void> deleteInventoryTransaction(String id) async {
+    await _delete('/api/inventory/transactions/$id');
+  }
+
   // ==================== WORKERS (local only — seeded on first run) ====================
   Future<List<WorkerModel>> getWorkers() => LocalDataService.getWorkers();
   Future<void> upsertWorker(Map<String, dynamic> data) =>
@@ -531,6 +535,10 @@ class ApiDataSource {
   Future<int> deleteAuditLogs() async {
     final res = await _delete('/api/audit');
     return (res as Map<String, dynamic>)['deleted'] as int? ?? 0;
+  }
+
+  Future<void> deleteAuditLog(String id) async {
+    await _delete('/api/audit/$id');
   }
 
   // ==================== DANGER ZONE (bulk clear) ====================

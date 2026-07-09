@@ -80,7 +80,10 @@ class _AuditLogPageState extends ConsumerState<AuditLogPage> {
                 child: ListView.builder(
                   padding: const EdgeInsets.symmetric(horizontal: 12),
                   itemCount: filtered.length,
-                  itemBuilder: (_, i) => _AuditCard(log: filtered[i]),
+                  itemBuilder: (_, i) => _AuditCard(
+                    log: filtered[i],
+                    onDelete: () => _deleteLog(context, ref, filtered[i]),
+                  ),
                 ),
               );
             },
@@ -93,6 +96,45 @@ class _AuditLogPageState extends ConsumerState<AuditLogPage> {
         ),
       ],
     );
+  }
+
+  Future<void> _deleteLog(
+      BuildContext context, WidgetRef ref, AuditLogModel log) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('تأكيد الحذف'),
+        content: Text('حذف سجل "${log.tableName}" (${_actionLabel(log.action)})؟'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('إلغاء')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('حذف', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+    try {
+      final ds = ref.read(dataSourceProvider);
+      await ds.deleteAuditLog(log.id);
+      ref.invalidate(auditLogProvider);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('تم حذف السجل'), backgroundColor: Colors.green),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(e.toString().replaceFirst('Exception: ', '')),
+          backgroundColor: Colors.red,
+        ));
+      }
+    }
   }
 
   String _actionLabel(String action) {
@@ -110,7 +152,8 @@ class _AuditLogPageState extends ConsumerState<AuditLogPage> {
 
 class _AuditCard extends StatelessWidget {
   final AuditLogModel log;
-  const _AuditCard({required this.log});
+  final VoidCallback onDelete;
+  const _AuditCard({required this.log, required this.onDelete});
 
   @override
   Widget build(BuildContext context) {
@@ -202,6 +245,11 @@ class _AuditCard extends StatelessWidget {
                   ),
                 ],
               ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
+              tooltip: 'حذف',
+              onPressed: onDelete,
             ),
           ],
         ),
