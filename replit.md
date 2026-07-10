@@ -58,3 +58,4 @@ This guarantees any Dart change is always reflected on restart, at the cost of ~
 - API base URL must remain configurable via `API_BASE_URL` env var without code changes.
 - The production database (Render PostgreSQL) must never be dropped, truncated, or reset.
 - Workflow command must NOT rebuild Flutter on every start — rebuild manually when Dart files change.
+- Do NOT replace external links/URLs with local ones. Do NOT change any details unless explicitly requested — leave everything as-is.
