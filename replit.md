@@ -22,14 +22,21 @@ This guarantees any Dart change is always reflected on restart, at the cost of ~
 
 | Name | Description | Default |
 |------|-------------|---------|
-| `DATABASE_URL` | PostgreSQL connection string | — (required) |
+| `RENDER_DATABASE_URL` | PostgreSQL connection string (Replit Secret — **required**) | — |
+| `DATABASE_URL` | Fallback PostgreSQL connection string | — |
 | `JWT_SECRET` | Secret key for signing login tokens | — (required in production) |
 | `SECRET_KEY` | Alias for JWT_SECRET | — |
 | `API_BASE_URL` | External API base URL baked into Flutter build | `https://plastic-factory-api.onrender.com` |
 | `FRONTEND_URL` | Netlify frontend URL for CORS | `https://plastic-factory-mob-1.netlify.app` |
-| `ENVIRONMENT` | `production` or `development` | `production` |
+| `ENVIRONMENT` | `production` or `development` | `development` |
 | `ADMIN_EMAIL` | Default admin email (first-run seeding) | `admin@factory.com` |
 | `ADMIN_PASSWORD` | Default admin password (first-run seeding) | `admin123` |
+
+### Replit Setup (first-time)
+
+1. Add `RENDER_DATABASE_URL` as a Replit Secret (the Render PostgreSQL connection string).
+2. Python dependencies are declared in `pyproject.toml` and installed automatically by Replit's package manager.
+3. Start the `Start application` workflow — it builds Flutter (~40s) then starts uvicorn on port 5000.
 
 ## Deployment Files
 

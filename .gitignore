@@ -8,3 +8,15 @@ web/flutter.js
 web/flutter_bootstrap.js
 web/version.json
 web/flutter_service_worker.js
+
+# Flutter build outputs and caches
+build/
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
