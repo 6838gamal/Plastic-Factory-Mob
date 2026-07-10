@@ -558,7 +558,7 @@ class ApiDataSource {
   }
 
   Future<int> deleteAllProduction() async {
-    final res = await _delete('/api/production');
+    final res = await _delete('/api/machine-production');
     return (res as Map<String, dynamic>)['deleted'] as int? ?? 0;
   }
 

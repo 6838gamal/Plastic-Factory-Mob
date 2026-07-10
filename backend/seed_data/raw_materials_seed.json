@@ -3,11 +3,11 @@
     "id": "395c9e41-9f32-4a38-b6d6-253de13a938e",
     "name": "سكراب أسود",
     "code": "MAT-001",
-    "category": "عام",
+    "category": "",
     "unit": "كجم",
     "min_stock": "20.000",
     "cost_per_unit": "0.000",
-    "is_active": true,
+    "is_active": false,
     "notes": null
   },
   {
@@ -33,9 +33,75 @@
     "notes": null
   },
   {
+    "id": "9e7ad3b9-82d2-4c4e-8072-035e8503226a",
+    "name": "سكراب ازرق سكري",
+    "code": "MAT-007",
+    "category": "مواد أساسية",
+    "unit": "كجم",
+    "min_stock": "0.000",
+    "cost_per_unit": "0.000",
+    "is_active": false,
+    "notes": null
+  },
+  {
+    "id": "c71845d5-104a-474b-a4bc-a3bf87d73edf",
+    "name": "سكراب ازرق ناعم",
+    "code": "MAT-010",
+    "category": "مواد أساسية",
+    "unit": "كجم",
+    "min_stock": "0.000",
+    "cost_per_unit": "0.000",
+    "is_active": false,
+    "notes": null
+  },
+  {
+    "id": "de0a0d6d-589e-42b7-9fac-d72129af6cef",
+    "name": "سكراب اسود ناعم",
+    "code": "MAT-008",
+    "category": "مواد أساسية",
+    "unit": "كجم",
+    "min_stock": "0.000",
+    "cost_per_unit": "0.000",
+    "is_active": false,
+    "notes": null
+  },
+  {
+    "id": "5a77527d-df9d-479e-a1cb-38d4b1a8f1b5",
+    "name": "شمع باودر عبوة 25 كيلو",
+    "code": "MAT-012",
+    "category": "مواد أساسية",
+    "unit": "كجم",
+    "min_stock": "0.000",
+    "cost_per_unit": "0.000",
+    "is_active": true,
+    "notes": null
+  },
+  {
+    "id": "df2d2860-7956-4a77-a654-91a57aa0926e",
+    "name": "DOP زيت عبوة طن",
+    "code": "MAT-013",
+    "category": "مواد أساسية",
+    "unit": "كجم",
+    "min_stock": "0.000",
+    "cost_per_unit": "0.000",
+    "is_active": true,
+    "notes": null
+  },
+  {
+    "id": "4b980301-e285-448e-8f1c-6d42032e5ff9",
+    "name": "بيكربونات اصفر محلي",
+    "code": "MAT-003",
+    "category": "مواد أساسية",
+    "unit": "كجم",
+    "min_stock": "0.000",
+    "cost_per_unit": "0.000",
+    "is_active": true,
+    "notes": null
+  },
+  {
     "id": "55e4bffa-b191-4cd1-96b1-cdd0569e364c",
     "name": "سيتريك اسيد (ملح الليمون) 490 عبوة 25 كجم",
-    "code": "MAT-003",
+    "code": "MAT-004",
     "category": "مواد أساسية",
     "unit": "كجم",
     "min_stock": "0.000",
@@ -46,7 +112,7 @@
   {
     "id": "f63d6bfb-2379-4eb5-9373-a3fefa04502f",
     "name": "مواد خام PVC صيني",
-    "code": "MAT-004",
+    "code": "MAT-005",
     "category": "مواد أساسية",
     "unit": "كجم",
     "min_stock": "0.000",
@@ -57,40 +123,7 @@
   {
     "id": "2f417a37-14da-441b-8b73-bac9e72a4288",
     "name": "مثبت استبليزر باودر عبوة 25 كيلو",
-    "code": "MAT-005",
-    "category": "مواد أساسية",
-    "unit": "كجم",
-    "min_stock": "0.000",
-    "cost_per_unit": "0.000",
-    "is_active": true,
-    "notes": null
-  },
-  {
-    "id": "9e7ad3b9-82d2-4c4e-8072-035e8503226a",
-    "name": "سكراب ازرق سكري",
     "code": "MAT-006",
-    "category": "مواد أساسية",
-    "unit": "كجم",
-    "min_stock": "0.000",
-    "cost_per_unit": "0.000",
-    "is_active": true,
-    "notes": null
-  },
-  {
-    "id": "de0a0d6d-589e-42b7-9fac-d72129af6cef",
-    "name": "سكراب اسود ناعم",
-    "code": "MAT-007",
-    "category": "مواد أساسية",
-    "unit": "كجم",
-    "min_stock": "0.000",
-    "cost_per_unit": "0.000",
-    "is_active": true,
-    "notes": null
-  },
-  {
-    "id": "df2d2860-7956-4a77-a654-91a57aa0926e",
-    "name": "DOP زيت",
-    "code": "MAT-008",
     "category": "مواد أساسية",
     "unit": "كجم",
     "min_stock": "0.000",
@@ -110,17 +143,6 @@
     "notes": null
   },
   {
-    "id": "c71845d5-104a-474b-a4bc-a3bf87d73edf",
-    "name": "سكراب ازرق ناعم",
-    "code": "MAT-010",
-    "category": "مواد أساسية",
-    "unit": "كجم",
-    "min_stock": "0.000",
-    "cost_per_unit": "0.000",
-    "is_active": true,
-    "notes": null
-  },
-  {
     "id": "ebdf02cd-1ca1-400b-bc29-ac178af94f2a",
     "name": "كالسيوم باودر عبوة 25 كيلو",
     "code": "MAT-011",
@@ -132,97 +154,20 @@
     "notes": null
   },
   {
-    "id": "5a77527d-df9d-479e-a1cb-38d4b1a8f1b5",
-    "name": "شمع باودر عبوة 25 كيلو",
-    "code": "MAT-012",
-    "category": "مواد أساسية",
-    "unit": "كجم",
-    "min_stock": "0.000",
-    "cost_per_unit": "0.000",
-    "is_active": true,
-    "notes": null
-  },
-  {
-    "id": "4b980301-e285-448e-8f1c-6d42032e5ff9",
-    "name": "بيكربونات اصفر محلي",
-    "code": "MAT-013",
-    "category": "مواد أساسية",
-    "unit": "كجم",
-    "min_stock": "0.000",
-    "cost_per_unit": "0.000",
-    "is_active": true,
-    "notes": null
-  },
-  {
-    "id": "fb878800-2482-4a64-b494-6a7c40da3885",
-    "name": "صبغه خضراء طاووس محلي",
-    "code": "DYE-001",
+    "id": "f2d6dd81-cd88-4bb3-9152-82d0498c60bd",
+    "name": "صبغة ارجواني عبوة 25 كيلو رقم-F٤٠٩",
+    "code": "DYE-011",
     "category": "أصباغ",
     "unit": "جرام",
     "min_stock": "0.000",
     "cost_per_unit": "0.000",
-    "is_active": true,
+    "is_active": false,
     "notes": null
   },
   {
-    "id": "84e33a9e-a935-4521-a94a-0e1b5335a696",
-    "name": "صبغه سوداء طاووس محلي",
-    "code": "DYE-002",
-    "category": "أصباغ",
-    "unit": "جرام",
-    "min_stock": "0.000",
-    "cost_per_unit": "0.000",
-    "is_active": true,
-    "notes": null
-  },
-  {
-    "id": "4c61febe-d6de-433e-b40e-dbc8e25a8e18",
-    "name": "صبغة احمر زهري عبوة 25 كيلو رقم-F٣٥٨",
-    "code": "DYE-003",
-    "category": "أصباغ",
-    "unit": "جرام",
-    "min_stock": "0.000",
-    "cost_per_unit": "0.000",
-    "is_active": true,
-    "notes": null
-  },
-  {
-    "id": "05e9d4cb-a57b-479d-94fb-c725d710de5d",
-    "name": "صبغة زرقاء باودر عبوة 20 كيلو رقم-١٠٢٧",
-    "code": "DYE-004",
-    "category": "أصباغ",
-    "unit": "جرام",
-    "min_stock": "0.000",
-    "cost_per_unit": "0.000",
-    "is_active": true,
-    "notes": null
-  },
-  {
-    "id": "d4c3ff21-3348-4307-ada0-6c6dcc0d2a36",
-    "name": "صبغه زرقاء طاووس محلي",
-    "code": "DYE-005",
-    "category": "أصباغ",
-    "unit": "جرام",
-    "min_stock": "0.000",
-    "cost_per_unit": "0.000",
-    "is_active": true,
-    "notes": null
-  },
-  {
-    "id": "db7b656a-6c24-4842-9986-ed386128ec8f",
-    "name": "صبغة كاكي بيج عبوة 25 كيلو رقم-١٠٣٥",
-    "code": "DYE-006",
-    "category": "أصباغ",
-    "unit": "جرام",
-    "min_stock": "0.000",
-    "cost_per_unit": "0.000",
-    "is_active": true,
-    "notes": null
-  },
-  {
-    "id": "6a0087eb-5f9d-44f5-bde0-ec9cb2f801da",
-    "name": "صبغه برتقالي محلي",
-    "code": "DYE-007",
+    "id": "47e81b13-7c5c-47ae-8476-db6ff94870c2",
+    "name": "صبغة زرقاء فاتح عبوة 20 كيلو رقم-١٢٥٦",
+    "code": "DYE-009",
     "category": "أصباغ",
     "unit": "جرام",
     "min_stock": "0.000",
@@ -242,9 +187,9 @@
     "notes": null
   },
   {
-    "id": "47e81b13-7c5c-47ae-8476-db6ff94870c2",
-    "name": "صبغة زرقاء فاتح عبوة 20 كيلو رقم-١٢٥٦",
-    "code": "DYE-009",
+    "id": "6a0087eb-5f9d-44f5-bde0-ec9cb2f801da",
+    "name": "صبغه برتقالي محلي",
+    "code": "DYE-007",
     "category": "أصباغ",
     "unit": "جرام",
     "min_stock": "0.000",
@@ -253,31 +198,86 @@
     "notes": null
   },
   {
-    "id": "f2d6dd81-cd88-4bb3-9152-82d0498c60bd",
-    "name": "صبغة ارجواني عبوة 25 كيلو رقم-F٤٠٩",
-    "code": "DYE-019",
+    "id": "d4c3ff21-3348-4307-ada0-6c6dcc0d2a36",
+    "name": "صبغه زرقاء طاووس محلي",
+    "code": "DYE-005",
     "category": "أصباغ",
     "unit": "جرام",
-    "min_stock": "0.000",
-    "cost_per_unit": "0.000",
-    "is_active": false,
-    "notes": null
-  },
-  {
-    "id": "1079ddae-18aa-4578-a647-cda743880235",
-    "name": "لواصق موديل ۷۰۳ بالحبه",
-    "code": "ADD-001",
-    "category": "إضافات",
-    "unit": "قطعة",
     "min_stock": "0.000",
     "cost_per_unit": "0.000",
     "is_active": true,
     "notes": null
   },
   {
-    "id": "7d77e68d-17cf-4077-a29d-e23fd596aabb",
-    "name": "لواصق موديل ٦٠٢٦-٨٠٢٦ بالحبه",
+    "id": "fb878800-2482-4a64-b494-6a7c40da3885",
+    "name": "صبغه خضراء طاووس محلي",
+    "code": "DYE-004",
+    "category": "أصباغ",
+    "unit": "جرام",
+    "min_stock": "0.000",
+    "cost_per_unit": "0.000",
+    "is_active": true,
+    "notes": null
+  },
+  {
+    "id": "05e9d4cb-a57b-479d-94fb-c725d710de5d",
+    "name": "صبغة زرقاء باودر عبوة 20 كيلو رقم-١٠٢٧",
+    "code": "DYE-003",
+    "category": "أصباغ",
+    "unit": "جرام",
+    "min_stock": "0.000",
+    "cost_per_unit": "0.000",
+    "is_active": true,
+    "notes": null
+  },
+  {
+    "id": "4c61febe-d6de-433e-b40e-dbc8e25a8e18",
+    "name": "صبغة احمر زهري عبوة 25 كيلو رقم-F٣٥٨",
+    "code": "DYE-002",
+    "category": "أصباغ",
+    "unit": "جرام",
+    "min_stock": "0.000",
+    "cost_per_unit": "0.000",
+    "is_active": true,
+    "notes": null
+  },
+  {
+    "id": "84e33a9e-a935-4521-a94a-0e1b5335a696",
+    "name": "صبغه سوداء طاووس محلي",
+    "code": "DYE-001",
+    "category": "أصباغ",
+    "unit": "جرام",
+    "min_stock": "0.000",
+    "cost_per_unit": "0.000",
+    "is_active": true,
+    "notes": null
+  },
+  {
+    "id": "db7b656a-6c24-4842-9986-ed386128ec8f",
+    "name": "صبغة كاكي بيج عبوة 25 كيلو رقم-١٠٣٥",
+    "code": "DYE-006",
+    "category": "أصباغ",
+    "unit": "جرام",
+    "min_stock": "0.000",
+    "cost_per_unit": "0.000",
+    "is_active": true,
+    "notes": null
+  },
+  {
+    "id": "40e132a7-4136-401b-94ac-83a5d0ef267a",
+    "name": "خلطه ازرق",
     "code": "ADD-002",
+    "category": "إضافات",
+    "unit": "كجم",
+    "min_stock": "0.000",
+    "cost_per_unit": "0.000",
+    "is_active": true,
+    "notes": null
+  },
+  {
+    "id": "ad2a9859-39aa-4671-a065-f3655a1980a6",
+    "name": "لواصق موديل ٦٠٢٢-٨٠٢٢ بالحبه",
+    "code": "ADD-001",
     "category": "إضافات",
     "unit": "قطعة",
     "min_stock": "0.000",
@@ -288,7 +288,7 @@
   {
     "id": "ecb9ed2c-7390-4151-b80a-b8895eee7fb8",
     "name": "لواصق موديل ۸۰۳۱-٦٠٣١ بالحبه",
-    "code": "ADD-003",
+    "code": "ADD-005",
     "category": "إضافات",
     "unit": "قطعة",
     "min_stock": "0.000",
@@ -297,8 +297,8 @@
     "notes": null
   },
   {
-    "id": "ad2a9859-39aa-4671-a065-f3655a1980a6",
-    "name": "لواصق موديل ٦٠٢٢-٨٠٢٢ بالحبه",
+    "id": "7d77e68d-17cf-4077-a29d-e23fd596aabb",
+    "name": "لواصق موديل ٦٠٢٦-٨٠٢٦ بالحبه",
     "code": "ADD-004",
     "category": "إضافات",
     "unit": "قطعة",
@@ -308,11 +308,11 @@
     "notes": null
   },
   {
-    "id": "40e132a7-4136-401b-94ac-83a5d0ef267a",
-    "name": "خلطه ازرق",
-    "code": "ADD-005",
+    "id": "1079ddae-18aa-4578-a647-cda743880235",
+    "name": "لواصق موديل ۷۰۳ بالحبه",
+    "code": "ADD-003",
     "category": "إضافات",
-    "unit": "كجم",
+    "unit": "قطعة",
     "min_stock": "0.000",
     "cost_per_unit": "0.000",
     "is_active": true,
@@ -337,13 +337,13 @@
     "unit": "كجم",
     "min_stock": "1000.000",
     "cost_per_unit": "0.000",
-    "is_active": true,
+    "is_active": false,
     "notes": null
   },
   {
     "id": "8c968ae8-ff5c-4471-b36d-7e07e23dcbb3",
     "name": "سكراب أسود ناعم",
-    "code": "SCR-002",
+    "code": "SCR-005",
     "category": "سكراب",
     "unit": "كجم",
     "min_stock": "200.000",
@@ -354,7 +354,7 @@
   {
     "id": "1baa63f1-e78b-4c56-83f9-adf5ac465723",
     "name": "سكراب أزرق ناعم",
-    "code": "SCR-003",
+    "code": "SCR-004",
     "category": "سكراب",
     "unit": "كجم",
     "min_stock": "200.000",
@@ -365,7 +365,7 @@
   {
     "id": "4ab819d2-3bd7-42fe-b3a7-95f0ff2a9aac",
     "name": "سكراب أزرق سكري",
-    "code": "SCR-004",
+    "code": "SCR-003",
     "category": "سكراب",
     "unit": "كجم",
     "min_stock": "200.000",
@@ -376,7 +376,7 @@
   {
     "id": "b9921b8e-5dd4-4e54-9196-c67d156706ff",
     "name": "راجع ماكينة أزرق",
-    "code": "SCR-005",
+    "code": "SCR-002",
     "category": "سكراب",
     "unit": "كجم",
     "min_stock": "100.000",
@@ -387,7 +387,7 @@
   {
     "id": "8555808b-86f9-4e12-ba97-a3e64a79b0d8",
     "name": "DOP_زيت_2",
-    "code": "OIL-005",
+    "code": "OIL-001",
     "category": "زيوت وإضافات",
     "unit": "كجم",
     "min_stock": "200.000",
@@ -398,7 +398,7 @@
   {
     "id": "6fd2bb19-d40b-445b-b14c-7b9b3cba5867",
     "name": "مثبت استبليزر باودر 25 كجم",
-    "code": "OIL-001",
+    "code": "OIL-008",
     "category": "زيوت وإضافات",
     "unit": "كجم",
     "min_stock": "100.000",
@@ -409,7 +409,7 @@
   {
     "id": "1f20f7d7-f1d8-4a07-9ac1-932bd801798e",
     "name": "كالسيوم باودر 25 كجم",
-    "code": "OIL-002",
+    "code": "OIL-004",
     "category": "زيوت وإضافات",
     "unit": "كجم",
     "min_stock": "100.000",
@@ -429,9 +429,20 @@
     "notes": null
   },
   {
+    "id": "846859f2-feb9-46de-ad2b-1d87e2e94edc",
+    "name": "تيتانيوم",
+    "code": "OIL-005",
+    "category": "زيوت وإضافات",
+    "unit": "كجم",
+    "min_stock": "50.000",
+    "cost_per_unit": "0.000",
+    "is_active": false,
+    "notes": null
+  },
+  {
     "id": "31e7e006-413b-4446-a1fc-f12582a14a9f",
     "name": "سيتريك أسيد (ملح الليمون) 25 كجم",
-    "code": "OIL-004",
+    "code": "OIL-002",
     "category": "زيوت وإضافات",
     "unit": "كجم",
     "min_stock": "25.000",
@@ -464,7 +475,7 @@
   {
     "id": "f125f195-c441-40d8-9738-1b53a691d7e7",
     "name": "صبغة سوداء باودر 10 كجم",
-    "code": "DYE-010",
+    "code": "DYE-019",
     "category": "أصباغ",
     "unit": "كجم",
     "min_stock": "20.000",
@@ -475,7 +486,7 @@
   {
     "id": "5e383e39-b8f2-41b9-afca-95a7b14e57d7",
     "name": "صبغة زرقاء باودر 20 كجم رقم 1027",
-    "code": "DYE-011",
+    "code": "DYE-016",
     "category": "أصباغ",
     "unit": "كجم",
     "min_stock": "20.000",
@@ -486,7 +497,7 @@
   {
     "id": "1a216895-4607-42d7-85d0-ebd401e91ba3",
     "name": "صبغة زرقاء فاتح باودر 20 كجم رقم 1256",
-    "code": "DYE-012",
+    "code": "DYE-018",
     "category": "أصباغ",
     "unit": "كجم",
     "min_stock": "20.000",
@@ -496,8 +507,8 @@
   },
   {
     "id": "5a3cf5e5-d6fc-426d-99d8-bf957d700eb6",
-    "name": "صبغة أرجواني باودر 25 كجم رقم F409",
-    "code": "DYE-013",
+    "name": "صبغة أرجواني باودر عبوة 25 كجم رقم F409",
+    "code": "DYE-010",
     "category": "أصباغ",
     "unit": "كجم",
     "min_stock": "25.000",
@@ -507,8 +518,8 @@
   },
   {
     "id": "22ab6d88-129f-4c57-98bf-2851b45f6e61",
-    "name": "صبغة أحمر زهري باودر 25 كجم رقم F358",
-    "code": "DYE-014",
+    "name": "صبغة أحمر زهري باودر عبوة 25 كجم رقم - F358",
+    "code": "DYE-013",
     "category": "أصباغ",
     "unit": "كجم",
     "min_stock": "25.000",
@@ -519,7 +530,7 @@
   {
     "id": "a49ebf35-4cc8-4a4f-861f-482b752eb502",
     "name": "صبغة كاكي بيج باودر 25 كجم رقم 1035",
-    "code": "DYE-015",
+    "code": "DYE-020",
     "category": "أصباغ",
     "unit": "كجم",
     "min_stock": "25.000",
@@ -530,7 +541,7 @@
   {
     "id": "9da2d54c-824a-4ed9-a5f4-9ca5f2e38f15",
     "name": "صبغة خضراء طاووس محلي",
-    "code": "DYE-016",
+    "code": "DYE-015",
     "category": "أصباغ",
     "unit": "كجم",
     "min_stock": "10.000",
@@ -541,7 +552,7 @@
   {
     "id": "3ebce721-fc4c-4d03-9cbf-df07b770ed24",
     "name": "صبغة برتقالي محلي",
-    "code": "DYE-017",
+    "code": "DYE-014",
     "category": "أصباغ",
     "unit": "كجم",
     "min_stock": "10.000",
@@ -552,7 +563,7 @@
   {
     "id": "e322231f-92de-4a6a-aac7-44ac0922c84d",
     "name": "صبغة زرقاء طاووس محلي",
-    "code": "DYE-018",
+    "code": "DYE-017",
     "category": "أصباغ",
     "unit": "كجم",
     "min_stock": "10.000",
@@ -563,7 +574,7 @@
   {
     "id": "d28ee29a-021b-49de-9a10-07a2962b2018",
     "name": "صبغة سوداء طاووس محلي",
-    "code": "DYE-020",
+    "code": "DYE-012",
     "category": "أصباغ",
     "unit": "كجم",
     "min_stock": "10.000",
@@ -574,7 +585,7 @@
   {
     "id": "e406e8e9-b235-4b51-8d83-83b0450530b3",
     "name": "لاصق 703",
-    "code": "ADH-001",
+    "code": "ADH-003",
     "category": "لواصق",
     "unit": "كجم",
     "min_stock": "20.000",
@@ -585,7 +596,7 @@
   {
     "id": "60828dc3-0e7a-4c20-8ff9-87a43ce6c038",
     "name": "لاصق 8031",
-    "code": "ADH-002",
+    "code": "ADH-005",
     "category": "لواصق",
     "unit": "كجم",
     "min_stock": "20.000",
@@ -596,7 +607,7 @@
   {
     "id": "b6654597-9680-4d47-8c25-e1f8f8072808",
     "name": "لاصق 6031",
-    "code": "ADH-003",
+    "code": "ADH-002",
     "category": "لواصق",
     "unit": "كجم",
     "min_stock": "20.000",
@@ -607,7 +618,7 @@
   {
     "id": "51dc0bdd-6916-48ae-88cb-fc0f5b74cdaa",
     "name": "لاصق 6026",
-    "code": "ADH-004",
+    "code": "ADH-001",
     "category": "لواصق",
     "unit": "كجم",
     "min_stock": "20.000",
@@ -618,7 +629,7 @@
   {
     "id": "2c032579-c376-4afe-be67-1e116affe53a",
     "name": "لاصق 8026",
-    "code": "ADH-005",
+    "code": "ADH-004",
     "category": "لواصق",
     "unit": "كجم",
     "min_stock": "20.000",
@@ -640,7 +651,7 @@
   {
     "id": "174ea170-d9eb-4e5e-a274-5cd47fdc6215",
     "name": "لاصق 8022",
-    "code": "ADH-007",
+    "code": "ADH-011",
     "category": "لواصق",
     "unit": "كجم",
     "min_stock": "20.000",
@@ -663,11 +674,11 @@
     "id": "f5678a66-208d-478f-8faf-7c7934e8ad5c",
     "name": "زيت صبغة",
     "code": "MAT-014",
-    "category": "عام",
+    "category": "",
     "unit": "كجم",
     "min_stock": "23.000",
     "cost_per_unit": "0.000",
-    "is_active": true,
+    "is_active": false,
     "notes": null
   },
   {
@@ -684,7 +695,7 @@
   {
     "id": "4b732de8-865c-4c6c-bda8-13b7a3418f46",
     "name": "سكراب_أسود_ناعم_2",
-    "code": "SCR-006",
+    "code": "SCR-009",
     "category": "سكراب",
     "unit": "كجم",
     "min_stock": "200.000",
@@ -695,7 +706,7 @@
   {
     "id": "170d56b3-1b68-4029-870d-0b60c80f2932",
     "name": "سكراب_أزرق_ناعم_2",
-    "code": "SCR-007",
+    "code": "SCR-008",
     "category": "سكراب",
     "unit": "كجم",
     "min_stock": "200.000",
@@ -706,7 +717,7 @@
   {
     "id": "0a4a3ea5-8c07-427e-ab1e-c005c8469618",
     "name": "سكراب_أزرق_سكري_2",
-    "code": "SCR-008",
+    "code": "SCR-007",
     "category": "سكراب",
     "unit": "كجم",
     "min_stock": "200.000",
@@ -717,7 +728,7 @@
   {
     "id": "ed14ef71-7626-4d9d-8e20-3bfae2fdb28d",
     "name": "راجع_ماكينة_أزرق_2",
-    "code": "SCR-009",
+    "code": "SCR-006",
     "category": "سكراب",
     "unit": "كجم",
     "min_stock": "100.000",
@@ -728,7 +739,7 @@
   {
     "id": "a4bbfb04-1f6d-4eee-a985-e937b25b21bb",
     "name": "DOP_زيت_3",
-    "code": "OIL-006",
+    "code": "OIL-009",
     "category": "زيوت وإضافات",
     "unit": "كجم",
     "min_stock": "200.000",
@@ -739,7 +750,7 @@
   {
     "id": "a42ba795-4ec9-438a-a80f-6c929c065474",
     "name": "مثبت_استبليزر_باودر_25_كجم_2",
-    "code": "OIL-007",
+    "code": "OIL-012",
     "category": "زيوت وإضافات",
     "unit": "كجم",
     "min_stock": "100.000",
@@ -750,7 +761,7 @@
   {
     "id": "831a0e02-13a6-4fc0-9ac4-1c1555ff8b8a",
     "name": "كالسيوم_باودر_25_كجم_2",
-    "code": "OIL-008",
+    "code": "OIL-007",
     "category": "زيوت وإضافات",
     "unit": "كجم",
     "min_stock": "100.000",
@@ -761,7 +772,18 @@
   {
     "id": "b2a710ee-dfb1-4db9-82aa-9f60ebd94b23",
     "name": "شمع_باودر_25_كجم_2",
-    "code": "OIL-009",
+    "code": "OIL-011",
+    "category": "زيوت وإضافات",
+    "unit": "كجم",
+    "min_stock": "50.000",
+    "cost_per_unit": "0.000",
+    "is_active": false,
+    "notes": null
+  },
+  {
+    "id": "a98e0da4-89f8-42ad-a688-8fe5e20dee9a",
+    "name": "تيتانيوم",
+    "code": "OIL-006",
     "category": "زيوت وإضافات",
     "unit": "كجم",
     "min_stock": "50.000",
@@ -783,7 +805,7 @@
   {
     "id": "a3d73147-d8a2-4c65-9170-2287d2b1578a",
     "name": "بيكربونات_أصفر_محلي_2",
-    "code": "BIC-003",
+    "code": "BIC-004",
     "category": "بيكربونات",
     "unit": "كجم",
     "min_stock": "50.000",
@@ -794,7 +816,7 @@
   {
     "id": "5d655333-8139-4e42-a676-7a5b094e88df",
     "name": "بيكربونات_أبيض_محلي_2",
-    "code": "BIC-004",
+    "code": "BIC-003",
     "category": "بيكربونات",
     "unit": "كجم",
     "min_stock": "50.000",
@@ -805,7 +827,7 @@
   {
     "id": "05947c6f-c4c9-43fc-9d36-4504b7d6cce2",
     "name": "صبغة_سوداء_باودر_10_كجم_2",
-    "code": "DYE-021",
+    "code": "DYE-025",
     "category": "أصباغ",
     "unit": "كجم",
     "min_stock": "20.000",
@@ -816,7 +838,7 @@
   {
     "id": "75b3eed5-cc9c-4bad-9818-ddb1ca3d3c6d",
     "name": "صبغة_زرقاء_باودر_20_كجم_رقم_1027_2",
-    "code": "DYE-022",
+    "code": "DYE-030",
     "category": "أصباغ",
     "unit": "كجم",
     "min_stock": "20.000",
@@ -827,7 +849,7 @@
   {
     "id": "969f4f29-12b2-4007-97ff-147e4301fbde",
     "name": "صبغة_زرقاء_فاتح_باودر_20_كجم_رقم_1256_2",
-    "code": "DYE-023",
+    "code": "DYE-024",
     "category": "أصباغ",
     "unit": "كجم",
     "min_stock": "20.000",
@@ -836,9 +858,20 @@
     "notes": null
   },
   {
+    "id": "4a643395-a6df-4b92-af44-fb4a25d380d3",
+    "name": "صبغة أرجواني باودر 25 كجم رقم F409",
+    "code": "DYE-021",
+    "category": "أصباغ",
+    "unit": "كجم",
+    "min_stock": "25.000",
+    "cost_per_unit": "0.000",
+    "is_active": false,
+    "notes": null
+  },
+  {
     "id": "7016057f-a37f-4371-8ee2-1c0262df5bcc",
     "name": "صبغة_أحمر_زهري_باودر_25_كجم_رقم_F358_2",
-    "code": "DYE-024",
+    "code": "DYE-027",
     "category": "أصباغ",
     "unit": "كجم",
     "min_stock": "25.000",
@@ -849,7 +882,7 @@
   {
     "id": "48348c28-5ee4-4c3f-b9bf-5f22ee3872ef",
     "name": "صبغة_كاكي_بيج_باودر_25_كجم_رقم_1035_2",
-    "code": "DYE-025",
+    "code": "DYE-026",
     "category": "أصباغ",
     "unit": "كجم",
     "min_stock": "25.000",
@@ -860,7 +893,7 @@
   {
     "id": "7940e33f-ba75-4fe1-9ace-d463c5236a9d",
     "name": "صبغة_خضراء_طاووس_محلي_2",
-    "code": "DYE-026",
+    "code": "DYE-029",
     "category": "أصباغ",
     "unit": "كجم",
     "min_stock": "10.000",
@@ -871,7 +904,7 @@
   {
     "id": "5cbbef97-f1c9-46a5-8105-90bd109f6d9d",
     "name": "صبغة_برتقالي_محلي_2",
-    "code": "DYE-027",
+    "code": "DYE-028",
     "category": "أصباغ",
     "unit": "كجم",
     "min_stock": "10.000",
@@ -882,7 +915,18 @@
   {
     "id": "5771347b-0ee9-4a7b-9328-34921742ce71",
     "name": "صبغة_زرقاء_طاووس_محلي_2",
-    "code": "DYE-028",
+    "code": "DYE-023",
+    "category": "أصباغ",
+    "unit": "كجم",
+    "min_stock": "10.000",
+    "cost_per_unit": "0.000",
+    "is_active": false,
+    "notes": null
+  },
+  {
+    "id": "bd054268-345e-4bfd-8628-e8c794a8767e",
+    "name": "صبغة سوداء طاووس محلي",
+    "code": "DYE-022",
     "category": "أصباغ",
     "unit": "كجم",
     "min_stock": "10.000",
@@ -893,7 +937,7 @@
   {
     "id": "617799bc-cbd3-48d4-bead-c9e5ce032d3d",
     "name": "لاصق_703_2",
-    "code": "ADH-008",
+    "code": "ADH-010",
     "category": "لواصق",
     "unit": "كجم",
     "min_stock": "20.000",
@@ -904,7 +948,7 @@
   {
     "id": "add2de4e-a381-4037-9f8c-232156337032",
     "name": "لاصق_8031_2",
-    "code": "ADH-009",
+    "code": "ADH-014",
     "category": "لواصق",
     "unit": "كجم",
     "min_stock": "20.000",
@@ -915,7 +959,7 @@
   {
     "id": "df4e468b-84d5-4857-8edf-1ccacf115848",
     "name": "لاصق_6031_2",
-    "code": "ADH-010",
+    "code": "ADH-009",
     "category": "لواصق",
     "unit": "كجم",
     "min_stock": "20.000",
@@ -926,7 +970,7 @@
   {
     "id": "f845acf7-2341-432b-8212-cb43d389a889",
     "name": "لاصق_6026_2",
-    "code": "ADH-011",
+    "code": "ADH-008",
     "category": "لواصق",
     "unit": "كجم",
     "min_stock": "20.000",
@@ -937,7 +981,7 @@
   {
     "id": "8f2495e0-f246-4d4b-94ba-feffb7b40d96",
     "name": "لاصق_8026_2",
-    "code": "ADH-012",
+    "code": "ADH-013",
     "category": "لواصق",
     "unit": "كجم",
     "min_stock": "20.000",
@@ -948,7 +992,7 @@
   {
     "id": "6c582f23-dcc6-4f9a-bc05-48cbeed490db",
     "name": "لاصق_6022_2",
-    "code": "ADH-013",
+    "code": "ADH-007",
     "category": "لواصق",
     "unit": "كجم",
     "min_stock": "20.000",
@@ -959,7 +1003,7 @@
   {
     "id": "4961ae4d-76c1-4d96-8d15-6c286f1ccef6",
     "name": "لاصق_8022_2",
-    "code": "ADH-014",
+    "code": "ADH-012",
     "category": "لواصق",
     "unit": "كجم",
     "min_stock": "20.000",
@@ -979,14 +1023,157 @@
     "notes": null
   },
   {
-    "id": "360f1163-2809-40b3-bf6f-b91212796f23",
-    "name": "مادة اختبار تلقائية",
+    "id": "5a39a341-f3de-41c3-9289-8f41a712e473",
+    "name": "فوم باودر عبوة 25 كيلو",
     "code": "MAT-015",
-    "category": "عام",
+    "category": "زيوت وإضافات",
     "unit": "كجم",
     "min_stock": "0.000",
     "cost_per_unit": "0.000",
-    "is_active": false,
+    "is_active": true,
+    "notes": null
+  },
+  {
+    "id": "6e59215f-b726-4cab-952d-d97291f2ae70",
+    "name": "مواد خام PVC صيني A3151H",
+    "code": "MAT-016",
+    "category": "مواد أساسية",
+    "unit": "كجم",
+    "min_stock": "0.000",
+    "cost_per_unit": "0.000",
+    "is_active": true,
+    "notes": null
+  },
+  {
+    "id": "071cf867-3969-4017-9d04-1d2b63ec1c0f",
+    "name": "سكراب مفروم لماع ناعم",
+    "code": "SCR-010",
+    "category": "سكراب",
+    "unit": "كجم",
+    "min_stock": "0.000",
+    "cost_per_unit": "0.000",
+    "is_active": true,
+    "notes": null
+  },
+  {
+    "id": "1fee394e-7759-4a87-a625-153ee5f26935",
+    "name": "سكراب أبيض ناعم",
+    "code": "SCR-011",
+    "category": "سكراب",
+    "unit": "كجم",
+    "min_stock": "0.000",
+    "cost_per_unit": "0.000",
+    "is_active": true,
+    "notes": null
+  },
+  {
+    "id": "d8a585b6-e03b-45fe-a2f5-478a60c8cec4",
+    "name": "الخلطة السحرية باودر عبوة 25 كيلو 55A",
+    "code": "MAT-017",
+    "category": "",
+    "unit": "كجم",
+    "min_stock": "0.000",
+    "cost_per_unit": "0.000",
+    "is_active": true,
+    "notes": null
+  },
+  {
+    "id": "666cd26f-1148-450a-8dfc-7fe8a792ed22",
+    "name": "صبغة بيج محلي عبوة 20 كيلو",
+    "code": "MAT-018",
+    "category": "",
+    "unit": "كجم",
+    "min_stock": "0.000",
+    "cost_per_unit": "0.000",
+    "is_active": true,
+    "notes": null
+  },
+  {
+    "id": "bd41e2df-4672-48dd-b339-0f72ff6459d1",
+    "name": "صبغة رمادي باودر عبوة 25 كيلو رقم - 1001",
+    "code": "MAT-019",
+    "category": "",
+    "unit": "كجم",
+    "min_stock": "0.000",
+    "cost_per_unit": "0.000",
+    "is_active": true,
+    "notes": null
+  },
+  {
+    "id": "fb04fe46-ba74-4192-905a-ae4d37734ef0",
+    "name": "الخلطة السحرية باودر عبوة 25 كيلو 30A",
+    "code": "MAT-020",
+    "category": "",
+    "unit": "كجم",
+    "min_stock": "0.000",
+    "cost_per_unit": "0.000",
+    "is_active": true,
+    "notes": null
+  },
+  {
+    "id": "a470d3ac-28ed-4480-a35f-6ff276a29b8e",
+    "name": "سكراب لولو ناعم",
+    "code": "MAT-021",
+    "category": "",
+    "unit": "كجم",
+    "min_stock": "0.000",
+    "cost_per_unit": "0.000",
+    "is_active": true,
+    "notes": null
+  },
+  {
+    "id": "9ec5a702-f18f-4616-a762-59c5ab40319f",
+    "name": "سكراب وردي ناعم",
+    "code": "MAT-022",
+    "category": "",
+    "unit": "كجم",
+    "min_stock": "0.000",
+    "cost_per_unit": "0.000",
+    "is_active": true,
+    "notes": null
+  },
+  {
+    "id": "61b4ba35-ffdd-4f52-bd2a-646d8abc0727",
+    "name": "صبغة بني باودر عبوة 25 كيلو",
+    "code": "MAT-023",
+    "category": "",
+    "unit": "كجم",
+    "min_stock": "0.000",
+    "cost_per_unit": "0.000",
+    "is_active": true,
+    "notes": null
+  },
+  {
+    "id": "150aaaa0-a806-4472-b93c-f7b3ad0c6c17",
+    "name": "سكراب بواتي مطر ملون ناعم",
+    "code": "MAT-024",
+    "category": "",
+    "unit": "كجم",
+    "min_stock": "0.000",
+    "cost_per_unit": "0.000",
+    "is_active": true,
+    "notes": null
+  },
+  {
+    "id": "73f56c73-dbd8-49ea-b25a-4bd6a3fc96a7",
+    "name": "رايش غريلة",
+    "code": "MAT-025",
+    "category": "",
+    "unit": "كجم",
+    "min_stock": "0.000",
+    "cost_per_unit": "0.000",
+    "is_active": true,
+    "notes": null
+  },
+  {
+    "id": "7a69e061-8ea3-4e96-b97c-6b782dd5e2ac",
+    "name": "فصوص",
+    "code": "MAT-026",
+    "category": "",
+    "unit": "كجم",
+    "min_stock": "0.000",
+    "cost_per_unit": "0.000",
+    "is_active": true,
     "notes": null
   }
 ]
