@@ -416,71 +416,22 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         const SizedBox(height: 12),
 
         // ── تنظيف شامل ───────────────────────────────────────────
-        Card(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-            side: const BorderSide(color: Colors.red, width: 1.5),
-          ),
-          color: Colors.red.shade50,
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Row(
-                  children: [
-                    Icon(Icons.delete_forever, color: Colors.red, size: 22),
-                    SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'تنظيف شامل',
-                        style: TextStyle(
-                          color: Colors.red,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                const Text(
-                  'يحذف جميع البيانات التشغيلية دفعةً واحدة:\nالطبخات • الإنتاج • الورديات • المخزون • التحذيرات • التقارير • السجلات\n\nتبقى البيانات المرجعية (المواد، العمال، الماكينات، المنتجات).',
-                  style: TextStyle(fontSize: 12, color: Colors.red),
-                ),
-                const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    icon: const Icon(Icons.delete_sweep, color: Colors.white),
-                    label: const Text(
-                      'تنظيف شامل للبيانات',
-                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                    ),
-                    onPressed: () => _confirmAndClear(
-                      context: context,
-                      title: 'تنظيف شامل للبيانات',
-                      message:
-                          'سيتم حذف جميع البيانات التشغيلية نهائيًا:\n\n• جميع الطبخات\n• سجلات الإنتاج\n• عمليات تسليم الورديات\n• حركات المخزون وأرصدتها\n• التحذيرات والتقارير والسجلات\n\nهذا الإجراء لا يمكن التراجع عنه.',
-                      action: () => ref.read(dataSourceProvider).fullReset(),
-                      onDone: () {
-                        ref.invalidate(batchesProvider);
-                        ref.invalidate(machineProductionsProvider);
-                        ref.invalidate(inventorySummaryProvider);
-                        ref.invalidate(alertsProvider(const AlertFilters(status: 'pending')));
-                        ref.invalidate(alertsProvider(const AlertFilters(status: 'acknowledged')));
-                        ref.invalidate(alertsProvider(const AlertFilters(status: 'resolved')));
-                        ref.invalidate(auditLogProvider);
-                      },
-                    ),
-                  ),
-                ),
-              ],
-            ),
+        _FullCleanupCard(
+          onConfirm: () => _confirmAndClear(
+            context: context,
+            title: 'تنظيف شامل للبيانات',
+            message:
+                'سيتم حذف جميع البيانات التشغيلية نهائيًا:\n\n• جميع الطبخات\n• سجلات الإنتاج\n• عمليات تسليم الورديات\n• حركات المخزون وأرصدتها\n• التحذيرات والتقارير والسجلات\n\nهذا الإجراء لا يمكن التراجع عنه.',
+            action: () => ref.read(dataSourceProvider).fullReset(),
+            onDone: () {
+              ref.invalidate(batchesProvider);
+              ref.invalidate(machineProductionsProvider);
+              ref.invalidate(inventorySummaryProvider);
+              ref.invalidate(alertsProvider(const AlertFilters(status: 'pending')));
+              ref.invalidate(alertsProvider(const AlertFilters(status: 'acknowledged')));
+              ref.invalidate(alertsProvider(const AlertFilters(status: 'resolved')));
+              ref.invalidate(auditLogProvider);
+            },
           ),
         ),
 
@@ -1418,6 +1369,67 @@ class _SmsSettingsCardState extends ConsumerState<_SmsSettingsCard> {
 }
 
 // ══════════════════════════════════════════════════════
+class _FullCleanupCard extends StatelessWidget {
+  final VoidCallback onConfirm;
+  const _FullCleanupCard({required this.onConfirm});
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+        side: const BorderSide(color: Colors.red, width: 1.5),
+      ),
+      color: Colors.red.shade50,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Row(
+              children: [
+                Icon(Icons.delete_forever, color: Colors.red, size: 22),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'تنظيف شامل',
+                    style: TextStyle(
+                      color: Colors.red,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'يحذف جميع البيانات التشغيلية دفعةً واحدة:\nالطبخات، الإنتاج، الورديات، المخزون، التحذيرات، التقارير، السجلات.\n\nتبقى البيانات المرجعية (المواد، العمال، الماكينات، المنتجات).',
+              style: TextStyle(fontSize: 12, color: Colors.red),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                icon: const Icon(Icons.delete_sweep, color: Colors.white),
+                label: const Text(
+                  'تنظيف شامل للبيانات',
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+                onPressed: onConfirm,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _SectionTitle extends StatelessWidget {
   final String title;
   const _SectionTitle(this.title);
