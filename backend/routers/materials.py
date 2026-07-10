@@ -143,6 +143,17 @@ async def upsert_material(body: MaterialUpsert):
             body.name, code, body.category, body.unit, body.min_stock,
             body.cost_per_unit, body.is_active, body.notes,
         )
+        # مادة جديدة: أنشئ سطر رصيد صفري في كل مخزن (رئيسي + خلاط) فوراً حتى
+        # تظهر المادة تلقائياً في شاشات استلام الوارد ومخزن الخلاط بدون أي
+        # إجراء يدوي إضافي — inventory_summary VIEW مبني على JOIN مع inventory
+        # فلا تظهر المادة فيه إلا إذا كان لها سطر مخزون موجود.
+        for wh in ("main", "mixer"):
+            await pool.execute(
+                """INSERT INTO inventory (id, material_id, warehouse_type, balance)
+                   VALUES (gen_random_uuid(), $1::uuid, $2, 0)
+                   ON CONFLICT DO NOTHING""",
+                row["id"], wh,
+            )
     await export_raw_materials_seed()
     return dict(row)
 

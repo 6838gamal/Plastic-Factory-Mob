@@ -1,46 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../data/models/raw_material_model.dart';
 import '../../../../data/models/reference_models.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/reference_data_provider.dart';
 
-// ── الحقول الثابتة لكل قسم ──────────────────────────────────────────────
-const _rawMaterials = [
-  ('مواد خام PVC صيني',                        'كجم'),
-  ('DOP زيت',                                   'كجم'),
-  ('سكراب اسود ناعم',                           'كجم'),
-  ('سكراب ازرق ناعم',                           'كجم'),
-  ('سكراب ازرق سكري',                           'كجم'),
-  ('كالسيوم باودر عبوة 25 كيلو',                'كجم'),
-  ('شمع باودر عبوة 25 كيلو',                    'كجم'),
-  ('مثبت استبليزر باودر عبوة 25 كيلو',          'كجم'),
-  ('تيتانيوم',                                  'كجم'),
-  ('سيتريك اسيد (ملح الليمون) 490 عبوة 25 كجم','كجم'),
-  ('بيكربونات اصفر محلي',                       'كجم'),
-  ('بيكربونات ابيض محلي',                       'كجم'),
-];
+// ── تصنيف المواد إلى أقسام العرض في محرر الوصفة ──────────────────────────
+// القسم يُحدَّد تلقائياً من فئة (category) المادة نفسها بدل قائمة ثابتة، لذا
+// أي مادة جديدة يضيفها الأدمن في شاشة "المواد" تظهر فوراً هنا بدون تعديل كود.
+const _pigmentCategories = {'أصباغ'};
+const _additiveCategories = {'إضافات', 'لواصق', 'خلطات'};
 
-const _pigments = [
-  ('صبغة سوداء باودر عبوة 10 كيلو',           'جرام'),
-  ('صبغة زرقاء باودر عبوة 20 كيلو رقم-١٠٢٧',  'جرام'),
-  ('صبغة زرقاء فاتح عبوة 20 كيلو رقم-١٢٥٦',   'جرام'),
-  ('صبغة ارجواني عبوة 25 كيلو رقم-F٤٠٩',       'جرام'),
-  ('صبغة احمر زهري عبوة 25 كيلو رقم-F٣٥٨',     'جرام'),
-  ('صبغة كاكي بيج عبوة 25 كيلو رقم-١٠٣٥',      'جرام'),
-  ('صبغه خضراء طاووس محلي',                    'جرام'),
-  ('صبغه برتقالي محلي',                        'جرام'),
-  ('صبغه زرقاء طاووس محلي',                    'جرام'),
-  ('صبغه سوداء طاووس محلي',                    'جرام'),
-];
-
-const _additives = [
-  ('لواصق موديل ۷۰۳ بالحبه',        'قطعة'),
-  ('لواصق موديل ۸۰۳۱-٦٠٣١ بالحبه', 'قطعة'),
-  ('لواصق موديل ٦٠٢٦-٨٠٢٦ بالحبه', 'قطعة'),
-  ('لواصق موديل ٦٠٢٢-٨٠٢٢ بالحبه', 'قطعة'),
-  ('خلطه ازرق',                      'كجم'),
-  ('راجع مكينه ازرق',                'كجم'),
-];
+String _sectionOf(RawMaterialModel m) {
+  if (_pigmentCategories.contains(m.category)) return 'pigments';
+  if (_additiveCategories.contains(m.category)) return 'additives';
+  return 'raw';
+}
 
 // ── Main Page ─────────────────────────────────────────────────────────────
 class RecipeManagementPage extends ConsumerStatefulWidget {
@@ -79,8 +54,13 @@ class _RecipeManagementPageState extends ConsumerState<RecipeManagementPage> {
   }
 
   Future<void> _openEditor({RecipeModel? existing}) async {
+    // نجلب كلاً من أنواع الخلطات وقائمة المواد الخام مباشرة من الخادم عند كل
+    // فتح للمحرر (rawMaterialsProvider هو autoDispose) — بذلك تظهر أي مادة
+    // أُضيفت أو عُدِّلت حديثاً من شاشة "المواد" فوراً هنا دون إعادة تشغيل التطبيق.
     final mixtureTypes =
         await ref.read(mixtureTypesProvider.future).catchError((_) => <MixtureTypeModel>[]);
+    final materials =
+        await ref.read(rawMaterialsProvider.future).catchError((_) => <RawMaterialModel>[]);
     if (!mounted) return;
 
     final result = await showModalBottomSheet<bool>(
@@ -90,6 +70,7 @@ class _RecipeManagementPageState extends ConsumerState<RecipeManagementPage> {
       builder: (ctx) => _RecipeEditor(
         existingRecipes: _recipes,
         mixtureTypes: mixtureTypes,
+        materials: materials,
         existing: existing,
       ),
     );
@@ -208,11 +189,13 @@ class _RecipeManagementPageState extends ConsumerState<RecipeManagementPage> {
 class _RecipeEditor extends ConsumerStatefulWidget {
   final List<RecipeModel> existingRecipes;
   final List<MixtureTypeModel> mixtureTypes;
+  final List<RawMaterialModel> materials;
   final RecipeModel? existing;
 
   const _RecipeEditor({
     required this.existingRecipes,
     required this.mixtureTypes,
+    required this.materials,
     this.existing,
   });
 
@@ -227,21 +210,54 @@ class _RecipeEditorState extends ConsumerState<_RecipeEditor> {
   MixtureTypeModel? _selectedType;
   bool _saving = false;
 
-  // Controllers for each fixed material
+  // Controllers for each مادة (مفتاحة بالاسم — نفس المفتاح المستخدم في qtyMap)
   final Map<String, TextEditingController> _ctrls = {};
 
-  static const _allFields = [
-    ..._rawMaterials,
-    ..._pigments,
-    ..._additives,
-  ];
+  late List<(String, String)> _rawFields;
+  late List<(String, String)> _pigmentFields;
+  late List<(String, String)> _additiveFields;
+  late List<(String, String)> _allFields;
 
   @override
   void initState() {
     super.initState();
+
+    final active = widget.materials.where((m) => m.isActive).toList();
+    _rawFields = [];
+    _pigmentFields = [];
+    _additiveFields = [];
+    for (final m in active) {
+      final field = (m.name, m.unit);
+      switch (_sectionOf(m)) {
+        case 'pigments':
+          _pigmentFields.add(field);
+          break;
+        case 'additives':
+          _additiveFields.add(field);
+          break;
+        default:
+          _rawFields.add(field);
+      }
+    }
+    _allFields = [..._rawFields, ..._pigmentFields, ..._additiveFields];
+
     for (final (name, _) in _allFields) {
       _ctrls[name] = TextEditingController();
     }
+
+    // إذا كانت الوصفة الحالية (عند التعديل) تحتوي مادة غير موجودة الآن في
+    // القائمة (مثلاً عُطِّلت)، أضفها كحقل إضافي حتى لا تُفقد قيمتها المحفوظة.
+    if (widget.existing != null) {
+      final qtyMap = widget.existing!.qtyMap;
+      for (final name in qtyMap.keys) {
+        if (!_ctrls.containsKey(name)) {
+          _ctrls[name] = TextEditingController();
+          _additiveFields.add((name, ''));
+          _allFields.add((name, ''));
+        }
+      }
+    }
+
     if (widget.existing != null) {
       _nameCtrl.text = widget.existing!.name;
       _notesCtrl.text = widget.existing!.notes ?? '';
@@ -447,10 +463,22 @@ class _RecipeEditorState extends ConsumerState<_RecipeEditor> {
                 maxLines: 2,
               ),
 
-              // ── Material sections ──────────────────────────────
-              _section('المواد الخام', Icons.inventory_2_outlined, _rawMaterials),
-              _section('الأصباغ', Icons.color_lens_outlined, _pigments),
-              _section('إضافات أخرى', Icons.add_circle_outline, _additives),
+              // ── Material sections (تُبنى تلقائياً من قائمة المواد الحالية) ──
+              if (_rawFields.isNotEmpty)
+                _section('المواد الخام', Icons.inventory_2_outlined, _rawFields),
+              if (_pigmentFields.isNotEmpty)
+                _section('الأصباغ', Icons.color_lens_outlined, _pigmentFields),
+              if (_additiveFields.isNotEmpty)
+                _section('إضافات أخرى', Icons.add_circle_outline, _additiveFields),
+              if (_allFields.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.only(top: 24),
+                  child: Text(
+                    'لا توجد مواد نشطة — أضف موادًا من شاشة "المواد" أولاً',
+                    style: TextStyle(color: Colors.grey),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
 
               const SizedBox(height: 32),
               SizedBox(

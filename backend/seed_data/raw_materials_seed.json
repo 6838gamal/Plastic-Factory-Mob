@@ -977,5 +977,16 @@
     "cost_per_unit": "0.000",
     "is_active": false,
     "notes": null
+  },
+  {
+    "id": "360f1163-2809-40b3-bf6f-b91212796f23",
+    "name": "مادة اختبار تلقائية",
+    "code": "MAT-015",
+    "category": "عام",
+    "unit": "كجم",
+    "min_stock": "0.000",
+    "cost_per_unit": "0.000",
+    "is_active": false,
+    "notes": null
   }
 ]
