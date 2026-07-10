@@ -189,6 +189,7 @@ class _MaterialsPageState extends ConsumerState<MaterialsPage> {
                   'is_active': true,
                 });
                 ref.invalidate(rawMaterialsProvider);
+                ref.invalidate(inventorySummaryProvider);
                 if (ctx.mounted) Navigator.pop(ctx);
               },
               child: const Text('حفظ'),
@@ -295,6 +296,7 @@ class _MaterialCard extends ConsumerWidget {
                     final ds = ref.read(dataSourceProvider);
                     await ds.deleteRawMaterial(material.id);
                     ref.invalidate(rawMaterialsProvider);
+                    ref.invalidate(inventorySummaryProvider);
                   }
                 }
               },
@@ -390,6 +392,7 @@ class _MaterialCard extends ConsumerWidget {
                   'is_active': true,
                 });
                 ref.invalidate(rawMaterialsProvider);
+                ref.invalidate(inventorySummaryProvider);
                 if (ctx.mounted) Navigator.pop(ctx);
               },
               child: const Text('حفظ'),
