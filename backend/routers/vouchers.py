@@ -1091,8 +1091,8 @@ async def delete_withdrawal_voucher(voucher_id: str):
     )
     if not v:
         raise HTTPException(404, "سند السحب غير موجود")
-    if v["status"] not in ("draft", "rejected"):
-        raise HTTPException(400, "لا يمكن حذف السند إلا إذا كان في حالة مسودة أو مرفوض")
+    if v["status"] not in ("draft", "rejected", "pending_approval"):
+        raise HTTPException(400, "لا يمكن حذف السند إلا إذا كان في حالة مسودة أو مرفوض أو بانتظار الموافقة")
     await pool.execute(
         "DELETE FROM withdrawal_vouchers WHERE id=$1::uuid", voucher_id
     )

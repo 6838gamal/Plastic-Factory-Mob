@@ -655,6 +655,15 @@ class _ReceiptVoucherCard extends ConsumerWidget {
                             TextStyle(fontSize: 12, color: Colors.red)),
                     onPressed: () => _deleteVoucher(context, ref),
                   ),
+                // ── Admin: delete any non-posted voucher ─────────
+                if (isAdmin && status != 'posted') ...[
+                  const SizedBox(width: 8),
+                  TextButton.icon(
+                    icon: const Icon(Icons.delete_outline, size: 14, color: Colors.red),
+                    label: const Text('حذف', style: TextStyle(fontSize: 12, color: Colors.red)),
+                    onPressed: () => _deleteVoucher(context, ref),
+                  ),
+                ],
               ],
             ),
           ],
@@ -2271,6 +2280,15 @@ class _WithdrawalVoucherCard extends ConsumerWidget {
                     label: const Text('اعتماد', style: TextStyle(fontSize: 12)),
                     style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
                     onPressed: () => _approve(context, ref),
+                  ),
+                ],
+                // ── Admin: delete any non-approved voucher ──────
+                if (isAdmin && voucher.status != 'approved') ...[
+                  const SizedBox(width: 8),
+                  TextButton.icon(
+                    icon: const Icon(Icons.delete_outline, size: 14, color: Colors.red),
+                    label: const Text('حذف', style: TextStyle(fontSize: 12, color: Colors.red)),
+                    onPressed: () => _delete(context, ref),
                   ),
                 ],
                 // ── Keeper actions ──────────────────────────────
