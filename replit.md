@@ -11,17 +11,12 @@ A Flutter web + FastAPI ERP system for managing plastic factory operations: batc
 
 ## Running
 
-The `Start application` workflow runs `uvicorn main:app --host 0.0.0.0 --port 5000` from `backend/`.
+The `Start application` workflow runs `bash start.sh`, which on every start:
+1. Runs `flutter clean` and removes `build/web` + `.dart_tool` to purge stale caches.
+2. Rebuilds the Flutter web app from source (`flutter build web --release --dart-define=API_BASE_URL=...`).
+3. Starts `uvicorn main:app --host 0.0.0.0 --port 5000` from `backend/`.
 
-### Rebuilding the Flutter Frontend
-
-After editing any Dart source in `lib/`:
-
-```bash
-flutter build web --release --dart-define=API_BASE_URL=https://plastic-factory-api.onrender.com
-```
-
-Then restart the workflow.
+This guarantees any Dart change is always reflected on restart, at the cost of ~40s extra startup time per restart (by explicit user request — previously the workflow only ran uvicorn and required a manual `flutter build web` after Dart edits).
 
 ## Environment Variables / Secrets
 

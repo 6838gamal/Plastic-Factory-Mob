@@ -10,16 +10,19 @@ Flutter config lives in `lib/core/config/app_config.dart` (const String.fromEnvi
 
 **Why:** Prevents scattered os.getenv() calls and makes production config auditable from one file.
 
-## Flutter rebuild rule
+## Flutter rebuild rule (updated 2026-07-10)
 
-Workflow command is `cd backend && uvicorn main:app --host 0.0.0.0 --port 5000` — NO Flutter rebuild.
-Flutter must be rebuilt manually after Dart changes:
-```bash
-flutter build web --release --dart-define=API_BASE_URL=https://plastic-factory-api.onrender.com
-```
+User explicitly requested the opposite of the old rule: workflow now runs `bash start.sh`, which
+does `flutter clean` + removes `build/web`/`.dart_tool` + full `flutter build web --release
+--dart-define=API_BASE_URL=...` on every single start, before launching uvicorn.
 
-**Why:** flutter clean + dart2js compiler crashes (Dart 3.8.0 / Flutter 3.32.0 known issue on Replit).
-Running clean before rebuild is required to fix stale cache crashes.
+**Why:** User was repeatedly hit by stale `build/web` (edited Dart source never reflected in the
+running app) and explicitly asked to force cache clearing + rebuild on every server start attempt,
+accepting the ~40s extra startup cost. This supersedes the earlier "don't rebuild on every
+start" convention — do not revert to manual-rebuild-only unless the user asks again.
+
+**How to apply:** Keep `start.sh` as the workflow entrypoint (`bash start.sh`), not a bare
+uvicorn command. If editing the workflow, preserve the clean+build+run sequence.
 
 ## dart2js crash fix
 
