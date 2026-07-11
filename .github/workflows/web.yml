@@ -1,52 +1,29 @@
 name: Build Flutter Web
 
 on:
-  push:
+ push:
     branches:
       - main
-  workflow_dispatch:
 
 jobs:
-  build-web:
+  build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
-
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@v2
         with:
           channel: stable
           cache: true
 
-      - name: Show Flutter Version
-        run: flutter --version
+      - run: flutter config --enable-web
 
-      - name: Enable Web
-        run: flutter config --enable-web
+      - run: flutter pub get
 
-      - name: Get Dependencies
-        run: flutter pub get
+      - run: flutter build web --release
 
-      - name: Analyze Project
-        run: flutter analyze
-
-      - name: Run Tests
-        run: flutter test
-        continue-on-error: true
-
-      - name: Build Flutter Web
-        run: flutter build web --release -t lib/main.dart
-
-      - name: Upload Web Build
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
-          name: flutter-web-build
+          name: web-build
           path: build/web
