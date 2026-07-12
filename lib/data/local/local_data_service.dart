@@ -155,4 +155,10 @@ class LocalDataService {
 
   static Future<void> upsertMixtureType(Map<String, dynamic> data) =>
       _upsert(_tKey, data);
+
+  static Future<void> deleteMixtureType(String id) async {
+    final list = await _load(_tKey);
+    list.removeWhere((e) => e['id'] == id);
+    await _save(_tKey, list);
+  }
 }

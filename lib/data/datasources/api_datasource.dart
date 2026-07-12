@@ -405,6 +405,8 @@ class ApiDataSource {
       LocalDataService.getMixtureTypes();
   Future<void> upsertMixtureType(Map<String, dynamic> data) =>
       LocalDataService.upsertMixtureType(data);
+  Future<void> deleteMixtureType(String id) =>
+      LocalDataService.deleteMixtureType(id);
 
   // ==================== RECIPES ====================
   Future<List<RecipeModel>> getRecipes() async {
