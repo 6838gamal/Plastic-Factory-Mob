@@ -259,20 +259,36 @@ class _RecipeEditorState extends ConsumerState<_RecipeEditor> {
     }
 
     if (widget.existing != null) {
-      _nameCtrl.text = widget.existing!.name;
-      _notesCtrl.text = widget.existing!.notes ?? '';
       _selectedType = widget.mixtureTypes.firstWhere(
         (m) => m.id == widget.existing!.mixtureTypeId,
         orElse: () => widget.mixtureTypes.first,
       );
-      final qtyMap = widget.existing!.qtyMap;
-      for (final (name, _) in _allFields) {
-        final qty = qtyMap[name];
-        if (qty != null && qty > 0) {
-          _ctrls[name]!.text =
-              qty == qty.truncateToDouble() ? qty.toInt().toString() : qty.toString();
-        }
-      }
+      _loadFrom(widget.existing!);
+    }
+  }
+
+  // ── يملأ الحقول من وصفة موجودة (تُستخدم عند فتح المحرر للتعديل، وأيضاً عند
+  // اختيار نوع خلطة له وصفة سابقة أثناء إنشاء "وصفة جديدة" — بما أن الخادم
+  // يعتمد نظام upsert بمعرّف نوع الخلطة، اختيار نوع مستخدَم مسبقاً هو فعليًا
+  // تعديل لوصفته الحالية، فيجب تحميل بياناتها بدل ترك الحقول فارغة). ──────────
+  void _loadFrom(RecipeModel recipe) {
+    _nameCtrl.text = recipe.name;
+    _notesCtrl.text = recipe.notes ?? '';
+    final qtyMap = recipe.qtyMap;
+    for (final (name, _) in _allFields) {
+      final qty = qtyMap[name];
+      _ctrls[name]!.text = (qty != null && qty > 0)
+          ? (qty == qty.truncateToDouble() ? qty.toInt().toString() : qty.toString())
+          : '';
+    }
+  }
+
+  // ── يفرغ الحقول (تُستخدم عند اختيار نوع خلطة جديد لا وصفة له بعد). ────────
+  void _clearFields() {
+    _nameCtrl.clear();
+    _notesCtrl.clear();
+    for (final c in _ctrls.values) {
+      c.clear();
     }
   }
 
@@ -377,14 +393,10 @@ class _RecipeEditorState extends ConsumerState<_RecipeEditor> {
   Widget build(BuildContext context) {
     final isEdit = widget.existing != null;
 
-    // Mixture types already used (exclude current one if editing)
-    final usedIds = widget.existingRecipes
-        .where((r) => widget.existing == null || r.id != widget.existing!.id)
-        .map((r) => r.mixtureTypeId)
-        .toSet();
-    final availableTypes = widget.mixtureTypes
-        .where((m) => m.isActive && !usedIds.contains(m.id))
-        .toList();
+    // كل أنواع الخلطة النشطة تظهر في القائمة دائماً — بما أن الحفظ upsert
+    // بمعرّف نوع الخلطة، اختيار نوع له وصفة سابقة هو تعديل لها وليس تعارضاً؛
+    // لا نستثني أي نوع مسبقاً استُخدم، حتى يمكن التبديل بين الوصفات بحرية.
+    final availableTypes = widget.mixtureTypes.where((m) => m.isActive).toList();
     if (_selectedType != null &&
         !availableTypes.any((m) => m.id == _selectedType!.id)) {
       availableTypes.insert(0, _selectedType!);
@@ -442,13 +454,51 @@ class _RecipeEditorState extends ConsumerState<_RecipeEditor> {
                 onChanged: (v) {
                   setState(() {
                     _selectedType = v;
-                    if (_nameCtrl.text.isEmpty && v != null) {
+                    if (v == null) return;
+                    // إذا كان لهذا النوع وصفة سابقة (لغير الوصفة الجاري تعديلها
+                    // حالياً)، نحمّل بياناتها فوراً ليعرف المستخدم أنه سيُحدّثها
+                    // بدل إنشاء تكرار — يطابق سلوك upsert في الخادم.
+                    final prior = widget.existingRecipes
+                        .where((r) => r.mixtureTypeId == v.id &&
+                            (widget.existing == null || r.id != widget.existing!.id))
+                        .toList();
+                    if (prior.isNotEmpty) {
+                      _loadFrom(prior.first);
+                    } else if (widget.existing == null) {
+                      _clearFields();
                       _nameCtrl.text = 'وصفة ${v.name}';
                     }
                   });
                 },
                 validator: (v) => v == null ? 'مطلوب' : null,
               ),
+              if (_selectedType != null &&
+                  widget.existingRecipes.any((r) =>
+                      r.mixtureTypeId == _selectedType!.id &&
+                      (widget.existing == null || r.id != widget.existing!.id)))
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.blue.shade200),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.info_outline, color: Colors.blue, size: 18),
+                        SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            'يوجد لهذا النوع وصفة محفوظة — سيتم تحديثها بالبيانات أدناه.',
+                            style: TextStyle(fontSize: 12),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               const SizedBox(height: 12),
               TextFormField(
                 controller: _nameCtrl,
