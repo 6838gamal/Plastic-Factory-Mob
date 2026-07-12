@@ -20,6 +20,7 @@ class BatchMaterialModel {
 
   Map<String, dynamic> toJson() => {
         'material_id': materialId,
+        'material_name': materialName,
         'quantity': quantity,
         'unit': unit,
       };
@@ -54,16 +55,20 @@ class BatchModel {
   final String status; // 'pending_sync', 'saved'
   final DateTime createdAt;
 
-  double get totalInput =>
-      pvcQty +
-      dopQty +
-      scrapQty +
-      calciumQty +
-      waxQty +
-      stabilizerQty +
-      titaniumQty +
-      pigments.fold(0.0, (s, m) => s + (m['quantity'] as num).toDouble()) +
-      additives.fold(0.0, (s, m) => s + (m['quantity'] as num).toDouble());
+  // إجمالي المدخلات: يُحسب من القائمة الديناميكية الكاملة materials عند
+  // توفرها (وهي المصدر الموثوق لكل مادة صُرفت فعلياً، بغض النظر عن اسمها)،
+  // ويرجع للحساب القديم بالأعمدة الثابتة فقط للطبخات المحفوظة قبل إضافتها.
+  double get totalInput => materials.isNotEmpty
+      ? materials.fold(0.0, (s, m) => s + m.quantity)
+      : pvcQty +
+          dopQty +
+          scrapQty +
+          calciumQty +
+          waxQty +
+          stabilizerQty +
+          titaniumQty +
+          pigments.fold(0.0, (s, m) => s + (m['quantity'] as num).toDouble()) +
+          additives.fold(0.0, (s, m) => s + (m['quantity'] as num).toDouble());
 
   const BatchModel({
     required this.id,

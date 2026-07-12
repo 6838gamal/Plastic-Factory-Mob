@@ -229,13 +229,29 @@ class _BatchCard extends StatelessWidget {
                 Text('المواد الخام:',
                     style: TextStyle(fontWeight: FontWeight.w600, color: Colors.grey[700])),
                 const SizedBox(height: 4),
-                if (batch.pvcQty > 0) _MaterialRow('PVC', batch.pvcQty),
-                if (batch.dopQty > 0) _MaterialRow('DOP', batch.dopQty),
-                if (batch.scrapQty > 0) _MaterialRow('سكراب', batch.scrapQty),
-                if (batch.calciumQty > 0) _MaterialRow('كالسيوم', batch.calciumQty),
-                if (batch.waxQty > 0) _MaterialRow('شمع', batch.waxQty),
-                if (batch.stabilizerQty > 0) _MaterialRow('مثبت', batch.stabilizerQty),
-                if (batch.titaniumQty > 0) _MaterialRow('تيتانيوم', batch.titaniumQty),
+                // المصدر الكامل والموثوق لكل مادة خام صُرفت في الطبخة — يعتمد على
+                // القائمة الديناميكية batch.materials (وليس على أسماء ثابتة قديمة
+                // مثل PVC/DOP) حتى يعمل بشكل صحيح مهما تغيّرت أسماء المواد الخام
+                // أو أُضيفت مواد جديدة من شاشة الإدارة.
+                if (batch.materials.isNotEmpty)
+                  ...batch.materials.map(
+                    (m) => _MaterialRow(
+                      m.materialName.isNotEmpty ? m.materialName : '(بدون اسم)',
+                      m.quantity,
+                      unit: m.unit,
+                    ),
+                  )
+                else ...[
+                  // طبخات قديمة محفوظة قبل إضافة القائمة الديناميكية — نعرض
+                  // الأعمدة الثابتة التاريخية كحل احتياطي فقط.
+                  if (batch.pvcQty > 0) _MaterialRow('PVC', batch.pvcQty),
+                  if (batch.dopQty > 0) _MaterialRow('DOP', batch.dopQty),
+                  if (batch.scrapQty > 0) _MaterialRow('سكراب', batch.scrapQty),
+                  if (batch.calciumQty > 0) _MaterialRow('كالسيوم', batch.calciumQty),
+                  if (batch.waxQty > 0) _MaterialRow('شمع', batch.waxQty),
+                  if (batch.stabilizerQty > 0) _MaterialRow('مثبت', batch.stabilizerQty),
+                  if (batch.titaniumQty > 0) _MaterialRow('تيتانيوم', batch.titaniumQty),
+                ],
                 const Divider(),
                 _DetailRow('إجمالي المدخلات', '${batch.totalInput.toStringAsFixed(2)} كجم'),
                 if (batch.notes != null && batch.notes!.isNotEmpty)
@@ -287,7 +303,8 @@ class _DetailRow extends StatelessWidget {
 class _MaterialRow extends StatelessWidget {
   final String name;
   final double qty;
-  const _MaterialRow(this.name, this.qty);
+  final String unit;
+  const _MaterialRow(this.name, this.qty, {this.unit = 'كجم'});
 
   @override
   Widget build(BuildContext context) {
@@ -298,7 +315,7 @@ class _MaterialRow extends StatelessWidget {
           const Icon(Icons.fiber_manual_record, size: 8, color: Colors.grey),
           const SizedBox(width: 6),
           Expanded(child: Text(name, style: const TextStyle(fontSize: 13))),
-          Text('${qty.toStringAsFixed(2)} كجم',
+          Text('${qty.toStringAsFixed(2)} $unit',
               style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
         ],
       ),
