@@ -306,19 +306,74 @@ async def reject_receipt_voucher(voucher_id: str, rejected_by: str = "admin"):
     return {"status": "rejected"}
 
 
+async def _reverse_receipt_voucher(pool, voucher_id: str, voucher_number: str,
+                                    performed_by: str) -> int:
+    """Reverses the inventory effect of a posted receipt voucher: subtracts back
+    every quantity it had added to the main warehouse and records a matching
+    'out' inventory_transactions entry, so deleting a posted voucher never
+    leaves inventory silently inflated. Returns number of items reversed."""
+    items = await pool.fetch(
+        "SELECT * FROM receipt_voucher_items WHERE voucher_id=$1::uuid", voucher_id
+    )
+    reversed_count = 0
+    for item in items:
+        mat_id = item["material_id"]
+        if not mat_id:
+            continue
+        qty = float(item["quantity"])
+        existing = await pool.fetchrow(
+            "SELECT id, balance FROM inventory WHERE material_id=$1::uuid AND warehouse_type='main'",
+            mat_id,
+        )
+        balance_before = float(existing["balance"]) if existing else 0.0
+        balance_after = balance_before - qty
+        if existing:
+            await pool.execute(
+                "UPDATE inventory SET balance=$1, updated_at=NOW() WHERE id=$2",
+                balance_after, existing["id"],
+            )
+        else:
+            await pool.execute(
+                """INSERT INTO inventory (material_id, warehouse_type, balance)
+                   VALUES ($1::uuid, 'main', $2)""",
+                mat_id, balance_after,
+            )
+        await pool.execute(
+            """INSERT INTO inventory_transactions
+                 (material_id, warehouse_type, transaction_type, quantity,
+                  balance_before, balance_after, transaction_ref, created_by, notes)
+               VALUES ($1::uuid,'main','out',$2,$3,$4,$5,$6,$7)""",
+            mat_id, qty, balance_before, balance_after,
+            voucher_number, performed_by,
+            f"حذف سند استلام مُرحَّل رقم {voucher_number}",
+        )
+        reversed_count += 1
+    return reversed_count
+
+
 @router.delete("/receipt/{voucher_id}")
-async def delete_receipt_voucher(voucher_id: str):
-    """Keeper deletes a voucher (only when draft or pending_approval)."""
+async def delete_receipt_voucher(voucher_id: str, performed_by: str = "admin"):
+    """Deletes a receipt voucher and everything tied to it. Keeper can only
+    delete drafts/pending/rejected; admin may also delete a posted voucher —
+    in that case its inventory effect (the quantities it added) is reversed
+    first so the main-warehouse balance stays correct."""
     pool = await get_pool()
     v = await pool.fetchrow("SELECT status, voucher_number FROM receipt_vouchers WHERE id=$1::uuid", voucher_id)
     if not v:
         raise HTTPException(404, "سند الاستلام غير موجود")
+
+    reversed_items = 0
     if v["status"] == "posted":
-        raise HTTPException(400, "لا يمكن حذف سند مُرحَّل")
+        reversed_items = await _reverse_receipt_voucher(
+            pool, voucher_id, v["voucher_number"], performed_by
+        )
+
+    await pool.execute("DELETE FROM receipt_voucher_items WHERE voucher_id=$1::uuid", voucher_id)
     await pool.execute("DELETE FROM receipt_vouchers WHERE id=$1::uuid", voucher_id)
-    await _write_audit(pool, "delete", "receipt_voucher", voucher_id, "keeper",
-                       {"voucher_number": v["voucher_number"]})
-    return {"status": "deleted"}
+    await _write_audit(pool, "delete", "receipt_voucher", voucher_id, performed_by,
+                       {"voucher_number": v["voucher_number"], "was_posted": v["status"] == "posted",
+                        "items_reversed": reversed_items})
+    return {"status": "deleted", "items_reversed": reversed_items}
 
 
 @router.post("/receipt/{voucher_id}/post")

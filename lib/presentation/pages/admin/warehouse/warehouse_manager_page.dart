@@ -655,13 +655,15 @@ class _ReceiptVoucherCard extends ConsumerWidget {
                             TextStyle(fontSize: 12, color: Colors.red)),
                     onPressed: () => _deleteVoucher(context, ref),
                   ),
-                // ── Admin: delete any non-posted voucher ─────────
-                if (isAdmin && status != 'posted') ...[
+                // ── Admin: can delete any voucher, including posted ──
+                // (deleting a posted voucher reverses its inventory effect
+                // on the server so the main-warehouse balance stays correct)
+                if (isAdmin) ...[
                   const SizedBox(width: 8),
                   TextButton.icon(
                     icon: const Icon(Icons.delete_outline, size: 14, color: Colors.red),
                     label: const Text('حذف', style: TextStyle(fontSize: 12, color: Colors.red)),
-                    onPressed: () => _deleteVoucher(context, ref),
+                    onPressed: () => _deleteVoucher(context, ref, isPosted: status == 'posted'),
                   ),
                 ],
               ],
@@ -833,13 +835,17 @@ class _ReceiptVoucherCard extends ConsumerWidget {
     }
   }
 
-  Future<void> _deleteVoucher(BuildContext context, WidgetRef ref) async {
+  Future<void> _deleteVoucher(BuildContext context, WidgetRef ref,
+      {bool isPosted = false}) async {
     if (voucher.id == null) return;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('حذف السند'),
-        content: Text('سيُحذف السند ${voucher.voucherNumber} نهائياً. هل أنت متأكد؟'),
+        content: Text(isPosted
+            ? 'السند ${voucher.voucherNumber} مُرحَّل بالفعل وأثّر على رصيد المخزن الرئيسي.\n'
+                'حذفه سيعكس الكميات التي أضافها (خصمها من الرصيد الحالي) نهائياً. هل أنت متأكد؟'
+            : 'سيُحذف السند ${voucher.voucherNumber} نهائياً. هل أنت متأكد؟'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('إلغاء')),
           ElevatedButton(
