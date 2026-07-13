@@ -242,8 +242,19 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               ),
               const Divider(),
               ListTile(
-                leading: const Icon(Icons.category),
+                leading: const Icon(Icons.category_outlined),
                 title: const Text('أنواع الخلطات'),
+                subtitle: const Text('القائمة المستقلة لتصنيف الطبخات'),
+                trailing: ElevatedButton(
+                  onPressed: () => _showManageBatchTypesDialog(context),
+                  child: const Text('إدارة'),
+                ),
+              ),
+              const Divider(),
+              ListTile(
+                leading: const Icon(Icons.book_outlined),
+                title: const Text('الخلطات المحفوظة'),
+                subtitle: const Text('مرتبطة بشاشة إنشاء وصفة جديدة'),
                 trailing: ElevatedButton(
                   onPressed: () => _showManageMixtureTypesDialog(context),
                   child: const Text('إدارة'),
@@ -1013,6 +1024,148 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               if (ctx.mounted) Navigator.pop(ctx);
             },
             child: const Text('حفظ'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── إدارة أنواع الخلطات المستقلة (batch_types) ───────────────────────────
+  void _showAddOrEditBatchTypeDialog(BuildContext context,
+      [BatchTypeModel? type]) {
+    final nameCtrl = TextEditingController(text: type?.name);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(type == null ? 'إضافة نوع خلطة' : 'تعديل نوع خلطة'),
+        content: TextField(
+            controller: nameCtrl,
+            autofocus: true,
+            decoration: const InputDecoration(labelText: 'اسم نوع الخلطة *')),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
+          ElevatedButton(
+            onPressed: () async {
+              if (nameCtrl.text.trim().isEmpty) return;
+              await ref.read(dataSourceProvider).upsertBatchType({
+                if (type != null) 'id': type.id,
+                'name': nameCtrl.text.trim(),
+                'is_active': true,
+              });
+              ref.invalidate(batchTypesProvider);
+              if (ctx.mounted) Navigator.pop(ctx);
+            },
+            child: const Text('حفظ'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showManageBatchTypesDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        title: const Text('أنواع الخلطات'),
+        content: SizedBox(
+          width: 400,
+          child: Consumer(
+            builder: (context, ref, _) {
+              final typesAsync = ref.watch(batchTypesProvider);
+              return typesAsync.when(
+                data: (types) {
+                  if (types.isEmpty) {
+                    return const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 24),
+                      child: Text('لا توجد أنواع خلطات بعد',
+                          style: TextStyle(color: Colors.grey)),
+                    );
+                  }
+                  return SizedBox(
+                    height: 320,
+                    child: ListView.separated(
+                      shrinkWrap: true,
+                      itemCount: types.length,
+                      separatorBuilder: (_, __) => const Divider(height: 1),
+                      itemBuilder: (_, i) {
+                        final t = types[i];
+                        return ListTile(
+                          dense: true,
+                          title: Text(t.name),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: const Icon(Icons.edit_outlined, size: 20),
+                                tooltip: 'تعديل',
+                                onPressed: () =>
+                                    _showAddOrEditBatchTypeDialog(context, t),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.delete_outline,
+                                    color: Colors.red, size: 20),
+                                tooltip: 'حذف',
+                                onPressed: () async {
+                                  final confirmed = await showDialog<bool>(
+                                    context: context,
+                                    builder: (ctx) => AlertDialog(
+                                      title: const Text('حذف نوع خلطة'),
+                                      content:
+                                          Text('هل تريد حذف "${t.name}"؟'),
+                                      actions: [
+                                        TextButton(
+                                            onPressed: () =>
+                                                Navigator.pop(ctx, false),
+                                            child: const Text('إلغاء')),
+                                        ElevatedButton(
+                                          style: ElevatedButton.styleFrom(
+                                              backgroundColor: Colors.red),
+                                          onPressed: () =>
+                                              Navigator.pop(ctx, true),
+                                          child: const Text('حذف',
+                                              style: TextStyle(
+                                                  color: Colors.white)),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                  if (confirmed == true) {
+                                    await ref
+                                        .read(dataSourceProvider)
+                                        .deleteBatchType(t.id);
+                                    ref.invalidate(batchTypesProvider);
+                                  }
+                                },
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  );
+                },
+                loading: () => const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 24),
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+                error: (e, _) => Padding(
+                  padding: EdgeInsets.symmetric(vertical: 24),
+                  child: Text('خطأ: $e',
+                      style: const TextStyle(color: Colors.red)),
+                ),
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(dialogCtx),
+              child: const Text('إغلاق')),
+          ElevatedButton.icon(
+            onPressed: () => _showAddOrEditBatchTypeDialog(context),
+            icon: const Icon(Icons.add, size: 18),
+            label: const Text('إضافة'),
           ),
         ],
       ),

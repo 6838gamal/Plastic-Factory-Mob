@@ -10,6 +10,7 @@ class LocalDataService {
   static const _xKey = 'lref_mixers';
   static const _pKey = 'lref_products';
   static const _tKey = 'lref_mixture_types';
+  static const _btKey = 'lref_batch_types';
   static const _seededKey = 'lref_seeded_v3';
 
   /// Seeds default data on first app run. Safe to call every startup.
@@ -32,6 +33,9 @@ class LocalDataService {
     for (final t in SeedData.mixtureTypes) {
       await _upsert(_tKey, Map<String, dynamic>.from(t));
     }
+    for (final bt in SeedData.batchTypes) {
+      await _upsert(_btKey, Map<String, dynamic>.from(bt));
+    }
 
     await prefs.setBool(_seededKey, true);
   }
@@ -46,6 +50,7 @@ class LocalDataService {
       _syncEndpoint(_xKey,  '/api/mixers'),
       _syncEndpoint(_pKey,  '/api/products'),
       _syncEndpoint(_tKey,  '/api/mixture-types'),
+      _syncEndpoint(_btKey, '/api/batch-types'),
     ]);
   }
 
@@ -160,5 +165,19 @@ class LocalDataService {
     final list = await _load(_tKey);
     list.removeWhere((e) => e['id'] == id);
     await _save(_tKey, list);
+  }
+
+  static Future<List<BatchTypeModel>> getBatchTypes() async {
+    final list = await _load(_btKey);
+    return list.map((e) => BatchTypeModel.fromJson(e)).toList();
+  }
+
+  static Future<void> upsertBatchType(Map<String, dynamic> data) =>
+      _upsert(_btKey, data);
+
+  static Future<void> deleteBatchType(String id) async {
+    final list = await _load(_btKey);
+    list.removeWhere((e) => e['id'] == id);
+    await _save(_btKey, list);
   }
 }

@@ -365,6 +365,17 @@ async def _init_db():
         except Exception as exc:
             logger.warning(f"[init_db] UUID→VARCHAR skipped: {exc}")
 
+    # ── Add batch_type columns to existing batches table ──────────────────────
+    _batch_type_cols = [
+        "ALTER TABLE batches ADD COLUMN IF NOT EXISTS batch_type_id VARCHAR(100)",
+        "ALTER TABLE batches ADD COLUMN IF NOT EXISTS batch_type_name VARCHAR(200)",
+    ]
+    for stmt in _batch_type_cols:
+        try:
+            await pool.execute(stmt)
+        except Exception as exc:
+            logger.warning(f"[init_db] batch_type column migration skipped: {exc}")
+
     logger.info("[init_db] Column migrations applied")
 
     # ── إعادة بناء VIEW: inventory_summary ────────────────────────────────────
@@ -598,7 +609,7 @@ async def _validate_startup():
 
 from routers import (
     auth, materials, inventory, workers, products,
-    machines, mixers, mixture_types, batches,
+    machines, mixers, mixture_types, batch_types, batches,
     machine_production, alerts, audit, dashboard, config,
     shifts, opening_balances, reports, settings, day,
 )
@@ -727,6 +738,7 @@ app.include_router(products.router)
 app.include_router(machines.router)
 app.include_router(mixers.router)
 app.include_router(mixture_types.router)
+app.include_router(batch_types.router)
 app.include_router(batches.router)
 app.include_router(machine_production.router)
 app.include_router(alerts.router)

@@ -39,6 +39,8 @@ class BatchModel {
   final String productName;
   final String mixtureTypeId;
   final String mixtureTypeName;
+  final String batchTypeId;
+  final String batchTypeName;
   final List<BatchMaterialModel> materials;
   final double pvcQty;
   final double dopQty;
@@ -83,6 +85,8 @@ class BatchModel {
     required this.productName,
     required this.mixtureTypeId,
     required this.mixtureTypeName,
+    this.batchTypeId = '',
+    this.batchTypeName = '',
     required this.materials,
     required this.pvcQty,
     required this.dopQty,
@@ -113,6 +117,8 @@ class BatchModel {
         productName: json['product_name'] as String? ?? '',
         mixtureTypeId: json['mixture_type_id'] as String? ?? '',
         mixtureTypeName: json['mixture_type_name'] as String? ?? '',
+        batchTypeId: json['batch_type_id'] as String? ?? '',
+        batchTypeName: json['batch_type_name'] as String? ?? '',
         materials: (json['materials'] as List<dynamic>?)
                 ?.map((e) => BatchMaterialModel.fromJson(e as Map<String, dynamic>))
                 .toList() ??

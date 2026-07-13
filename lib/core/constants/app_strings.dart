@@ -41,6 +41,7 @@ class AppStrings {
   static const mixer = 'الخلاط';
   static const product = 'المنتج';
   static const mixtureType = 'نوع الخلطة';
+  static const savedMixture = 'خلطة محفوظة';
   static const pvc = 'PVC';
   static const dop = 'DOP زيت';
   static const scrap = 'السكراب';

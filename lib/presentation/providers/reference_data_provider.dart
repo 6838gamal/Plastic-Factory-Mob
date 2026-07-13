@@ -54,6 +54,11 @@ final mixtureTypesProvider = FutureProvider<List<MixtureTypeModel>>((ref) async 
   return ds.getMixtureTypes();
 });
 
+final batchTypesProvider = FutureProvider<List<BatchTypeModel>>((ref) async {
+  final ds = ref.read(dataSourceProvider);
+  return ds.getBatchTypes();
+});
+
 final dashboardStatsProvider = FutureProvider<Map<String, dynamic>>((ref) async {
   final ds = ref.read(dataSourceProvider);
   return ds.getDashboardStats();

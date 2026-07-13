@@ -93,6 +93,7 @@ class _BatchEntryPageState extends ConsumerState<BatchEntryPage> {
   MixerModel? _selectedMixer;
   ProductModel? _selectedProduct;
   MixtureTypeModel? _selectedMixtureType;
+  BatchTypeModel? _selectedBatchType;
   File? _scaleImage;
   bool _loadingBatchNum = false;
   bool _loadingRecipe = false;
@@ -206,7 +207,7 @@ class _BatchEntryPageState extends ConsumerState<BatchEntryPage> {
         _selectedWorker == null ||
         _selectedMixer == null ||
         _selectedProduct == null ||
-        _selectedMixtureType == null) {
+        _selectedBatchType == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('يرجى ملء جميع الحقول المطلوبة'),
@@ -280,8 +281,10 @@ class _BatchEntryPageState extends ConsumerState<BatchEntryPage> {
       'mixer_name':        _selectedMixer!.name,
       'product_id':        _selectedProduct!.id,
       'product_name':      _selectedProduct!.name,
-      'mixture_type_id':   _selectedMixtureType!.id,
-      'mixture_type_name': _selectedMixtureType!.name,
+      'mixture_type_id':   _selectedMixtureType?.id,
+      'mixture_type_name': _selectedMixtureType?.name,
+      'batch_type_id':     _selectedBatchType!.id,
+      'batch_type_name':   _selectedBatchType!.name,
       'pvc_qty':           _qtyKgOf(mats, _kNamePvc),
       'dop_qty':           _qtyKgOf(mats, _kNameDop),
       'scrap_qty':         scrapQty,
@@ -332,6 +335,7 @@ class _BatchEntryPageState extends ConsumerState<BatchEntryPage> {
       _selectedMixer = null;
       _selectedProduct = null;
       _selectedMixtureType = null;
+      _selectedBatchType = null;
       _scaleImage = null;
     });
   }
@@ -342,6 +346,7 @@ class _BatchEntryPageState extends ConsumerState<BatchEntryPage> {
     final mixers = ref.watch(mixersProvider);
     final products = ref.watch(productsProvider);
     final mixtureTypes = ref.watch(mixtureTypesProvider);
+    final batchTypes = ref.watch(batchTypesProvider);
     final rawMaterials = ref.watch(rawMaterialsProvider);
     final opsState = ref.watch(batchOperationsProvider);
 
@@ -468,6 +473,26 @@ class _BatchEntryPageState extends ConsumerState<BatchEntryPage> {
             ),
             const SizedBox(height: 12),
 
+            // ── نوع الخلطة (مستقل، غير مرتبط بالوصفات) ─────────────────
+            batchTypes.when(
+              data: (list) => DropdownButtonFormField<BatchTypeModel>(
+                value: _selectedBatchType,
+                decoration: const InputDecoration(
+                  labelText: '${AppStrings.mixtureType} *',
+                ),
+                isExpanded: true,
+                items: list
+                    .map((bt) => DropdownMenuItem(value: bt, child: Text(bt.name)))
+                    .toList(),
+                onChanged: (v) => setState(() => _selectedBatchType = v),
+                validator: (v) => v == null ? 'نوع الخلطة مطلوب' : null,
+              ),
+              loading: () => const LinearProgressIndicator(),
+              error: (e, _) => Text('خطأ: $e'),
+            ),
+            const SizedBox(height: 12),
+
+            // ── خلطة محفوظة (مرتبطة بالوصفات — اختيارية) ──────────────
             mixtureTypes.when(
               data: (list) => Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -475,7 +500,7 @@ class _BatchEntryPageState extends ConsumerState<BatchEntryPage> {
                   DropdownButtonFormField<MixtureTypeModel>(
                     value: _selectedMixtureType,
                     decoration: InputDecoration(
-                      labelText: '${AppStrings.mixtureType} *',
+                      labelText: AppStrings.savedMixture,
                       suffixIcon: _loadingRecipe
                           ? const Padding(
                               padding: EdgeInsets.all(12),
@@ -489,9 +514,15 @@ class _BatchEntryPageState extends ConsumerState<BatchEntryPage> {
                               : null,
                     ),
                     isExpanded: true,
-                    items: list
-                        .map((m) => DropdownMenuItem(value: m, child: Text(m.name)))
-                        .toList(),
+                    items: [
+                      const DropdownMenuItem<MixtureTypeModel>(
+                        value: null,
+                        child: Text('— بدون خلطة محفوظة —',
+                            style: TextStyle(color: Colors.grey)),
+                      ),
+                      ...list.map(
+                          (m) => DropdownMenuItem(value: m, child: Text(m.name))),
+                    ],
                     onChanged: (v) {
                       setState(() {
                         _selectedMixtureType = v;
@@ -499,7 +530,6 @@ class _BatchEntryPageState extends ConsumerState<BatchEntryPage> {
                       });
                       if (v != null) _applyRecipe(v);
                     },
-                    validator: (v) => v == null ? 'نوع الخلطة مطلوب' : null,
                   ),
                   if (_recipeApplied)
                     Padding(

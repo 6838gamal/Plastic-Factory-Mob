@@ -183,6 +183,36 @@ class RecipeModel {
   Map<String, String> get unitMap => {for (final i in items) i.materialName: i.unit};
 }
 
+class BatchTypeModel {
+  final String id;
+  final String name;
+  final String? description;
+  final bool isActive;
+  final DateTime createdAt;
+
+  const BatchTypeModel({
+    required this.id,
+    required this.name,
+    this.description,
+    required this.isActive,
+    required this.createdAt,
+  });
+
+  factory BatchTypeModel.fromJson(Map<String, dynamic> json) => BatchTypeModel(
+        id: json['id'] as String,
+        name: json['name'] as String,
+        description: json['description'] as String?,
+        isActive: json['is_active'] as bool? ?? true,
+        createdAt: DateTime.parse(json['created_at'] as String),
+      );
+
+  Map<String, dynamic> toJson() => {
+        'name': name,
+        'description': description,
+        'is_active': isActive,
+      };
+}
+
 class MixtureTypeModel {
   final String id;
   final String name;

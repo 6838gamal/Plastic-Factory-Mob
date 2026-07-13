@@ -37,6 +37,8 @@ class BatchCreate(BaseModel):
     product_name: Optional[str] = None
     mixture_type_id: Optional[str] = None
     mixture_type_name: Optional[str] = None
+    batch_type_id: Optional[str] = None
+    batch_type_name: Optional[str] = None
     pvc_qty: Optional[float] = 0
     dop_qty: Optional[float] = 0
     scrap_qty: Optional[float] = 0
@@ -761,15 +763,17 @@ async def create_batch(body: BatchCreate):
         """INSERT INTO batches (
             id, batch_number, date, shift, worker_id, worker_name, mixer_id, mixer_name,
             product_id, product_name, mixture_type_id, mixture_type_name,
+            batch_type_id, batch_type_name,
             pvc_qty, dop_qty, scrap_qty, calcium_qty, wax_qty, stabilizer_qty, titanium_qty,
             pigments, additives, materials, notes, scale_image_url, transaction_id, status
         ) VALUES (
             gen_random_uuid(),$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,
-            $12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25
+            $12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27
         ) RETURNING *""",
         body.batch_number, body.date or DateType.today(), body.shift,
         body.worker_id, body.worker_name, body.mixer_id, body.mixer_name,
         body.product_id, body.product_name, body.mixture_type_id, body.mixture_type_name,
+        body.batch_type_id, body.batch_type_name,
         body.pvc_qty, body.dop_qty, body.scrap_qty, body.calcium_qty,
         body.wax_qty, body.stabilizer_qty, body.titanium_qty,
         json.dumps(body.pigments or []),
@@ -880,14 +884,16 @@ async def update_batch(batch_id: str, body: BatchUpdate):
             batch_number=$1, date=$2, shift=$3, worker_id=$4, worker_name=$5,
             mixer_id=$6, mixer_name=$7, product_id=$8, product_name=$9,
             mixture_type_id=$10, mixture_type_name=$11,
-            pvc_qty=$12, dop_qty=$13, scrap_qty=$14, calcium_qty=$15,
-            wax_qty=$16, stabilizer_qty=$17, titanium_qty=$18,
-            pigments=$19, additives=$20, materials=$21, notes=$22,
-            scale_image_url=$23, status=$24, updated_at=NOW()
-           WHERE id=$25 RETURNING *""",
+            batch_type_id=$12, batch_type_name=$13,
+            pvc_qty=$14, dop_qty=$15, scrap_qty=$16, calcium_qty=$17,
+            wax_qty=$18, stabilizer_qty=$19, titanium_qty=$20,
+            pigments=$21, additives=$22, materials=$23, notes=$24,
+            scale_image_url=$25, status=$26, updated_at=NOW()
+           WHERE id=$27 RETURNING *""",
         body.batch_number, body.date or DateType.today(), body.shift,
         body.worker_id, body.worker_name, body.mixer_id, body.mixer_name,
         body.product_id, body.product_name, body.mixture_type_id, body.mixture_type_name,
+        body.batch_type_id, body.batch_type_name,
         body.pvc_qty, body.dop_qty, body.scrap_qty, body.calcium_qty,
         body.wax_qty, body.stabilizer_qty, body.titanium_qty,
         json.dumps(body.pigments or []),

@@ -306,7 +306,7 @@ class _RecipeEditorState extends ConsumerState<_RecipeEditor> {
     if (!_formKey.currentState!.validate()) return;
     if (_selectedType == null) {
       ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('اختر نوع الخلطة')));
+          .showSnackBar(const SnackBar(content: Text('اختر الخلطة المحفوظة')));
       return;
     }
     setState(() => _saving = true);
@@ -445,7 +445,7 @@ class _RecipeEditorState extends ConsumerState<_RecipeEditor> {
               // ── Header fields ──────────────────────────────────
               DropdownButtonFormField<MixtureTypeModel>(
                 value: _selectedType,
-                decoration: const InputDecoration(labelText: 'نوع الخلطة *'),
+                decoration: const InputDecoration(labelText: 'خلطة محفوظة *'),
                 isExpanded: true,
                 items: availableTypes
                     .map((m) =>

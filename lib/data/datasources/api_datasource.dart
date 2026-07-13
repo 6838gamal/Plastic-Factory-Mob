@@ -408,6 +408,14 @@ class ApiDataSource {
   Future<void> deleteMixtureType(String id) =>
       LocalDataService.deleteMixtureType(id);
 
+  // ==================== BATCH TYPES (local only) ====================
+  Future<List<BatchTypeModel>> getBatchTypes() =>
+      LocalDataService.getBatchTypes();
+  Future<void> upsertBatchType(Map<String, dynamic> data) =>
+      LocalDataService.upsertBatchType(data);
+  Future<void> deleteBatchType(String id) =>
+      LocalDataService.deleteBatchType(id);
+
   // ==================== RECIPES ====================
   Future<List<RecipeModel>> getRecipes() async {
     final res = await _get('/api/recipes');

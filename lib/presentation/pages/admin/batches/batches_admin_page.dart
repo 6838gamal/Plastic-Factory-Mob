@@ -224,7 +224,8 @@ class _BatchCard extends StatelessWidget {
               children: [
                 _DetailRow('الخلاط', batch.mixerName),
                 _DetailRow('المنتج', batch.productName),
-                _DetailRow('نوع الخلطة', batch.mixtureTypeName),
+                _DetailRow('نوع الخلطة', batch.batchTypeName.isNotEmpty ? batch.batchTypeName : '—'),
+                _DetailRow('الخلطة المحفوظة', batch.mixtureTypeName.isNotEmpty ? batch.mixtureTypeName : '—'),
                 const Divider(),
                 Text('المواد الخام:',
                     style: TextStyle(fontWeight: FontWeight.w600, color: Colors.grey[700])),

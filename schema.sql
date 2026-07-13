@@ -113,6 +113,17 @@ CREATE TABLE IF NOT EXISTS mixers (
 );
 
 -- =============================================================
+-- جدول أنواع الخلطات المستقلة - Batch Types
+-- =============================================================
+CREATE TABLE IF NOT EXISTS batch_types (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name VARCHAR(200) NOT NULL,
+  description TEXT,
+  is_active BOOLEAN NOT NULL DEFAULT true,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- =============================================================
 -- جدول أنواع الخلطات - Mixture Types
 -- =============================================================
 CREATE TABLE IF NOT EXISTS mixture_types (

@@ -29,4 +29,6 @@ class SeedData {
     {'id': 'seed-t-1', 'name': 'خلطة سوداء', 'is_active': true},
     {'id': 'seed-t-2', 'name': 'خلطة زرقاء', 'is_active': true},
   ];
+
+  static const List<Map<String, dynamic>> batchTypes = [];
 }
