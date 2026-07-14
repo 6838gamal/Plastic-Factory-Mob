@@ -458,6 +458,66 @@ async def transfer_inventory(body: TransferRequest):
     }
 
 
+@router.delete("/material/{material_id}")
+async def delete_material_fully(material_id: str):
+    """حذف كامل لمادة خام من المخزن: يحذف جميع الحركات والأرصدة الافتتاحية
+    وصفوف المخزون لكلا المخزنين، ثم يُعطّل المادة في raw_materials.
+    العملية كلها في transaction واحد لضمان الاتساق."""
+    pool = await get_pool()
+
+    rm = await pool.fetchrow("SELECT name FROM raw_materials WHERE id=$1::uuid", material_id)
+    if not rm:
+        raise HTTPException(status_code=404, detail="المادة غير موجودة")
+    material_name = rm["name"]
+
+    import json as _json
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            # حذف حركات المخزون لكلا المخزنين
+            tx_deleted = await conn.fetchval(
+                """WITH d AS (DELETE FROM inventory_transactions
+                             WHERE material_id::text=$1::text RETURNING id)
+                   SELECT COUNT(*) FROM d""",
+                material_id,
+            )
+            # حذف الأرصدة الافتتاحية
+            ob_deleted = await conn.fetchval(
+                """WITH d AS (DELETE FROM opening_balances
+                             WHERE material_id::text=$1::text RETURNING id)
+                   SELECT COUNT(*) FROM d""",
+                material_id,
+            )
+            # حذف صفوف المخزون
+            inv_deleted = await conn.fetchval(
+                """WITH d AS (DELETE FROM inventory
+                             WHERE material_id::text=$1::text RETURNING id)
+                   SELECT COUNT(*) FROM d""",
+                material_id,
+            )
+            # تعطيل المادة الخام (soft delete)
+            await conn.execute(
+                "UPDATE raw_materials SET is_active=false, updated_at=NOW() WHERE id=$1::uuid",
+                material_id,
+            )
+            # سجل في audit_log
+            await conn.execute(
+                """INSERT INTO audit_log
+                   (id, action, table_name, record_id, description)
+                   VALUES (gen_random_uuid(), 'delete', 'raw_materials', $1, $2)""",
+                material_id,
+                f"حذف كامل للمادة: {material_name} (حركات: {tx_deleted}، أرصدة: {ob_deleted}، مخزون: {inv_deleted})",
+            )
+
+    return {
+        "success": True,
+        "material_id": material_id,
+        "material_name": material_name,
+        "deleted_transactions": tx_deleted,
+        "deleted_opening_balances": ob_deleted,
+        "deleted_inventory_rows": inv_deleted,
+    }
+
+
 @router.delete("/transactions")
 async def delete_all_transactions():
     """Bulk delete — يحذف جميع حركات المخزون ويصفّر الأرصدة."""

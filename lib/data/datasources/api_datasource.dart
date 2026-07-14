@@ -238,6 +238,12 @@ class ApiDataSource {
     await _delete('/api/materials/$id');
   }
 
+  /// حذف كامل لمادة خام: يزيل جميع حركاتها وأرصدتها وصفوف مخزونها
+  /// ثم يُعطّل المادة نفسها في raw_materials.
+  Future<void> deleteInventoryMaterialFully(String materialId) async {
+    await _delete('/api/inventory/material/$materialId');
+  }
+
   // ==================== INVENTORY ====================
   Future<List<InventoryModel>> getInventory({String? warehouseType}) async {
     final res = await _get('/api/inventory', query: {'warehouse_type': warehouseType});

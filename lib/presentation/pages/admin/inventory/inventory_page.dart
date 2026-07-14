@@ -5,7 +5,7 @@ import '../../../../data/models/inventory_model.dart';
 import '../../../../data/models/inventory_summary_model.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/reference_data_provider.dart'
-    show inventorySummaryProvider, allRawMaterialsAsSummaryProvider;
+    show inventorySummaryProvider, allRawMaterialsAsSummaryProvider, rawMaterialsProvider;
 import '../../../../core/constants/app_constants.dart';
 import '../../../widgets/common/loading_widget.dart';
 import '../../../../core/utils/helpers.dart';
@@ -1083,13 +1083,109 @@ class _StatChip extends StatelessWidget {
 // Material Summary Card
 // ══════════════════════════════════════════════════════════════════════════════
 
-class _SummaryCard extends StatelessWidget {
+class _SummaryCard extends ConsumerWidget {
   final InventorySummaryModel item;
   final Color accentColor;
   const _SummaryCard({required this.item, required this.accentColor});
 
+  Future<void> _confirmDelete(BuildContext context, WidgetRef ref) async {
+    bool confirmed = false;
+    final ds = ref.read(dataSourceProvider);
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, ss) => AlertDialog(
+          title: Row(children: [
+            Icon(Icons.delete_forever_outlined, color: Colors.red.shade700),
+            const SizedBox(width: 8),
+            const Text('حذف المادة نهائياً'),
+          ]),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              RichText(
+                text: TextSpan(
+                  style: DefaultTextStyle.of(ctx).style,
+                  children: [
+                    const TextSpan(text: 'سيتم حذف المادة '),
+                    TextSpan(
+                      text: '"${item.materialName}"',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const TextSpan(
+                      text: ' من المخزن الرئيسي ومخزن الخلاط معاً:\n\n'
+                          '• جميع حركات المخزون\n'
+                          '• الأرصدة الافتتاحية\n'
+                          '• صفوف المخزون\n'
+                          '• المادة نفسها من قائمة المواد الخام\n\n'
+                          'هذا الإجراء لا يمكن التراجع عنه.',
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.red.shade200),
+                ),
+                child: CheckboxListTile(
+                  value: confirmed,
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text(
+                    'أؤكد حذف هذه المادة نهائياً',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                  ),
+                  onChanged: (v) => ss(() => confirmed = v ?? false),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('إلغاء'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.red.shade700),
+              onPressed: confirmed ? () => Navigator.pop(ctx, true) : null,
+              child: const Text('حذف نهائياً', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (result != true) return;
+
+    try {
+      await ds.deleteInventoryMaterialFully(item.materialId);
+      ref.invalidate(inventorySummaryProvider);
+      ref.invalidate(rawMaterialsProvider);
+      ref.invalidate(allRawMaterialsAsSummaryProvider);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('تم حذف "${item.materialName}" نهائياً'),
+          backgroundColor: Colors.green,
+        ));
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('خطأ أثناء الحذف: $e'),
+          backgroundColor: Colors.red,
+        ));
+      }
+    }
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final Color statusColor = item.isOutOfStock
         ? Colors.red
         : item.isCritical
@@ -1154,6 +1250,28 @@ class _SummaryCard extends StatelessWidget {
                           color: statusColor,
                           fontSize: 11,
                           fontWeight: FontWeight.bold)),
+                ),
+                // ── زر الحذف النهائي ────────────────────────────
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.more_vert, size: 20),
+                  tooltip: 'خيارات',
+                  itemBuilder: (_) => [
+                    PopupMenuItem(
+                      value: 'delete',
+                      child: Row(children: [
+                        Icon(Icons.delete_forever_outlined,
+                            color: Colors.red.shade700, size: 18),
+                        const SizedBox(width: 8),
+                        Text('حذف نهائي',
+                            style: TextStyle(
+                                color: Colors.red.shade700,
+                                fontWeight: FontWeight.w600)),
+                      ]),
+                    ),
+                  ],
+                  onSelected: (v) {
+                    if (v == 'delete') _confirmDelete(context, ref);
+                  },
                 ),
               ],
             ),
