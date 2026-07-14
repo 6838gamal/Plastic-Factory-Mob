@@ -4,7 +4,8 @@ import '../../../../data/datasources/api_datasource.dart';
 import '../../../../data/models/voucher_models.dart';
 import '../../../../data/models/inventory_summary_model.dart';
 import '../../../providers/auth_provider.dart';
-import '../../../providers/reference_data_provider.dart' show inventorySummaryProvider;
+import '../../../providers/reference_data_provider.dart'
+    show inventorySummaryProvider, allRawMaterialsAsSummaryProvider;
 import '../../../../core/utils/helpers.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../suppliers/suppliers_page.dart';
@@ -1525,7 +1526,9 @@ class _ReceiptVoucherDialogState extends ConsumerState<_ReceiptVoucherDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final summaryAsync = ref.watch(inventorySummaryProvider);
+    // allRawMaterialsAsSummaryProvider: يشمل كل المواد الخام النشطة (حتى غير المستلمة بعد)
+    // حتى تظهر المواد المضافة حديثاً في قائمة البنود فوراً دون انتظار أول استلام لها.
+    final summaryAsync = ref.watch(allRawMaterialsAsSummaryProvider);
     final suppliersAsync = ref.watch(_suppliersProvider);
     final materials = summaryAsync.valueOrNull
             ?.where((m) => m.warehouseType == 'main')

@@ -4,7 +4,8 @@ import '../../../../data/datasources/api_datasource.dart';
 import '../../../../data/models/inventory_model.dart';
 import '../../../../data/models/inventory_summary_model.dart';
 import '../../../providers/auth_provider.dart';
-import '../../../providers/reference_data_provider.dart' show inventorySummaryProvider;
+import '../../../providers/reference_data_provider.dart'
+    show inventorySummaryProvider, allRawMaterialsAsSummaryProvider;
 import '../../../../core/constants/app_constants.dart';
 import '../../../widgets/common/loading_widget.dart';
 import '../../../../core/utils/helpers.dart';
@@ -398,14 +399,16 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
     required Color iconColor,
     required String defaultWarehouse,
   }) async {
-    final summaryAsync = ref.read(inventorySummaryProvider);
+    // allRawMaterialsAsSummaryProvider: يشمل كل المواد الخام النشطة بصرف النظر عن وجودها في المخزن
+    // حتى تظهر المواد المضافة حديثاً في قائمة الاستلام فوراً.
+    final summaryAsync = ref.read(allRawMaterialsAsSummaryProvider);
     final all = summaryAsync.value ?? [];
     final materials = all.where((m) => m.warehouseType == defaultWarehouse).toList();
 
     if (materials.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
           content: Text(
-              'لا توجد مواد خام في هذا المخزن. أضف رصيداً افتتاحياً أولاً.')));
+              'لا توجد مواد خام. أضف مواداً من صفحة المواد الخام أولاً.')));
       return;
     }
 
@@ -710,9 +713,10 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
 
   Future<void> _showOpeningBalanceDialog(BuildContext context,
       {required String defaultWarehouse}) async {
-    final summaryAsync = ref.read(inventorySummaryProvider);
+    // allRawMaterialsAsSummaryProvider: يشمل كل المواد الخام النشطة حتى المضافة حديثاً
+    final summaryAsync = ref.read(allRawMaterialsAsSummaryProvider);
     final all = summaryAsync.value ?? [];
-    // Show ALL materials (not filtered) for opening balance since material may not exist in this warehouse yet
+    // إزالة التكرار: رصيد افتتاحي يُطبَّق على المادة بغض النظر عن المخزن
     final uniqueMaterials = <String, InventorySummaryModel>{};
     for (final m in all) {
       uniqueMaterials.putIfAbsent(m.materialId, () => m);
@@ -721,7 +725,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
 
     if (materials.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('لا توجد مواد خام. أضف مواداً أولاً.')));
+          content: Text('لا توجد مواد خام. أضف مواداً من صفحة المواد الخام أولاً.')));
       return;
     }
 

@@ -14,4 +14,4 @@ flutter build web --release --dart-define=API_BASE_URL=https://plastic-factory-a
 
 echo "🚀 Starting backend server..."
 cd backend
-exec python -m uvicorn main:app --host 0.0.0.0 --port 5000
+exec uv run uvicorn main:app --host 0.0.0.0 --port 5000
