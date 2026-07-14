@@ -25,10 +25,9 @@ Future<void> _confirmAndSignOut(BuildContext context, WidgetRef ref) async {
       ],
     ),
   );
-  if (confirmed == true && context.mounted) {
+  if (confirmed == true) {
     await ref.read(authProvider.notifier).signOut();
-    // Explicit navigation as safety net — GoRouter redirect also fires.
-    if (context.mounted) context.go('/worker');
+    // GoRouter redirect fires on state change — no explicit context.go needed.
   }
 }
 
@@ -59,7 +58,7 @@ class AdminShellPage extends ConsumerWidget {
             ),
           ],
         ),
-        drawer: _AdminDrawer(scaffoldContext: context),
+        drawer: const _AdminDrawer(),
         body: OfflineBannerWrapper(child: child),
       ),
     );
@@ -67,8 +66,7 @@ class AdminShellPage extends ConsumerWidget {
 }
 
 class _AdminDrawer extends ConsumerWidget {
-  final BuildContext scaffoldContext;
-  const _AdminDrawer({required this.scaffoldContext});
+  const _AdminDrawer();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -264,10 +262,7 @@ class _AdminDrawer extends ConsumerWidget {
               tileColor: Colors.red.withOpacity(0.08),
               leading: const Icon(Icons.exit_to_app, color: Colors.red),
               title: const Text(AppStrings.logout, style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
-              onTap: () async {
-                Navigator.pop(context); // close drawer first
-                await _confirmAndSignOut(scaffoldContext, ref);
-              },
+              onTap: () => _confirmAndSignOut(context, ref),
             ),
           ),
         ],
