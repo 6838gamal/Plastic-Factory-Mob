@@ -58,7 +58,7 @@ class AdminShellPage extends ConsumerWidget {
             ),
           ],
         ),
-        drawer: const _AdminDrawer(),
+        drawer: _AdminDrawer(scaffoldContext: context),
         body: OfflineBannerWrapper(child: child),
       ),
     );
@@ -66,7 +66,8 @@ class AdminShellPage extends ConsumerWidget {
 }
 
 class _AdminDrawer extends ConsumerWidget {
-  const _AdminDrawer();
+  final BuildContext scaffoldContext;
+  const _AdminDrawer({required this.scaffoldContext});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -262,7 +263,7 @@ class _AdminDrawer extends ConsumerWidget {
               tileColor: Colors.red.withOpacity(0.08),
               leading: const Icon(Icons.exit_to_app, color: Colors.red),
               title: const Text(AppStrings.logout, style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
-              onTap: () => _confirmAndSignOut(context, ref),
+              onTap: () => _confirmAndSignOut(scaffoldContext, ref),
             ),
           ),
         ],
