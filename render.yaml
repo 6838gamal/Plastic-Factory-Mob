@@ -15,7 +15,7 @@ services:
       - key: SECRET_KEY
         sync: false
       - key: API_BASE_URL
-        value: https://plastic-factory-api.onrender.com
+        value: https://plastic-factory-api-backend.onrender.com
       - key: FRONTEND_URL
         value: https://plastic-factory-mob-1.netlify.app
       - key: ENVIRONMENT

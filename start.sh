@@ -10,7 +10,7 @@ flutter clean
 rm -rf build/web .dart_tool
 
 echo "🔨 Rebuilding Flutter web app from source..."
-flutter build web --release --dart-define=API_BASE_URL=https://plastic-factory-api.onrender.com
+flutter build web --release --dart-define=API_BASE_URL=https://plastic-factory-api-backend.onrender.com
 
 echo "🚀 Starting backend server..."
 cd backend

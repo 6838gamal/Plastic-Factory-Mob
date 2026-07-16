@@ -26,7 +26,7 @@ This guarantees any Dart change is always reflected on restart, at the cost of ~
 | `DATABASE_URL` | Fallback PostgreSQL connection string | — |
 | `JWT_SECRET` | Secret key for signing login tokens | — (required in production) |
 | `SECRET_KEY` | Alias for JWT_SECRET | — |
-| `API_BASE_URL` | External API base URL baked into Flutter build | `https://plastic-factory-api.onrender.com` |
+| `API_BASE_URL` | External API base URL baked into Flutter build | `https://plastic-factory-api-backend.onrender.com` |
 | `FRONTEND_URL` | Netlify frontend URL for CORS | `https://plastic-factory-mob-1.netlify.app` |
 | `ENVIRONMENT` | `production` or `development` | `development` |
 | `ADMIN_EMAIL` | Default admin email (first-run seeding) | `admin@factory.com` |
