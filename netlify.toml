@@ -1,3 +1,7 @@
+[build]
+  command = "git clone https://github.com/flutter/flutter.git -b stable --depth 1 $HOME/flutter && $HOME/flutter/bin/flutter pub get && $HOME/flutter/bin/flutter build web --release --dart-define=API_BASE_URL=https://plastic-factory-api-backend.onrender.com"
+  publish = "build/web"
+
 [[redirects]]
 from = "/api/*"
 to = "https://plastic-factory-api-backend.onrender.com/api/:splat"
