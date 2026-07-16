@@ -1,6 +1,6 @@
 [build]
-  base = "."
-  command = "flutter build web --release --dart-define=API_BASE_URL=https://plastic-factory-api-backend.onrender.com"
+  command= "flutter build web"
+  base    = "."
   publish = "build/web"
 
 [[redirects]]
