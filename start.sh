@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # Rebuild the Flutter web frontend on every start, then serve it via the backend.
-# backend/static/ is the stable served directory — updated after each successful build.
+# Only the build output (build/web) is removed — .dart_tool cache is preserved
+# so incremental builds are faster and external builds are not affected.
 set -e
 
 cd "$(dirname "$0")"
 
-echo "🧹 Cleaning old Flutter build cache..."
-flutter clean
-rm -rf build/web .dart_tool
+echo "🧹 Removing old build output..."
+rm -rf build/web
 
 echo "🔨 Rebuilding Flutter web app from source..."
 flutter build web --release --dart-define=API_BASE_URL=https://plastic-factory-api-backend.onrender.com
