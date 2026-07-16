@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Always wipe any cached Flutter build artifacts and rebuild the web
-# frontend from scratch before starting the backend server.
+# Rebuild the Flutter web frontend on every start, then serve it via the backend.
+# backend/static/ is the stable served directory — updated after each successful build.
 set -e
 
 cd "$(dirname "$0")"
