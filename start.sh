@@ -6,9 +6,6 @@ set -e
 
 cd "$(dirname "$0")"
 
-echo "🧹 Removing old build output..."
-rm -rf build/web
-
 echo "🔨 Rebuilding Flutter web app from source..."
 flutter build web --release --dart-define=API_BASE_URL=https://plastic-factory-api-backend.onrender.com
 
