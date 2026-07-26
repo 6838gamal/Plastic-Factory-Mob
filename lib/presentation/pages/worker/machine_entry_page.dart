@@ -20,12 +20,10 @@ class MachineEntryPage extends ConsumerStatefulWidget {
 class _MachineEntryPageState extends ConsumerState<MachineEntryPage> {
   final _formKey = GlobalKey<FormState>();
   final _batchNumberCtrl = TextEditingController();
-  final _producedQtyCtrl = TextEditingController();
   final _scrapQtyCtrl = TextEditingController();
   final _wasteQtyCtrl = TextEditingController();
   final _stopTimeCtrl = TextEditingController();
   final _notesCtrl = TextEditingController();
-  final _pairsCtrl = TextEditingController();
 
   final List<MachineModel> _selectedMachines = [];
   ProductModel? _selectedProduct;
@@ -39,11 +37,8 @@ class _MachineEntryPageState extends ConsumerState<MachineEntryPage> {
   @override
   void initState() {
     super.initState();
-    // Listen to quantity fields to refresh waste indicator live
-    _producedQtyCtrl.addListener(() => setState(() {}));
     _scrapQtyCtrl.addListener(() => setState(() {}));
     _wasteQtyCtrl.addListener(() => setState(() {}));
-    _pairsCtrl.addListener(() => setState(() {}));
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadRecentBatchNumbers());
   }
 
@@ -62,33 +57,13 @@ class _MachineEntryPageState extends ConsumerState<MachineEntryPage> {
   @override
   void dispose() {
     _batchNumberCtrl.dispose();
-    _producedQtyCtrl.dispose();
     _scrapQtyCtrl.dispose();
     _wasteQtyCtrl.dispose();
     _stopTimeCtrl.dispose();
     _notesCtrl.dispose();
-    _pairsCtrl.dispose();
     super.dispose();
   }
 
-  // ── Yield stats (computed live from form values) ─────────────────
-  YieldStats? get _yieldStats {
-    final pairs = int.tryParse(_pairsCtrl.text.trim()) ?? 0;
-    if (pairs <= 0 || _selectedStandard == null) return null;
-    final totalKg = (double.tryParse(_producedQtyCtrl.text) ?? 0) +
-        (double.tryParse(_scrapQtyCtrl.text) ?? 0) +
-        (double.tryParse(_wasteQtyCtrl.text) ?? 0);
-    if (totalKg <= 0) return null;
-    final actualGram = (totalKg * 1000) / pairs;
-    final standardGram = _selectedStandard!.standardGramPerPair;
-    final deviation = ((actualGram - standardGram) / standardGram) * 100;
-    return YieldStats(
-      actualGramPerPair: actualGram,
-      standardGramPerPair: standardGram,
-      deviationPct: deviation,
-      indicator: wasteIndicatorFromDeviation(deviation),
-    );
-  }
 
   // ── Auto-match standard when product is selected ─────────────────
   void _onProductSelected(ProductModel? product) {
@@ -145,7 +120,7 @@ class _MachineEntryPageState extends ConsumerState<MachineEntryPage> {
         'machine_name': machine.name,
         'product_id': _selectedProduct!.id,
         'product_name': _selectedProduct!.name,
-        'produced_quantity': double.tryParse(_producedQtyCtrl.text) ?? 0,
+        'produced_quantity': 0,
         'scrap_quantity': double.tryParse(_scrapQtyCtrl.text) ?? 0,
         'waste_quantity': double.tryParse(_wasteQtyCtrl.text) ?? 0,
         'stop_time_minutes': double.tryParse(_stopTimeCtrl.text) ?? 0,
@@ -153,7 +128,7 @@ class _MachineEntryPageState extends ConsumerState<MachineEntryPage> {
         'production_image_url': imageUrl,
         'recorded_at': now,
         'standard_id': _selectedStandard?.id,
-        'pairs_produced': int.tryParse(_pairsCtrl.text.trim()) ?? 0,
+        'pairs_produced': 0,
       };
       final result = await ref.read(batchOperationsProvider.notifier).saveProduction(data);
       if (result.success) {
@@ -194,12 +169,10 @@ class _MachineEntryPageState extends ConsumerState<MachineEntryPage> {
   void _resetForm() {
     _formKey.currentState?.reset();
     _batchNumberCtrl.clear();
-    _producedQtyCtrl.clear();
     _scrapQtyCtrl.clear();
     _wasteQtyCtrl.clear();
     _stopTimeCtrl.clear();
     _notesCtrl.clear();
-    _pairsCtrl.clear();
     setState(() {
       _selectedMachines.clear();
       _selectedProduct = null;
@@ -215,7 +188,6 @@ class _MachineEntryPageState extends ConsumerState<MachineEntryPage> {
     final products = ref.watch(productsProvider);
     final standards = ref.watch(productionStandardsProvider);
     final opsState = ref.watch(batchOperationsProvider);
-    final stats = _yieldStats;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -380,58 +352,11 @@ class _MachineEntryPageState extends ConsumerState<MachineEntryPage> {
             ),
             const SizedBox(height: 20),
 
-            _buildSection('الكميات (كجم)', Icons.scale_outlined),
+            _buildSection('المخلفات (كجم)', Icons.scale_outlined),
             const SizedBox(height: 12),
 
-            _buildQuantityRow(AppStrings.producedQuantity, _producedQtyCtrl, required: true),
             _buildQuantityRow(AppStrings.scrap, _scrapQtyCtrl),
             _buildQuantityRow(AppStrings.waste, _wasteQtyCtrl),
-
-            // ── Pairs Produced ───────────────────────────────────────
-            Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: TextFormField(
-                controller: _pairsCtrl,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'عدد الأزواج المنتجة *',
-                  prefixIcon: Icon(Icons.people_outline),
-                  suffixText: 'زوج',
-                  helperText: 'مطلوب لحساب مؤشر الهدر والانحراف عن المعيار',
-                ),
-                validator: (v) {
-                  final n = int.tryParse(v?.trim() ?? '');
-                  if (n == null || n <= 0) return 'عدد الأزواج مطلوب ويجب أن يكون أكبر من صفر';
-                  return null;
-                },
-              ),
-            ),
-
-            // ── Waste Indicator (live) ───────────────────────────────
-            if (stats != null) ...[
-              _WasteIndicatorCard(stats: stats),
-              const SizedBox(height: 12),
-            ] else if (_selectedStandard != null) ...[
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade100,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.grey.shade300),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.info_outline, color: Colors.grey.shade500, size: 18),
-                    const SizedBox(width: 8),
-                    Text(
-                      'أدخل الكميات وعدد الأزواج لحساب مؤشر الهدر',
-                      style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 12),
-            ],
 
             const SizedBox(height: 4),
             TextFormField(

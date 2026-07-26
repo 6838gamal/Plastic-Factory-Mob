@@ -23,6 +23,11 @@ class _ShiftHandoverPageState extends ConsumerState<ShiftHandoverPage> {
   final _receivedFromMainCtrl  = TextEditingController(text: '0');
   final _notesCtrl             = TextEditingController();
 
+  // Machine productions — produced qty per record
+  List<Map<String, dynamic>> _machineProductions = [];
+  bool _loadingMachines = false;
+  final Map<String, TextEditingController> _producedQtyControllers = {};
+
   String? _selectedShift;
   DateTime _selectedDate = DateTime.now();
   bool _loading         = false;
@@ -36,6 +41,7 @@ class _ShiftHandoverPageState extends ConsumerState<ShiftHandoverPage> {
   void initState() {
     super.initState();
     _fetchExpectedBalance();
+    _fetchMachineProductions();
   }
 
   @override
@@ -47,7 +53,34 @@ class _ShiftHandoverPageState extends ConsumerState<ShiftHandoverPage> {
     _wasteCtrl.dispose();
     _receivedFromMainCtrl.dispose();
     _notesCtrl.dispose();
+    for (final c in _producedQtyControllers.values) c.dispose();
     super.dispose();
+  }
+
+  Future<void> _fetchMachineProductions() async {
+    setState(() => _loadingMachines = true);
+    try {
+      final dateStr = _selectedDate.toIso8601String().substring(0, 10);
+      final data = await _ds.getRaw('/api/machine-production', query: {
+        'from': '${dateStr}T00:00:00',
+        'to': '${dateStr}T23:59:59',
+      });
+      final list = (data as List).cast<Map<String, dynamic>>();
+      for (final c in _producedQtyControllers.values) c.dispose();
+      _producedQtyControllers.clear();
+      for (final p in list) {
+        final id = p['id'] as String;
+        final qty = (p['produced_quantity'] as num?)?.toDouble() ?? 0.0;
+        _producedQtyControllers[id] = TextEditingController(
+          text: qty > 0 ? qty.toStringAsFixed(qty == qty.truncateToDouble() ? 0 : 3) : '',
+        );
+      }
+      if (mounted) setState(() => _machineProductions = list);
+    } catch (_) {
+      if (mounted) setState(() => _machineProductions = []);
+    } finally {
+      if (mounted) setState(() => _loadingMachines = false);
+    }
   }
 
   Future<void> _fetchExpectedBalance() async {
@@ -81,6 +114,20 @@ class _ShiftHandoverPageState extends ConsumerState<ShiftHandoverPage> {
 
     setState(() { _loading = true; _result = null; });
     try {
+      // ── Save produced quantity for each machine production ──
+      for (final p in _machineProductions) {
+        final id = p['id'] as String;
+        final ctrl = _producedQtyControllers[id];
+        final qty = double.tryParse(ctrl?.text.trim() ?? '') ?? 0.0;
+        try {
+          await _ds.putRaw('/api/machine-production/$id', {
+            ...p,
+            'produced_quantity': qty,
+          });
+        } catch (_) {}
+      }
+
+      // ── Close the shift ──
       final body = <String, dynamic>{
         'shift_name': _selectedShift!,
         'supervisor_name': _supervisorCtrl.text.trim(),
@@ -315,6 +362,106 @@ class _ShiftHandoverPageState extends ConsumerState<ShiftHandoverPage> {
     );
   }
 
+  Widget _machineProductionsCard() {
+    return Card(
+      color: Colors.teal.shade50,
+      shape: RoundedRectangleBorder(
+        side: BorderSide(color: Colors.teal.shade200),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(children: [
+              const Icon(Icons.precision_manufacturing, color: Colors.teal),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text('الكمية المنتجة لكل ماكينة',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.teal)),
+              ),
+              IconButton(
+                icon: const Icon(Icons.refresh, size: 18, color: Colors.teal),
+                tooltip: 'تحديث',
+                onPressed: _fetchMachineProductions,
+              ),
+            ]),
+            Text(
+              'أدخل الكمية المنتجة فعلياً لكل ماكينة لهذا اليوم',
+              style: TextStyle(fontSize: 12, color: Colors.teal.shade700),
+            ),
+            const SizedBox(height: 12),
+            if (_loadingMachines)
+              const Center(child: Padding(
+                padding: EdgeInsets.all(12),
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ))
+            else if (_machineProductions.isEmpty)
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(children: [
+                  Icon(Icons.info_outline, color: Colors.grey.shade500, size: 18),
+                  const SizedBox(width: 8),
+                  Text('لا توجد إدخالات ماكينات لهذا اليوم',
+                      style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
+                ]),
+              )
+            else
+              Column(
+                children: _machineProductions.map((p) {
+                  final id = p['id'] as String;
+                  final machineName = p['machine_name'] as String? ?? '—';
+                  final productName = p['product_name'] as String? ?? '—';
+                  final ctrl = _producedQtyControllers[id];
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.settings_outlined, size: 16, color: Colors.teal),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(machineName,
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                              Text(productName,
+                                  style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        SizedBox(
+                          width: 110,
+                          child: TextFormField(
+                            controller: ctrl,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            textAlign: TextAlign.center,
+                            decoration: InputDecoration(
+                              hintText: '0',
+                              suffixText: 'كجم',
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                              isDense: true,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _kgField(TextEditingController ctrl, String label, IconData icon,
       {bool required = false}) =>
       TextFormField(
@@ -426,6 +573,7 @@ class _ShiftHandoverPageState extends ConsumerState<ShiftHandoverPage> {
                           if (d != null) {
                             setState(() => _selectedDate = d);
                             _fetchExpectedBalance();
+                            _fetchMachineProductions();
                           }
                         },
                       ),
@@ -433,6 +581,10 @@ class _ShiftHandoverPageState extends ConsumerState<ShiftHandoverPage> {
                   ),
                 ),
               ),
+              const SizedBox(height: 16),
+
+              // ── Machine produced quantities ─────────────────────────
+              _machineProductionsCard(),
               const SizedBox(height: 16),
 
               // Received from main (user-confirmable)
