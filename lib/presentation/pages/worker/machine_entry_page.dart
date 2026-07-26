@@ -27,7 +27,7 @@ class _MachineEntryPageState extends ConsumerState<MachineEntryPage> {
   final _notesCtrl = TextEditingController();
   final _pairsCtrl = TextEditingController();
 
-  MachineModel? _selectedMachine;
+  final List<MachineModel> _selectedMachines = [];
   ProductModel? _selectedProduct;
   ProductionStandardModel? _selectedStandard;
   File? _productionImage;
@@ -114,9 +114,9 @@ class _MachineEntryPageState extends ConsumerState<MachineEntryPage> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    if (_selectedMachine == null || _selectedProduct == null) {
+    if (_selectedMachines.isEmpty || _selectedProduct == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('يرجى اختيار الماكينة والمنتج'), backgroundColor: Colors.red),
+        const SnackBar(content: Text('يرجى اختيار ماكينة واحدة على الأقل والمنتج'), backgroundColor: Colors.red),
       );
       return;
     }
@@ -134,36 +134,58 @@ class _MachineEntryPageState extends ConsumerState<MachineEntryPage> {
       } catch (_) {}
     }
 
-    final data = {
-      'batch_number': _batchNumberCtrl.text.trim(),
-      'machine_id': _selectedMachine!.id,
-      'machine_name': _selectedMachine!.name,
-      'product_id': _selectedProduct!.id,
-      'product_name': _selectedProduct!.name,
-      'produced_quantity': double.tryParse(_producedQtyCtrl.text) ?? 0,
-      'scrap_quantity': double.tryParse(_scrapQtyCtrl.text) ?? 0,
-      'waste_quantity': double.tryParse(_wasteQtyCtrl.text) ?? 0,
-      'stop_time_minutes': double.tryParse(_stopTimeCtrl.text) ?? 0,
-      'notes': _notesCtrl.text.trim(),
-      'production_image_url': imageUrl,
-      'recorded_at': DateTime.now().toIso8601String(),
-      'standard_id': _selectedStandard?.id,
-      'pairs_produced': int.tryParse(_pairsCtrl.text.trim()) ?? 0,
-    };
+    final now = DateTime.now().toIso8601String();
+    int successCount = 0;
+    String? lastError;
 
-    final result = await ref.read(batchOperationsProvider.notifier).saveProduction(data);
+    for (final machine in _selectedMachines) {
+      final data = {
+        'batch_number': _batchNumberCtrl.text.trim(),
+        'machine_id': machine.id,
+        'machine_name': machine.name,
+        'product_id': _selectedProduct!.id,
+        'product_name': _selectedProduct!.name,
+        'produced_quantity': double.tryParse(_producedQtyCtrl.text) ?? 0,
+        'scrap_quantity': double.tryParse(_scrapQtyCtrl.text) ?? 0,
+        'waste_quantity': double.tryParse(_wasteQtyCtrl.text) ?? 0,
+        'stop_time_minutes': double.tryParse(_stopTimeCtrl.text) ?? 0,
+        'notes': _notesCtrl.text.trim(),
+        'production_image_url': imageUrl,
+        'recorded_at': now,
+        'standard_id': _selectedStandard?.id,
+        'pairs_produced': int.tryParse(_pairsCtrl.text.trim()) ?? 0,
+      };
+      final result = await ref.read(batchOperationsProvider.notifier).saveProduction(data);
+      if (result.success) {
+        successCount++;
+      } else {
+        lastError = result.error;
+      }
+    }
+
     if (!mounted) return;
 
-    if (result.success) {
+    if (successCount == _selectedMachines.length) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text(AppStrings.saveSuccess), backgroundColor: Colors.green),
+        SnackBar(
+          content: Text(
+            _selectedMachines.length == 1
+                ? AppStrings.saveSuccess
+                : 'تم الحفظ بنجاح لـ $successCount ماكينة',
+          ),
+          backgroundColor: Colors.green,
+        ),
       );
       _resetForm();
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(result.error ?? AppStrings.saveFailed),
-          backgroundColor: Colors.red,
+          content: Text(
+            successCount > 0
+                ? 'تم الحفظ لـ $successCount ماكينة، وفشل ${_selectedMachines.length - successCount} (${lastError ?? AppStrings.saveFailed})'
+                : (lastError ?? AppStrings.saveFailed),
+          ),
+          backgroundColor: successCount > 0 ? Colors.orange : Colors.red,
         ),
       );
     }
@@ -179,7 +201,7 @@ class _MachineEntryPageState extends ConsumerState<MachineEntryPage> {
     _notesCtrl.clear();
     _pairsCtrl.clear();
     setState(() {
-      _selectedMachine = null;
+      _selectedMachines.clear();
       _selectedProduct = null;
       _selectedStandard = null;
       _productionImage = null;
@@ -285,16 +307,9 @@ class _MachineEntryPageState extends ConsumerState<MachineEntryPage> {
             ),
             const SizedBox(height: 12),
 
-            // ── Machine ──────────────────────────────────────────────
+            // ── Machines (multi-select) ──────────────────────────────
             machines.when(
-              data: (list) => DropdownButtonFormField<MachineModel>(
-                value: _selectedMachine,
-                decoration: const InputDecoration(labelText: '${AppStrings.machine} *'),
-                isExpanded: true,
-                items: list.map((m) => DropdownMenuItem(value: m, child: Text(m.name))).toList(),
-                onChanged: (v) => setState(() => _selectedMachine = v),
-                validator: (v) => v == null ? 'الماكينة مطلوبة' : null,
-              ),
+              data: (list) => _buildMachineMultiSelect(list),
               loading: () => const LinearProgressIndicator(),
               error: (e, _) => Text('خطأ: $e'),
             ),
@@ -492,6 +507,105 @@ class _MachineEntryPageState extends ConsumerState<MachineEntryPage> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildMachineMultiSelect(List<MachineModel> list) {
+    final hasError = _selectedMachines.isEmpty;
+    final borderColor = hasError ? Colors.red.shade300 : Colors.grey.shade400;
+    final labelColor = hasError ? Colors.red : Colors.grey.shade700;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(
+              '${AppStrings.machine} *',
+              style: TextStyle(fontSize: 13, color: labelColor, fontWeight: FontWeight.w500),
+            ),
+            const SizedBox(width: 8),
+            if (_selectedMachines.isNotEmpty)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).primaryColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  'تم اختيار ${_selectedMachines.length}',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context).primaryColor,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            const Spacer(),
+            if (_selectedMachines.isNotEmpty)
+              TextButton.icon(
+                onPressed: () => setState(() => _selectedMachines.clear()),
+                icon: const Icon(Icons.clear_all, size: 16),
+                label: const Text('مسح الكل', style: TextStyle(fontSize: 12)),
+                style: TextButton.styleFrom(foregroundColor: Colors.red),
+              ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            border: Border.all(color: borderColor),
+            borderRadius: BorderRadius.circular(8),
+            color: Colors.grey.shade50,
+          ),
+          child: list.isEmpty
+              ? Text(
+                  'لا توجد ماكينات — أضف ماكينات أولاً من الإدارة',
+                  style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
+                )
+              : Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  children: list.map((machine) {
+                    final selected = _selectedMachines.any((m) => m.id == machine.id);
+                    return FilterChip(
+                      label: Text(machine.name),
+                      selected: selected,
+                      onSelected: (val) {
+                        setState(() {
+                          if (val) {
+                            _selectedMachines.add(machine);
+                          } else {
+                            _selectedMachines.removeWhere((m) => m.id == machine.id);
+                          }
+                        });
+                      },
+                      selectedColor: Theme.of(context).primaryColor.withOpacity(0.15),
+                      checkmarkColor: Theme.of(context).primaryColor,
+                      labelStyle: TextStyle(
+                        color: selected ? Theme.of(context).primaryColor : Colors.grey.shade800,
+                        fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+                      ),
+                      side: BorderSide(
+                        color: selected
+                            ? Theme.of(context).primaryColor
+                            : Colors.grey.shade300,
+                      ),
+                    );
+                  }).toList(),
+                ),
+        ),
+        if (hasError && list.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 4, right: 12),
+            child: Text(
+              'يرجى اختيار ماكينة واحدة على الأقل',
+              style: TextStyle(fontSize: 12, color: Colors.red.shade700),
+            ),
+          ),
+      ],
     );
   }
 
