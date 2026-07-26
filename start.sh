@@ -7,7 +7,7 @@ set -e
 cd "$(dirname "$0")"
 
 echo "🔨 Rebuilding Flutter web app from source..."
-flutter build web --release --dart-define=API_BASE_URL=https://plastic-factory-api-backend.onrender.com
+flutter build web --release
 
 echo "🚀 Starting backend server..."
 cd backend
