@@ -344,7 +344,6 @@ class _MachineEntryPageState extends ConsumerState<MachineEntryPage> {
                             '${s.productName} — ${s.standardGramPerPair.toStringAsFixed(0)} جم/زوج'),
                       )).toList(),
                   onChanged: (v) => setState(() => _selectedStandard = v),
-                  validator: (v) => v == null ? 'معيار الإنتاج مطلوب' : null,
                 );
               },
               loading: () => const SizedBox.shrink(),

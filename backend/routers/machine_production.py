@@ -419,24 +419,6 @@ async def get_productions(
 async def create_production(body: ProductionCreate):
     pool = await get_pool()
 
-    # ── Business rule: standard and pairs are required ─────────
-    if not body.standard_id:
-        raise HTTPException(
-            status_code=400,
-            detail={
-                "error": "standard_required",
-                "message": "لا يمكن حفظ أمر الإنتاج بدون تحديد معيار إنتاج (Standard). اختر الصنف ومعياره أولاً.",
-            },
-        )
-    if not body.pairs_produced or body.pairs_produced <= 0:
-        raise HTTPException(
-            status_code=400,
-            detail={
-                "error": "pairs_required",
-                "message": "يجب إدخال عدد الأزواج المنتجة (يجب أن يكون أكبر من صفر).",
-            },
-        )
-
     # ── Auto 11: Enforce notes when deviation is large ────────
     await _check_notes_required(pool, body.batch_number, body)
 
