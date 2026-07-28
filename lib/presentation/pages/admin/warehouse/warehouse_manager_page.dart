@@ -2168,6 +2168,53 @@ class _ItemRow extends StatelessWidget {
 }
 
 // ══════════════════════════════════════════════════════════════════
+// Main → Staging Transfer Tab (admin only)
+// ══════════════════════════════════════════════════════════════════
+
+class _MainTransferTab extends ConsumerWidget {
+  final VoidCallback onRefresh;
+  const _MainTransferTab({required this.onRefresh});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final vouchersAsync = ref.watch(_mainTransfersProvider);
+
+    return RefreshIndicator(
+      onRefresh: () async => ref.invalidate(_mainTransfersProvider),
+      child: vouchersAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) =>
+            Center(child: Text('خطأ: ${Helpers.friendlyError(e)}')),
+        data: (list) {
+          if (list.isEmpty) {
+            return const Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.swap_horiz_outlined, size: 56, color: Colors.grey),
+                  SizedBox(height: 12),
+                  Text('لا توجد سندات تحويل للمرحلي',
+                      style: TextStyle(color: Colors.grey)),
+                ],
+              ),
+            );
+          }
+          return ListView.builder(
+            padding: const EdgeInsets.all(12),
+            itemCount: list.length,
+            itemBuilder: (_, i) => TransferVoucherCard(
+              voucher: TransferVoucherModel.fromJson(list[i]),
+              onAction: () => ref.invalidate(_mainTransfersProvider),
+              role: 'manager',
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════
 // Withdrawal Tab
 // ══════════════════════════════════════════════════════════════════
 
