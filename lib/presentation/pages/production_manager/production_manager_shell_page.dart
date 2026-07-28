@@ -150,6 +150,13 @@ class _ProductionManagerDrawer extends ConsumerWidget {
                   currentRoute: currentRoute,
                 ),
                 _DrawerItem(
+                  icon: Icons.swap_horiz_outlined,
+                  selectedIcon: Icons.swap_horiz,
+                  title: 'المخزن المرحلي',
+                  route: '/production-manager/staging-warehouse',
+                  currentRoute: currentRoute,
+                ),
+                _DrawerItem(
                   icon: Icons.blender_outlined,
                   selectedIcon: Icons.blender,
                   title: 'مخزن الخلطات',

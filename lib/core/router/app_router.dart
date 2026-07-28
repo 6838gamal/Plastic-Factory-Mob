@@ -148,6 +148,10 @@ final routerProvider = Provider<GoRouter>((ref) {
             builder: (_, __) => const WarehouseManagerPage(),
           ),
           GoRoute(
+            path: '/production-manager/staging-warehouse',
+            builder: (_, __) => const StagingWarehousePage(),
+          ),
+          GoRoute(
             path: '/production-manager/mixing-warehouse',
             builder: (_, __) => const MixingWarehousePage(),
           ),

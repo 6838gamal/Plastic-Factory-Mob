@@ -121,6 +121,7 @@ class TransferVoucherModel {
   final String? id;
   final String? voucherNumber;
   final String status; // draft | pending | confirmed | cancelled
+  final String transferType; // main_to_mixer | main_to_staging | staging_to_mixer
   final String? notes;
   final String? createdBy;
   final String? createdAt;
@@ -134,6 +135,7 @@ class TransferVoucherModel {
     this.id,
     this.voucherNumber,
     this.status = 'draft',
+    this.transferType = 'main_to_mixer',
     this.notes,
     this.createdBy,
     this.createdAt,
@@ -155,6 +157,7 @@ class TransferVoucherModel {
         id: json['id'] as String?,
         voucherNumber: json['voucher_number'] as String?,
         status: json['status'] as String? ?? 'draft',
+        transferType: json['transfer_type'] as String? ?? 'main_to_mixer',
         notes: json['notes'] as String?,
         createdBy: json['created_by'] as String?,
         createdAt: json['created_at'] as String?,

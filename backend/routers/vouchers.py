@@ -61,6 +61,7 @@ class ReceiptVoucherCreate(BaseModel):
 class TransferVoucherCreate(BaseModel):
     notes: Optional[str] = None
     created_by: Optional[str] = "admin"
+    transfer_type: Optional[str] = "main_to_mixer"  # main_to_mixer | main_to_staging | staging_to_mixer
     items: List[VoucherItem] = []
 
 
@@ -480,34 +481,50 @@ async def post_receipt_voucher(voucher_id: str, performed_by: str = "admin"):
 # ═══════════════════════════════════════════════════════════════════
 
 @router.get("/transfer")
-async def list_transfer_vouchers(status: Optional[str] = Query(None)):
+async def list_transfer_vouchers(
+    status: Optional[str] = Query(None),
+    transfer_type: Optional[str] = Query(None),
+):
     pool = await get_pool()
+    conditions = ["1=1"]
+    params = []
+    i = 1
+    if status:
+        conditions.append(f"tv.status = ${i}"); params.append(status); i += 1
+    if transfer_type:
+        conditions.append(f"tv.transfer_type = ${i}"); params.append(transfer_type); i += 1
     rows = await pool.fetch(
-        """SELECT tv.*, COUNT(ti.id)::int AS item_count,
+        f"""SELECT tv.*, COUNT(ti.id)::int AS item_count,
                   COALESCE(array_agg(ti.material_name ORDER BY ti.created_at)
                            FILTER (WHERE ti.id IS NOT NULL), ARRAY[]::text[]) AS item_names
            FROM transfer_vouchers tv
            LEFT JOIN transfer_voucher_items ti ON ti.voucher_id = tv.id
-           WHERE ($1::text IS NULL OR tv.status = $1)
+           WHERE {' AND '.join(conditions)}
            GROUP BY tv.id
            ORDER BY tv.created_at DESC""",
-        status
+        *params,
     )
     return [_row_to_dict(r) for r in rows]
 
 
 @router.get("/transfer/pending")
-async def list_pending_transfers():
+async def list_pending_transfers(transfer_type: Optional[str] = Query(None)):
     pool = await get_pool()
+    conditions = ["tv.status = 'pending'"]
+    params = []
+    if transfer_type:
+        conditions.append(f"tv.transfer_type = $1")
+        params.append(transfer_type)
     rows = await pool.fetch(
-        """SELECT tv.*, COUNT(ti.id)::int AS item_count,
+        f"""SELECT tv.*, COUNT(ti.id)::int AS item_count,
                   COALESCE(array_agg(ti.material_name ORDER BY ti.created_at)
                            FILTER (WHERE ti.id IS NOT NULL), ARRAY[]::text[]) AS item_names
            FROM transfer_vouchers tv
            LEFT JOIN transfer_voucher_items ti ON ti.voucher_id = tv.id
-           WHERE tv.status = 'pending'
+           WHERE {' AND '.join(conditions)}
            GROUP BY tv.id
            ORDER BY tv.created_at ASC""",
+        *params,
     )
     return [_row_to_dict(r) for r in rows]
 
@@ -531,11 +548,12 @@ async def get_transfer_voucher(voucher_id: str):
 async def create_transfer_voucher(body: TransferVoucherCreate):
     pool = await get_pool()
     voucher_no = await _next_voucher_number(pool, "transfer")
+    transfer_type = body.transfer_type or "main_to_mixer"
 
     vid = await pool.fetchval(
-        """INSERT INTO transfer_vouchers (voucher_number, notes, created_by)
-           VALUES ($1, $2, $3) RETURNING id""",
-        voucher_no, body.notes, body.created_by
+        """INSERT INTO transfer_vouchers (voucher_number, notes, created_by, transfer_type)
+           VALUES ($1, $2, $3, $4) RETURNING id""",
+        voucher_no, body.notes, body.created_by, transfer_type
     )
 
     for item in body.items:
@@ -622,6 +640,23 @@ async def confirm_transfer_voucher(voucher_id: str, body: ConfirmTransferRequest
     if not items_db:
         raise HTTPException(400, "لا يوجد بنود في السند")
 
+    # ── Determine source / destination warehouses from transfer_type ──────────
+    transfer_type = (v.get("transfer_type") or "main_to_mixer")
+    _wh_names = {
+        "main":    "المخزن الرئيسي",
+        "staging": "المخزن المرحلي",
+        "mixer":   "مخزن الخلطات",
+    }
+    if transfer_type == "main_to_staging":
+        from_wh, to_wh = "main", "staging"
+    elif transfer_type == "staging_to_mixer":
+        from_wh, to_wh = "staging", "mixer"
+    else:  # main_to_mixer (default / legacy)
+        from_wh, to_wh = "main", "mixer"
+
+    from_name = _wh_names.get(from_wh, from_wh)
+    to_name   = _wh_names.get(to_wh,   to_wh)
+
     # Build confirmed quantities map (override from body if provided)
     override_map = {}
     if body.items:
@@ -641,7 +676,6 @@ async def confirm_transfer_voucher(voucher_id: str, body: ConfirmTransferRequest
             )
             if found:
                 mat_id = str(found["id"])
-                # Update the item row so future operations use the correct ID
                 await pool.execute(
                     "UPDATE transfer_voucher_items SET material_id=$1::uuid WHERE id=$2",
                     mat_id, item["id"],
@@ -663,54 +697,53 @@ async def confirm_transfer_voucher(voucher_id: str, body: ConfirmTransferRequest
             confirmed_qty, item["id"]
         )
 
-        # Deduct from main warehouse
-        main_inv = await pool.fetchrow(
-            "SELECT id, balance FROM inventory WHERE material_id=$1::uuid AND warehouse_type='main'",
-            mat_id
+        # ── Deduct from source warehouse ──────────────────────────────────
+        src_inv = await pool.fetchrow(
+            "SELECT id, balance FROM inventory WHERE material_id=$1::uuid AND warehouse_type=$2",
+            mat_id, from_wh,
         )
-        main_balance_before = float(main_inv["balance"]) if main_inv else 0.0
-        main_balance_after = max(0, main_balance_before - confirmed_qty)
-        if main_inv:
+        src_balance_before = float(src_inv["balance"]) if src_inv else 0.0
+        src_balance_after  = max(0, src_balance_before - confirmed_qty)
+        if src_inv:
             await pool.execute(
                 "UPDATE inventory SET balance=$1, updated_at=NOW() WHERE id=$2",
-                main_balance_after, main_inv["id"]
+                src_balance_after, src_inv["id"]
             )
         await pool.execute(
             """INSERT INTO inventory_transactions
                  (material_id, warehouse_type, transaction_type, quantity,
                   balance_before, balance_after, transaction_ref, created_by, notes)
-               VALUES ($1::uuid,'main','transfer_out',$2,$3,$4,$5,$6,$7)""",
-            mat_id, confirmed_qty, main_balance_before, main_balance_after,
+               VALUES ($1::uuid,$2,'transfer_out',$3,$4,$5,$6,$7,$8)""",
+            mat_id, from_wh, confirmed_qty, src_balance_before, src_balance_after,
             v["voucher_number"], body.confirmed_by,
-            f"تحويل للخلاط — سند {v['voucher_number']}"
+            f"تحويل إلى {to_name} — سند {v['voucher_number']}"
         )
 
-        # Add to mixer warehouse
-        mix_inv = await pool.fetchrow(
-            "SELECT id, balance FROM inventory WHERE material_id=$1::uuid AND warehouse_type='mixer'",
-            mat_id
+        # ── Add to destination warehouse ──────────────────────────────────
+        dst_inv = await pool.fetchrow(
+            "SELECT id, balance FROM inventory WHERE material_id=$1::uuid AND warehouse_type=$2",
+            mat_id, to_wh,
         )
-        mix_balance_before = float(mix_inv["balance"]) if mix_inv else 0.0
-        mix_balance_after = mix_balance_before + confirmed_qty
-        if mix_inv:
+        dst_balance_before = float(dst_inv["balance"]) if dst_inv else 0.0
+        dst_balance_after  = dst_balance_before + confirmed_qty
+        if dst_inv:
             await pool.execute(
                 "UPDATE inventory SET balance=$1, updated_at=NOW() WHERE id=$2",
-                mix_balance_after, mix_inv["id"]
+                dst_balance_after, dst_inv["id"]
             )
         else:
             await pool.execute(
-                """INSERT INTO inventory (material_id, warehouse_type, balance)
-                   VALUES ($1::uuid, 'mixer', $2)""",
-                mat_id, mix_balance_after
+                "INSERT INTO inventory (material_id, warehouse_type, balance) VALUES ($1::uuid, $2, $3)",
+                mat_id, to_wh, dst_balance_after
             )
         await pool.execute(
             """INSERT INTO inventory_transactions
                  (material_id, warehouse_type, transaction_type, quantity,
                   balance_before, balance_after, transaction_ref, created_by, notes)
-               VALUES ($1::uuid,'mixer','transfer_in',$2,$3,$4,$5,$6,$7)""",
-            mat_id, confirmed_qty, mix_balance_before, mix_balance_after,
+               VALUES ($1::uuid,$2,'transfer_in',$3,$4,$5,$6,$7,$8)""",
+            mat_id, to_wh, confirmed_qty, dst_balance_before, dst_balance_after,
             v["voucher_number"], body.confirmed_by,
-            f"وارد من المخزن الرئيسي — سند {v['voucher_number']}"
+            f"وارد من {from_name} — سند {v['voucher_number']}"
         )
         processed += 1
 
@@ -722,9 +755,11 @@ async def confirm_transfer_voucher(voucher_id: str, body: ConfirmTransferRequest
         body.confirmed_by, now, voucher_id
     )
     await _write_audit(pool, "confirm", "transfer_voucher", voucher_id,
-                       body.confirmed_by or "مشرف الخلطات",
-                       {"voucher_number": v["voucher_number"], "items_processed": processed, "items_skipped": skipped})
-    return {"status": "confirmed", "items_processed": processed, "items_skipped": skipped}
+                       body.confirmed_by or "مشرف",
+                       {"voucher_number": v["voucher_number"], "transfer_type": transfer_type,
+                        "items_processed": processed, "items_skipped": skipped})
+    return {"status": "confirmed", "items_processed": processed, "items_skipped": skipped,
+            "transfer_type": transfer_type, "from_warehouse": from_wh, "to_warehouse": to_wh}
 
 
 @router.post("/transfer/{voucher_id}/cancel")

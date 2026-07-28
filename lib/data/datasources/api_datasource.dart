@@ -753,14 +753,18 @@ class ApiDataSource {
   }
 
   // Transfer vouchers
-  Future<List<Map<String, dynamic>>> getTransferVouchers({String? status}) async {
-    final res = await _get('/api/vouchers/transfer',
-        query: status != null ? {'status': status} : null);
+  Future<List<Map<String, dynamic>>> getTransferVouchers(
+      {String? status, String? transferType}) async {
+    final q = <String, String>{};
+    if (status != null) q['status'] = status;
+    if (transferType != null) q['transfer_type'] = transferType;
+    final res = await _get('/api/vouchers/transfer', query: q.isEmpty ? null : q);
     return List<Map<String, dynamic>>.from((res as List).map((e) => Map<String, dynamic>.from(e as Map)));
   }
 
-  Future<List<Map<String, dynamic>>> getPendingTransfers() async {
-    final res = await _get('/api/vouchers/transfer/pending');
+  Future<List<Map<String, dynamic>>> getPendingTransfers({String? transferType}) async {
+    final q = transferType != null ? {'transfer_type': transferType} : null;
+    final res = await _get('/api/vouchers/transfer/pending', query: q);
     return List<Map<String, dynamic>>.from((res as List).map((e) => Map<String, dynamic>.from(e as Map)));
   }
 

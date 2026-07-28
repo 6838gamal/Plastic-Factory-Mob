@@ -299,6 +299,8 @@ async def _init_db():
         "ALTER TABLE receipt_vouchers ADD COLUMN IF NOT EXISTS approved_at TIMESTAMPTZ",
         "ALTER TABLE receipt_vouchers ADD COLUMN IF NOT EXISTS posted_by VARCHAR(200)",
         "ALTER TABLE receipt_vouchers ADD COLUMN IF NOT EXISTS posted_at TIMESTAMPTZ",
+        # staging warehouse: transfer_type column for vouchers (main_to_mixer | main_to_staging | staging_to_mixer)
+        "ALTER TABLE transfer_vouchers ADD COLUMN IF NOT EXISTS transfer_type VARCHAR(50) NOT NULL DEFAULT 'main_to_mixer'",
     ]
     for stmt in _col_migrations:
         try:
