@@ -174,6 +174,21 @@ class ApiDataSource {
     return res as Map<String, dynamic>;
   }
 
+  Future<Map<String, dynamic>> getProductionManagerAccount() async {
+    final res = await _get('/api/auth/production-manager-account');
+    return res as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> upsertProductionManagerAccount(
+      String email, String password, {String? name}) async {
+    final res = await _put('/api/auth/production-manager-account', {
+      'email': email,
+      'password': password,
+      if (name != null && name.isNotEmpty) 'name': name,
+    });
+    return res as Map<String, dynamic>;
+  }
+
   // ── Suppliers ────────────────────────────────────────────────────
 
   Future<List<Map<String, dynamic>>> getSuppliers({bool activeOnly = false}) async {

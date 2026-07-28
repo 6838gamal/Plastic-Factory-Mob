@@ -268,6 +268,60 @@ async def upsert_warehouse_account(body: WarehouseAccountRequest):
     return {"success": True, "message": "تم حفظ بيانات أمين المخزن بنجاح"}
 
 
+# ── Production Manager Account (admin-controlled) ─────────────────────────────
+
+class ProductionManagerAccountRequest(BaseModel):
+    email: str
+    password: str
+    name: Optional[str] = None
+
+
+@router.get("/production-manager-account")
+async def get_production_manager_account():
+    """Return the production manager account (email + name) or null if not yet created."""
+    pool = await get_pool()
+    row = await pool.fetchrow(
+        "SELECT id, email, name FROM admin_users WHERE role='production_manager' LIMIT 1"
+    )
+    if row:
+        return {"exists": True, "email": row["email"], "name": row["name"]}
+    return {"exists": False, "email": None, "name": None}
+
+
+@router.put("/production-manager-account")
+async def upsert_production_manager_account(body: ProductionManagerAccountRequest):
+    """Admin creates or updates the production manager credentials (no old-password required)."""
+    pool = await get_pool()
+    if not body.email or not body.password:
+        raise HTTPException(status_code=400, detail="البريد وكلمة المرور مطلوبان")
+    if len(body.password) < 6:
+        raise HTTPException(status_code=400, detail="كلمة المرور يجب أن تكون 6 أحرف على الأقل")
+
+    # Check if email used by a non-production-manager account
+    conflict = await pool.fetchrow(
+        "SELECT id FROM admin_users WHERE email=$1 AND role!='production_manager'", body.email
+    )
+    if conflict:
+        raise HTTPException(status_code=400, detail="هذا البريد مستخدم من قِبَل حساب آخر")
+
+    hashed = bcrypt.hashpw(body.password.encode(), bcrypt.gensalt()).decode()
+    existing = await pool.fetchrow(
+        "SELECT id FROM admin_users WHERE role='production_manager' LIMIT 1"
+    )
+    if existing:
+        await pool.execute(
+            "UPDATE admin_users SET email=$1, password_hash=$2, name=$3 WHERE id=$4",
+            body.email, hashed, body.name, existing["id"],
+        )
+    else:
+        await pool.execute(
+            "INSERT INTO admin_users (id, email, password_hash, role, name) "
+            "VALUES (gen_random_uuid(), $1, $2, 'production_manager', $3)",
+            body.email, hashed, body.name,
+        )
+    return {"success": True, "message": "تم حفظ بيانات مدير الإنتاج بنجاح"}
+
+
 # ── OTP / Forgot-password flow ────────────────────────────────────────────────
 
 @router.post("/send-otp")

@@ -19,6 +19,11 @@ final _warehouseAccountProvider = FutureProvider<Map<String, dynamic>>((ref) asy
   return ds.getWarehouseAccount();
 });
 
+final _productionManagerAccountProvider = FutureProvider<Map<String, dynamic>>((ref) async {
+  final ds = ref.read(dataSourceProvider);
+  return ds.getProductionManagerAccount();
+});
+
 class SettingsPage extends ConsumerStatefulWidget {
   const SettingsPage({super.key});
 
@@ -159,6 +164,94 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               title: Text('خطأ في تحميل حساب أمين المخزن: $e'),
               trailing: ElevatedButton(
                 onPressed: () => ref.invalidate(_warehouseAccountProvider),
+                child: const Text('إعادة'),
+              ),
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 16),
+
+        // ── حساب مدير الإنتاج ───────────────────────────────────
+        _SectionTitle('حساب مدير الإنتاج'),
+        ref.watch(_productionManagerAccountProvider).when(
+          data: (info) {
+            final exists = info['exists'] as bool? ?? false;
+            final email = info['email'] as String?;
+            final name = info['name'] as String?;
+            return Card(
+              child: Column(
+                children: [
+                  ListTile(
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.deepOrange.withOpacity(0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.engineering, color: Colors.deepOrange),
+                    ),
+                    title: const Text('مدير الإنتاج'),
+                    subtitle: exists
+                        ? Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (name?.isNotEmpty == true)
+                                Text(name!,
+                                    style: const TextStyle(
+                                        fontSize: 13,
+                                        color: Colors.deepOrange,
+                                        fontWeight: FontWeight.w600)),
+                              Text(email ?? '—',
+                                  style: TextStyle(
+                                      fontSize: 12, color: Colors.grey[600])),
+                            ],
+                          )
+                        : const Text('لم يُنشأ الحساب بعد',
+                            style: TextStyle(
+                                fontSize: 12, color: Colors.orange)),
+                    trailing: exists
+                        ? const Icon(Icons.verified_user,
+                            color: Colors.deepOrange, size: 18)
+                        : const Icon(Icons.warning_amber,
+                            color: Colors.orange, size: 18),
+                  ),
+                  const Divider(height: 0),
+                  ListTile(
+                    leading: const Icon(Icons.edit, color: Colors.blue, size: 20),
+                    title: Text(exists ? 'تعديل بيانات مدير الإنتاج' : 'إنشاء الحساب'),
+                    subtitle: const Text('الاسم والبريد الإلكتروني'),
+                    trailing: const Icon(Icons.arrow_forward_ios, size: 14),
+                    onTap: () => _showProductionManagerEmailDialog(
+                        context, email ?? '', currentName: name ?? ''),
+                  ),
+                  const Divider(height: 0),
+                  ListTile(
+                    leading: const Icon(Icons.lock_reset,
+                        color: Colors.orange, size: 20),
+                    title: const Text('تغيير كلمة المرور'),
+                    subtitle: const Text('تعيين كلمة مرور جديدة لمدير الإنتاج'),
+                    trailing: const Icon(Icons.arrow_forward_ios, size: 14),
+                    onTap: () =>
+                        _showProductionManagerPasswordDialog(context, email ?? ''),
+                  ),
+                ],
+              ),
+            );
+          },
+          loading: () => const Card(
+            child: Padding(
+              padding: EdgeInsets.all(24),
+              child: Center(child: CircularProgressIndicator()),
+            ),
+          ),
+          error: (e, _) => Card(
+            child: ListTile(
+              leading: const Icon(Icons.error_outline, color: Colors.red),
+              title: Text('خطأ في تحميل حساب مدير الإنتاج: $e'),
+              trailing: ElevatedButton(
+                onPressed: () => ref.invalidate(_productionManagerAccountProvider),
                 child: const Text('إعادة'),
               ),
             ),
@@ -906,6 +999,257 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                           errorMsg = e
                               .toString()
                               .replaceFirst('Exception: ', '');
+                        });
+                      }
+                    },
+              child: loading
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white))
+                  : const Text('حفظ'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── حساب مدير الإنتاج — تعديل البريد والاسم ──────────────────
+  void _showProductionManagerEmailDialog(BuildContext context, String currentEmail, {String currentName = ''}) {
+    final nameCtrl = TextEditingController(text: currentName);
+    final emailCtrl = TextEditingController(text: currentEmail);
+    final passCtrl = TextEditingController();
+    bool obscure = true;
+    String? errorMsg;
+    bool loading = false;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, ss) => AlertDialog(
+          title: const Row(children: [
+            Icon(Icons.engineering, color: Colors.deepOrange),
+            SizedBox(width: 8),
+            Text('بيانات مدير الإنتاج'),
+          ]),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameCtrl,
+                textDirection: TextDirection.rtl,
+                decoration: const InputDecoration(
+                  labelText: 'الاسم الكامل لمدير الإنتاج *',
+                  prefixIcon: Icon(Icons.person_outlined),
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: emailCtrl,
+                keyboardType: TextInputType.emailAddress,
+                textDirection: TextDirection.ltr,
+                decoration: const InputDecoration(
+                  labelText: 'البريد الإلكتروني *',
+                  prefixIcon: Icon(Icons.email_outlined),
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: passCtrl,
+                obscureText: obscure,
+                decoration: InputDecoration(
+                  labelText: 'كلمة المرور الجديدة *',
+                  prefixIcon: const Icon(Icons.lock_outlined),
+                  border: const OutlineInputBorder(),
+                  suffixIcon: IconButton(
+                    icon: Icon(obscure
+                        ? Icons.visibility_outlined
+                        : Icons.visibility_off_outlined),
+                    onPressed: () => ss(() => obscure = !obscure),
+                  ),
+                ),
+              ),
+              if (errorMsg != null) ...[
+                const SizedBox(height: 8),
+                Text(errorMsg!,
+                    style: const TextStyle(color: Colors.red, fontSize: 13)),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(
+                onPressed: loading ? null : () => Navigator.pop(ctx),
+                child: const Text('إلغاء')),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.deepOrange, foregroundColor: Colors.white),
+              onPressed: loading
+                  ? null
+                  : () async {
+                      final name = nameCtrl.text.trim();
+                      final email = emailCtrl.text.trim();
+                      final pass = passCtrl.text;
+                      if (name.isEmpty || email.isEmpty || pass.isEmpty) {
+                        ss(() => errorMsg = 'يرجى ملء جميع الحقول');
+                        return;
+                      }
+                      if (pass.length < 6) {
+                        ss(() => errorMsg =
+                            'كلمة المرور يجب أن تكون 6 أحرف على الأقل');
+                        return;
+                      }
+                      ss(() { loading = true; errorMsg = null; });
+                      try {
+                        await ref
+                            .read(dataSourceProvider)
+                            .upsertProductionManagerAccount(email, pass, name: name);
+                        ref.invalidate(_productionManagerAccountProvider);
+                        if (ctx.mounted) Navigator.pop(ctx);
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                  content: Text('تم حفظ بيانات مدير الإنتاج بنجاح'),
+                                  backgroundColor: Colors.green));
+                        }
+                      } catch (e) {
+                        ss(() {
+                          loading = false;
+                          errorMsg = e.toString().replaceFirst('Exception: ', '');
+                        });
+                      }
+                    },
+              child: loading
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white))
+                  : const Text('حفظ'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── حساب مدير الإنتاج — تغيير كلمة المرور فقط ────────────────
+  void _showProductionManagerPasswordDialog(BuildContext context, String currentEmail) {
+    if (currentEmail.isEmpty) {
+      _showProductionManagerEmailDialog(context, '');
+      return;
+    }
+    final passCtrl = TextEditingController();
+    final confirmCtrl = TextEditingController();
+    bool obscure = true;
+    String? errorMsg;
+    bool loading = false;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, ss) => AlertDialog(
+          title: const Row(children: [
+            Icon(Icons.lock_reset, color: Colors.orange),
+            SizedBox(width: 8),
+            Text('تغيير كلمة مرور مدير الإنتاج'),
+          ]),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.deepOrange.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(children: [
+                  const Icon(Icons.person_outline,
+                      color: Colors.deepOrange, size: 16),
+                  const SizedBox(width: 6),
+                  Text(currentEmail,
+                      style: const TextStyle(
+                          fontSize: 13, color: Colors.deepOrange)),
+                ]),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: passCtrl,
+                obscureText: obscure,
+                decoration: InputDecoration(
+                  labelText: 'كلمة المرور الجديدة',
+                  prefixIcon: const Icon(Icons.lock_open_outlined),
+                  border: const OutlineInputBorder(),
+                  suffixIcon: IconButton(
+                    icon: Icon(obscure
+                        ? Icons.visibility_outlined
+                        : Icons.visibility_off_outlined),
+                    onPressed: () => ss(() => obscure = !obscure),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: confirmCtrl,
+                obscureText: true,
+                decoration: const InputDecoration(
+                  labelText: 'تأكيد كلمة المرور',
+                  prefixIcon: Icon(Icons.check_circle_outline),
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              if (errorMsg != null) ...[
+                const SizedBox(height: 8),
+                Text(errorMsg!,
+                    style: const TextStyle(color: Colors.red, fontSize: 13)),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(
+                onPressed: loading ? null : () => Navigator.pop(ctx),
+                child: const Text('إلغاء')),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.orange,
+                  foregroundColor: Colors.white),
+              onPressed: loading
+                  ? null
+                  : () async {
+                      final pass = passCtrl.text;
+                      final confirm = confirmCtrl.text;
+                      if (pass.isEmpty || confirm.isEmpty) {
+                        ss(() => errorMsg = 'يرجى ملء جميع الحقول');
+                        return;
+                      }
+                      if (pass.length < 6) {
+                        ss(() => errorMsg =
+                            'كلمة المرور يجب أن تكون 6 أحرف على الأقل');
+                        return;
+                      }
+                      if (pass != confirm) {
+                        ss(() => errorMsg = 'كلمة المرور غير متطابقة');
+                        return;
+                      }
+                      ss(() { loading = true; errorMsg = null; });
+                      try {
+                        await ref
+                            .read(dataSourceProvider)
+                            .upsertProductionManagerAccount(currentEmail, pass);
+                        if (ctx.mounted) Navigator.pop(ctx);
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                  content: Text('تم تغيير كلمة المرور بنجاح'),
+                                  backgroundColor: Colors.green));
+                        }
+                      } catch (e) {
+                        ss(() {
+                          loading = false;
+                          errorMsg = e.toString().replaceFirst('Exception: ', '');
                         });
                       }
                     },
