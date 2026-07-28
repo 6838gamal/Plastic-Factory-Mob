@@ -38,6 +38,16 @@ final _withdrawalVouchersProvider =
   return ref.read(dataSourceProvider).getWithdrawalVouchers();
 });
 
+/// Transfers from main warehouse → staging warehouse
+final _mainTransfersProvider =
+    FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
+  final all = await ref.read(dataSourceProvider).getTransferVouchers();
+  return all.where((v) {
+    final type = v['transfer_type'] as String? ?? 'main_to_mixer';
+    return type == 'main_to_staging';
+  }).toList();
+});
+
 // ── Page ─────────────────────────────────────────────────────────
 
 class WarehouseManagerPage extends ConsumerStatefulWidget {
@@ -55,8 +65,9 @@ class _WarehouseManagerPageState extends ConsumerState<WarehouseManagerPage>
   @override
   void initState() {
     super.initState();
-    // Keepers see 4 tabs (+ incoming receipt); admins see 3 (transfers live in mixing-warehouse)
-    _tabs = TabController(length: widget.keeperName == null ? 3 : 4, vsync: this);
+    // Keepers: 4 tabs (استلام وارد, الاستلام, السحب, الموردون)
+    // Admins:  4 tabs (الاستلام, السحب, التحويل, الموردون)
+    _tabs = TabController(length: 4, vsync: this);
     _tabs.addListener(() => setState(() {}));
   }
 
@@ -69,9 +80,9 @@ class _WarehouseManagerPageState extends ConsumerState<WarehouseManagerPage>
   @override
   Widget build(BuildContext context) {
     final isKeeper = widget.keeperName != null;
-    // Admin: 3 tabs (Receipts, Withdrawals, Suppliers) — transfers live in mixing-warehouse page
-    // Keeper: 4 tabs (استلام وارد, Receipts, Withdrawals, Suppliers)
-    final suppliersIndex = isKeeper ? 3 : 2;
+    // Keeper: [استلام وارد(0), الاستلام(1), السحب(2), الموردون(3)]
+    // Admin:  [الاستلام(0), السحب(1), سندات التحويل(2), الموردون(3)]
+    const suppliersIndex = 3;
 
     final tabs = isKeeper
         ? const [
@@ -83,6 +94,7 @@ class _WarehouseManagerPageState extends ConsumerState<WarehouseManagerPage>
         : const [
             Tab(icon: Icon(Icons.download_outlined), text: 'سندات الاستلام'),
             Tab(icon: Icon(Icons.remove_circle_outline), text: 'سندات السحب'),
+            Tab(icon: Icon(Icons.swap_horiz_outlined), text: 'سندات التحويل'),
             Tab(icon: Icon(Icons.business_outlined), text: 'الموردون'),
           ];
 
@@ -96,6 +108,7 @@ class _WarehouseManagerPageState extends ConsumerState<WarehouseManagerPage>
         : <Widget>[
             const _ReceiptTab(isAdmin: true),
             _WithdrawalTab(isAdmin: true, keeperName: null),
+            _MainTransferTab(onRefresh: () => ref.invalidate(_mainTransfersProvider)),
             const SuppliersPage(),
           ];
 
@@ -125,21 +138,24 @@ class _WarehouseManagerPageState extends ConsumerState<WarehouseManagerPage>
           ? null
           : FloatingActionButton.extended(
               onPressed: () {
-                // Keeper: tab 0=incoming(no FAB handled above), 1=receipts, 2=withdrawals, 3=suppliers
-              // Admin:  tab 0=receipts, 1=withdrawals, 2=suppliers
-              if (isKeeper) {
-                if (_tabs.index == 1) _showCreateReceiptDialog(context);
-                else _showCreateWithdrawalDialog(context);
-              } else {
-                if (_tabs.index == 0) _showCreateReceiptDialog(context);
-                else _showCreateWithdrawalDialog(context);
-              }
-            },
-            icon: const Icon(Icons.add),
-            label: Text(() {
-              if (isKeeper) return _tabs.index == 1 ? 'سند استلام جديد' : 'سند سحب جديد';
-              return _tabs.index == 0 ? 'سند استلام جديد' : 'سند سحب جديد';
-            }()),
+                // Keeper: 1=receipts, 2=withdrawals
+                // Admin:  0=receipts, 1=withdrawals, 2=transfers(main→staging)
+                if (isKeeper) {
+                  if (_tabs.index == 1) _showCreateReceiptDialog(context);
+                  else _showCreateWithdrawalDialog(context);
+                } else {
+                  if (_tabs.index == 0) _showCreateReceiptDialog(context);
+                  else if (_tabs.index == 1) _showCreateWithdrawalDialog(context);
+                  else if (_tabs.index == 2) _showCreateMainTransferDialog(context);
+                }
+              },
+              icon: const Icon(Icons.add),
+              label: Text(() {
+                if (isKeeper) return _tabs.index == 1 ? 'سند استلام جديد' : 'سند سحب جديد';
+                if (_tabs.index == 0) return 'سند استلام جديد';
+                if (_tabs.index == 2) return 'تحويل للمرحلي';
+                return 'سند سحب جديد';
+              }()),
             ),
     );
   }
@@ -160,14 +176,17 @@ class _WarehouseManagerPageState extends ConsumerState<WarehouseManagerPage>
     );
   }
 
-  void _showCreateTransferDialog(BuildContext context) {
+  /// Opens the transfer dialog fixed to main → staging.
+  void _showCreateMainTransferDialog(BuildContext context) {
     showDialog(
       context: context,
       useSafeArea: false,
       builder: (_) => TransferVoucherDialog(
+        transferType: 'main_to_staging',
         keeperName: widget.keeperName,
         onSaved: () {
-          ref.invalidate(transferVouchersProvider);
+          ref.invalidate(_mainTransfersProvider);
+          _tabs.animateTo(2); // stay on transfers tab
         },
       ),
     );
