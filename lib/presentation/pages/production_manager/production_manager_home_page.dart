@@ -43,13 +43,6 @@ class ProductionManagerHomePage extends StatelessWidget {
         color: Colors.deepOrange.shade800,
       ),
       _MenuItem(
-        icon: Icons.swap_horiz,
-        title: 'المخزن المرحلي',
-        subtitle: 'تحويل المواد بين الرئيسي والخلاط',
-        route: '/production-manager/staging-warehouse',
-        color: Colors.teal.shade700,
-      ),
-      _MenuItem(
         icon: Icons.blender,
         title: 'مخزن الخلطات',
         subtitle: 'إدارة مخزن الخلطات والتحويلات',
