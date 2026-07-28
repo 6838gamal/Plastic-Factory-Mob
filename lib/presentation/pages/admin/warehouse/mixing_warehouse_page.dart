@@ -464,8 +464,14 @@ class _ReturnVoucherDialogState extends ConsumerState<_ReturnVoucherDialog> {
     try {
       final ds = ref.read(dataSourceProvider);
       final data = await ds.getTransferVouchers(status: 'confirmed');
+      // عرض سندات التحويل الواردة للخلاط فقط — أي main_to_mixer أو staging_to_mixer
+      // (main_to_staging لا تمر بمخزن الخلاط إطلاقاً ولا يجب عرضها هنا)
+      final mixerVouchers = data.where((v) {
+        final t = v['transfer_type'] as String? ?? 'main_to_mixer';
+        return t == 'main_to_mixer' || t == 'staging_to_mixer';
+      }).toList();
       if (mounted) setState(() {
-        _confirmedVouchers = data;
+        _confirmedVouchers = mixerVouchers;
         _loadingVouchers = false;
       });
     } catch (_) {
@@ -584,10 +590,44 @@ class _ReturnVoucherDialogState extends ConsumerState<_ReturnVoucherDialog> {
                     prefixIcon: Icon(Icons.swap_horiz_outlined),
                   ),
                   items: _confirmedVouchers
-                      .map((v) => DropdownMenuItem<String>(
-                            value: v['id'] as String,
-                            child: Text(v['voucher_number'] as String? ?? '', style: const TextStyle(fontSize: 13)),
-                          ))
+                      .map((v) {
+                        final type = v['transfer_type'] as String? ?? 'main_to_mixer';
+                        final returnLabel = type == 'staging_to_mixer'
+                            ? '← مرحلي'    // الإرجاع سيذهب للمرحلي
+                            : '← رئيسي';   // الإرجاع سيذهب للرئيسي
+                        return DropdownMenuItem<String>(
+                          value: v['id'] as String,
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  v['voucher_number'] as String? ?? '',
+                                  style: const TextStyle(fontSize: 13),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: type == 'staging_to_mixer'
+                                      ? Colors.deepOrange.shade50
+                                      : Colors.blue.shade50,
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  returnLabel,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: type == 'staging_to_mixer'
+                                        ? Colors.deepOrange.shade700
+                                        : Colors.blue.shade700,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      })
                       .toList(),
                   onChanged: (id) {
                     if (id == null) return;

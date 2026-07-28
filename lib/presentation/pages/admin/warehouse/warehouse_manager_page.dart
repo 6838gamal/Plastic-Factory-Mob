@@ -1315,7 +1315,11 @@ class TransferVoucherCard extends ConsumerWidget {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('إرسال للتأكيد'),
-        content: const Text('سيتم إرسال السند لمشرف الخلطات للتأكيد. لن يمكن حذفه بعد ذلك.'),
+        content: Text(
+          voucher.transferType == 'main_to_staging'
+              ? 'سيتم إرسال السند لمشرف المخزن المرحلي للتأكيد. لن يمكن حذفه بعد ذلك.'
+              : 'سيتم إرسال السند لمشرف الخلطات للتأكيد. لن يمكن حذفه بعد ذلك.',
+        ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('إلغاء')),
           ElevatedButton(
@@ -1332,7 +1336,14 @@ class TransferVoucherCard extends ConsumerWidget {
       await ds.submitTransferVoucher(voucher.id!);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('تم إرسال السند لمشرف الخلطات'), backgroundColor: Colors.blue),
+          SnackBar(
+            content: Text(
+              voucher.transferType == 'main_to_staging'
+                  ? 'تم إرسال السند لمشرف المخزن المرحلي'
+                  : 'تم إرسال السند لمشرف الخلطات',
+            ),
+            backgroundColor: Colors.blue,
+          ),
         );
       }
       onAction();
@@ -1719,7 +1730,14 @@ class TransferVoucherDialog extends ConsumerStatefulWidget {
   final String? voucherId;
   final String? keeperName;
   final VoidCallback onSaved;
-  const TransferVoucherDialog({this.voucherId, this.keeperName, required this.onSaved});
+  /// نوع التحويل: 'main_to_mixer' (افتراضي) أو 'main_to_staging'
+  final String transferType;
+  const TransferVoucherDialog({
+    this.voucherId,
+    this.keeperName,
+    required this.onSaved,
+    this.transferType = 'main_to_mixer',
+  });
 
   @override
   ConsumerState<TransferVoucherDialog> createState() => _TransferVoucherDialogState();
@@ -1805,6 +1823,7 @@ class _TransferVoucherDialogState extends ConsumerState<TransferVoucherDialog> {
         await ds.createTransferVoucher({
           'notes': _notesCtrl.text.trim(),
           'created_by': widget.keeperName ?? 'أمين المخزن',
+          'transfer_type': widget.transferType,
           'items': itemsList,
         });
       }
@@ -1844,14 +1863,16 @@ class _TransferVoucherDialogState extends ConsumerState<TransferVoucherDialog> {
                   color: Colors.blue.withOpacity(0.08),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Row(
+                child: Row(
                   children: [
-                    Icon(Icons.info_outline, color: Colors.blue, size: 16),
-                    SizedBox(width: 8),
+                    const Icon(Icons.info_outline, color: Colors.blue, size: 16),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'المخزن الرئيسي ← مخزن الخلطات',
-                        style: TextStyle(color: Colors.blue, fontSize: 13),
+                        widget.transferType == 'main_to_staging'
+                            ? 'المخزن الرئيسي ← المخزن المرحلي'
+                            : 'المخزن الرئيسي ← مخزن الخلطات',
+                        style: const TextStyle(color: Colors.blue, fontSize: 13),
                       ),
                     ),
                   ],
