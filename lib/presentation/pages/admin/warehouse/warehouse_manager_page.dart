@@ -566,7 +566,7 @@ class _ReceiptVoucherCard extends ConsumerWidget {
                     onPressed: () => _approveVoucher(context, ref),
                   ),
                 ],
-                // ── Admin: approved → edit quantities + post ─────
+                // ── Admin: approved → edit quantities + accept receipt ─
                 if (isAdmin && status == 'approved') ...[
                   TextButton.icon(
                     icon: const Icon(Icons.edit_outlined, size: 14),
@@ -582,8 +582,8 @@ class _ReceiptVoucherCard extends ConsumerWidget {
                   ),
                   const SizedBox(width: 6),
                   ElevatedButton.icon(
-                    icon: const Icon(Icons.warehouse_outlined, size: 14),
-                    label: const Text('ترحيل للمخزن',
+                    icon: const Icon(Icons.check_circle_outline, size: 14),
+                    label: const Text('قبول الاستلام',
                         style: TextStyle(fontSize: 12)),
                     style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.green,
@@ -629,15 +629,15 @@ class _ReceiptVoucherCard extends ConsumerWidget {
                   const Text('بانتظار موافقة الإدارة',
                       style:
                           TextStyle(fontSize: 12, color: Colors.orange)),
-                // ── Keeper: approved → post ──────────────────────
+                // ── Keeper: approved → accept receipt ────────────
                 if (!isAdmin && status == 'approved') ...[
                   Text('مقبول ✓',
                       style: TextStyle(
                           fontSize: 12, color: Colors.teal.shade700)),
                   const SizedBox(width: 8),
                   ElevatedButton.icon(
-                    icon: const Icon(Icons.warehouse_outlined, size: 14),
-                    label: const Text('ترحيل للمخزن',
+                    icon: const Icon(Icons.check_circle_outline, size: 14),
+                    label: const Text('قبول الاستلام',
                         style: TextStyle(fontSize: 12)),
                     style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.green,
@@ -763,17 +763,21 @@ class _ReceiptVoucherCard extends ConsumerWidget {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('ترحيل للمخزن'),
+        title: const Row(children: [
+          Icon(Icons.check_circle_outline, color: Colors.green),
+          SizedBox(width: 8),
+          Text('قبول الاستلام'),
+        ]),
         content: Text(
-          'سيُضاف محتوى السند ${voucher.voucherNumber} للمخزن الرئيسي بالكميات المحددة.\n'
-          'هل تريد المتابعة؟',
+          'سيتم قبول استلام محتوى السند ${voucher.voucherNumber} وإضافته للمخزن الرئيسي بالكميات المحددة.\n\n'
+          'هل تريد قبول الاستلام؟',
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('إلغاء')),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('ترحيل', style: TextStyle(color: Colors.white)),
+            child: const Text('قبول', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
