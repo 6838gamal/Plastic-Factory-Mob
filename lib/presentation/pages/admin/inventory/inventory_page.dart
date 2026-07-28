@@ -112,8 +112,8 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
             ],
           ),
 
-          // ── Search Bar (only on main/mixer tabs) ─────────────────
-          if (!isTransactionsTab && !isStagingTab)
+          // ── Search Bar (all tabs except transactions) ─────────────
+          if (!isTransactionsTab)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               child: SearchBar(
@@ -142,11 +142,14 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
                   icon: Icons.blender_outlined,
                   label: 'مخزن الخلاط',
                 ),
-                _StagingTab(onRefresh: () {
-                  ref.invalidate(_stagingIncomingVouchersProvider);
-                  ref.invalidate(_stagingOutgoingVouchersProvider);
-                  ref.invalidate(inventorySummaryProvider);
-                }),
+                _StagingTab(
+                  search: _search,
+                  onRefresh: () {
+                    ref.invalidate(_stagingIncomingVouchersProvider);
+                    ref.invalidate(_stagingOutgoingVouchersProvider);
+                    ref.invalidate(inventorySummaryProvider);
+                  },
+                ),
                 _TransactionsTab(search: _search),
               ],
             ),
@@ -155,7 +158,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
       ),
 
       // ── FAB ──────────────────────────────────────────────────────
-      floatingActionButton: isTransactionsTab || isStagingTab
+      floatingActionButton: isTransactionsTab
           ? null
           : FloatingActionButton.extended(
               onPressed: () => _showActionDialog(context),
@@ -163,11 +166,15 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
               label: Text(
                 _tabController.index == _tabMixer
                     ? 'حركة — الخلاط'
-                    : 'حركة — رئيسي',
+                    : _tabController.index == _tabStaging
+                        ? 'إجراء — المرحلي'
+                        : 'حركة — رئيسي',
               ),
               backgroundColor: _tabController.index == _tabMixer
                   ? Colors.teal
-                  : Colors.blue,
+                  : _tabController.index == _tabStaging
+                      ? Colors.deepOrange
+                      : Colors.blue,
             ),
     );
   }
@@ -175,7 +182,91 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
   // ── Action bottom sheet ──────────────────────────────────────────────────
 
   void _showActionDialog(BuildContext context) {
-    final isMain = _tabController.index == _tabMain;
+    final isMain    = _tabController.index == _tabMain;
+    final isMixer   = _tabController.index == _tabMixer;
+    final isStaging = _tabController.index == _tabStaging;
+
+    // ── Staging tab has its own dedicated sheet ───────────────────────────
+    if (isStaging) {
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+        builder: (_) => SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.swap_horiz, color: Colors.deepOrange, size: 20),
+                  const SizedBox(width: 8),
+                  const Text('إجراءات المخزن المرحلي',
+                      style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                          color: Colors.deepOrange)),
+                ],
+              ),
+              const Divider(),
+              // ── Banner explaining the 2-step flow ────────────────────
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                child: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.deepOrange.withOpacity(0.07),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.info_outline, color: Colors.deepOrange.shade300, size: 16),
+                      const SizedBox(width: 8),
+                      const Expanded(
+                        child: Text(
+                          'الرئيسي  →  المرحلي  →  الخلاط',
+                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 4),
+              ListTile(
+                leading: CircleAvatar(
+                    backgroundColor: Colors.blue,
+                    child: const Icon(Icons.arrow_downward, color: Colors.white)),
+                title: const Text('طلب تحويل من الرئيسي'),
+                subtitle: const Text('إنشاء سند نقل مواد من المخزن الرئيسي إلى المرحلي'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _openStagingVoucherDialog(context, 'main_to_staging');
+                },
+              ),
+              ListTile(
+                leading: CircleAvatar(
+                    backgroundColor: Colors.teal,
+                    child: const Icon(Icons.arrow_upward, color: Colors.white)),
+                title: const Text('إرسال للخلاط'),
+                subtitle: const Text('إنشاء سند نقل مواد من المرحلي إلى مخزن الخلاط'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _openStagingVoucherDialog(context, 'staging_to_mixer');
+                },
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      );
+      return;
+    }
+
+    // ── Main / Mixer sheet ────────────────────────────────────────────────
     final color = isMain ? Colors.blue : Colors.teal;
     final warehouseLabel = isMain ? 'المخزن الرئيسي' : 'مخزن الخلاط';
 
@@ -206,8 +297,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
               ListTile(
                 leading: CircleAvatar(
                     backgroundColor: Colors.green,
-                    child:
-                        const Icon(Icons.add_circle_outline, color: Colors.white)),
+                    child: const Icon(Icons.add_circle_outline, color: Colors.white)),
                 title: Text(isMain ? 'استلام وارد' : 'استلام من الرئيسي'),
                 subtitle: Text(isMain
                     ? 'إضافة مواد خام جديدة للمخزون'
@@ -249,8 +339,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
               ListTile(
                 leading: CircleAvatar(
                     backgroundColor: Colors.blue,
-                    child: const Icon(Icons.playlist_add_check,
-                        color: Colors.white)),
+                    child: const Icon(Icons.playlist_add_check, color: Colors.white)),
                 title: const Text('رصيد افتتاحي'),
                 subtitle: const Text('تسجيل الرصيد الافتتاحي لمادة'),
                 onTap: () {
@@ -259,29 +348,38 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
                       defaultWarehouse: _activeWarehouse);
                 },
               ),
-              if (isMain)
+              if (isMain) ...[
                 ListTile(
                   leading: CircleAvatar(
                       backgroundColor: Colors.purple,
-                      child: const Icon(Icons.compare_arrows,
-                          color: Colors.white)),
+                      child: const Icon(Icons.compare_arrows, color: Colors.white)),
                   title: const Text('تحويل للخلاط'),
-                  subtitle: const Text('نقل كمية من الرئيسي إلى الخلاط'),
+                  subtitle: const Text('نقل كمية مباشرة من الرئيسي إلى مخزن الخلاط'),
                   onTap: () {
                     Navigator.pop(context);
                     _showTransferDialog(context,
                         fromWarehouse: AppConstants.warehouseMain,
                         toWarehouse: AppConstants.warehouseMixer);
                   },
-                )
-              else
+                ),
+                ListTile(
+                  leading: CircleAvatar(
+                      backgroundColor: Colors.deepOrange,
+                      child: const Icon(Icons.swap_horiz, color: Colors.white)),
+                  title: const Text('تحويل للمرحلي'),
+                  subtitle: const Text('إنشاء سند نقل مواد من الرئيسي إلى المخزن المرحلي'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _openStagingVoucherDialog(context, 'main_to_staging');
+                  },
+                ),
+              ] else ...[
                 ListTile(
                   leading: CircleAvatar(
                       backgroundColor: Colors.indigo,
-                      child: const Icon(Icons.compare_arrows,
-                          color: Colors.white)),
+                      child: const Icon(Icons.compare_arrows, color: Colors.white)),
                   title: const Text('إرجاع للرئيسي'),
-                  subtitle: const Text('إرجاع كمية من الخلاط إلى الرئيسي'),
+                  subtitle: const Text('إرجاع كمية من مخزن الخلاط إلى الرئيسي'),
                   onTap: () {
                     Navigator.pop(context);
                     _showTransferDialog(context,
@@ -289,6 +387,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
                         toWarehouse: AppConstants.warehouseMain);
                   },
                 ),
+              ],
               ListTile(
                 leading: CircleAvatar(
                     backgroundColor: Colors.red.shade700,
@@ -304,6 +403,27 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  // ── Open staging voucher dialog (callable from page level) ───────────────
+
+  Future<void> _openStagingVoucherDialog(
+      BuildContext context, String transferType) async {
+    final authState = ref.read(authProvider);
+    final operatorName =
+        authState.user?.name ?? authState.user?.email ?? 'مدير';
+    await showDialog(
+      context: context,
+      builder: (_) => _StagingVoucherDialog(
+        transferType: transferType,
+        createdBy: operatorName,
+        onSaved: () {
+          ref.invalidate(_stagingIncomingVouchersProvider);
+          ref.invalidate(_stagingOutgoingVouchersProvider);
+          ref.invalidate(inventorySummaryProvider);
+        },
       ),
     );
   }
@@ -594,8 +714,13 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
       return;
     }
 
-    final fromLabel = fromWarehouse == 'main' ? 'المخزن الرئيسي' : 'مخزن الخلاط';
-    final toLabel = toWarehouse == 'main' ? 'المخزن الرئيسي' : 'مخزن الخلاط';
+    String _whLabel(String w) => w == 'main'
+        ? 'المخزن الرئيسي'
+        : w == 'mixer'
+            ? 'مخزن الخلاط'
+            : 'المخزن المرحلي';
+    final fromLabel = _whLabel(fromWarehouse);
+    final toLabel   = _whLabel(toWarehouse);
 
     InventorySummaryModel? selected = materials.first;
     final qtyCtrl = TextEditingController();
@@ -1432,7 +1557,8 @@ enum _StagingSection { inventory, incoming, outgoing }
 
 class _StagingTab extends ConsumerStatefulWidget {
   final VoidCallback onRefresh;
-  const _StagingTab({required this.onRefresh});
+  final String search;
+  const _StagingTab({required this.onRefresh, required this.search});
 
   @override
   ConsumerState<_StagingTab> createState() => _StagingTabState();
@@ -1501,52 +1627,26 @@ class _StagingTabState extends ConsumerState<_StagingTab> {
 
         // ── Section content ──────────────────────────────────────
         Expanded(
-          child: Stack(
+          child: IndexedStack(
+            index: _section.index,
             children: [
-              if (_section == _StagingSection.inventory)
-                _StagingInventorySection(onRefresh: _refresh),
-              if (_section == _StagingSection.incoming)
-                _StagingVouchersSection(
-                  provider: _stagingIncomingVouchersProvider,
-                  emptyLabel: 'لا توجد طلبات واردة من المخزن الرئيسي',
-                  emptyHint: 'اضغط + لإنشاء طلب تحويل من الرئيسي',
-                  role: 'incoming',
-                  operatorName: _operatorName,
-                  onAction: _refresh,
-                ),
-              if (_section == _StagingSection.outgoing)
-                _StagingVouchersSection(
-                  provider: _stagingOutgoingVouchersProvider,
-                  emptyLabel: 'لا توجد سندات صادرة للخلاط',
-                  emptyHint: 'اضغط + لإنشاء سند تحويل للخلاط',
-                  role: 'outgoing',
-                  operatorName: _operatorName,
-                  onAction: _refresh,
-                ),
-
-              // ── FAB ─────────────────────────────────────────────
-              if (_section != _StagingSection.inventory)
-                Positioned(
-                  bottom: 16,
-                  left: 16,
-                  child: FloatingActionButton.extended(
-                    heroTag: 'staging_fab',
-                    backgroundColor: Colors.deepOrange,
-                    icon: const Icon(Icons.add, color: Colors.white),
-                    label: Text(
-                      _section == _StagingSection.incoming
-                          ? 'طلب من الرئيسي'
-                          : 'إرسال للخلاط',
-                      style: const TextStyle(color: Colors.white),
-                    ),
-                    onPressed: () => _openVoucherDialog(
-                      context,
-                      _section == _StagingSection.incoming
-                          ? 'main_to_staging'
-                          : 'staging_to_mixer',
-                    ),
-                  ),
-                ),
+              _StagingInventorySection(search: widget.search, onRefresh: _refresh),
+              _StagingVouchersSection(
+                provider: _stagingIncomingVouchersProvider,
+                emptyLabel: 'لا توجد طلبات واردة من المخزن الرئيسي',
+                emptyHint: 'استخدم زر + لإنشاء طلب تحويل من الرئيسي',
+                role: 'incoming',
+                operatorName: _operatorName,
+                onAction: _refresh,
+              ),
+              _StagingVouchersSection(
+                provider: _stagingOutgoingVouchersProvider,
+                emptyLabel: 'لا توجد سندات صادرة للخلاط',
+                emptyHint: 'استخدم زر + لإنشاء سند تحويل للخلاط',
+                role: 'outgoing',
+                operatorName: _operatorName,
+                onAction: _refresh,
+              ),
             ],
           ),
         ),
@@ -1554,16 +1654,6 @@ class _StagingTabState extends ConsumerState<_StagingTab> {
     );
   }
 
-  Future<void> _openVoucherDialog(BuildContext context, String transferType) async {
-    await showDialog(
-      context: context,
-      builder: (_) => _StagingVoucherDialog(
-        transferType: transferType,
-        createdBy: _operatorName,
-        onSaved: _refresh,
-      ),
-    );
-  }
 }
 
 // ── Section chip ─────────────────────────────────────────────────────────────
@@ -1632,7 +1722,9 @@ class _StagingChip extends StatelessWidget {
 
 class _StagingInventorySection extends ConsumerWidget {
   final VoidCallback onRefresh;
-  const _StagingInventorySection({required this.onRefresh});
+  final String search;
+  const _StagingInventorySection(
+      {required this.onRefresh, required this.search});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -1645,88 +1737,70 @@ class _StagingInventorySection extends ConsumerWidget {
       ),
       data: (all) {
         final items = all.where((m) => m.warehouseType == 'staging').toList();
-        final total = items.fold(0.0, (s, m) => s + m.currentBalance);
-
-        if (items.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.inventory_2_outlined, size: 64,
-                    color: Colors.deepOrange.withOpacity(0.3)),
-                const SizedBox(height: 12),
-                const Text('لا توجد مواد في المخزن المرحلي',
-                    style: TextStyle(color: Colors.grey)),
-                const SizedBox(height: 6),
-                const Text('استخدم "وارد من الرئيسي" لطلب مواد',
-                    style: TextStyle(color: Colors.grey, fontSize: 12)),
-              ],
-            ),
-          );
-        }
+        final filtered = search.isEmpty
+            ? items
+            : items
+                .where((m) => m.materialName
+                    .toLowerCase()
+                    .contains(search.toLowerCase()))
+                .toList();
 
         return RefreshIndicator(
           onRefresh: () async => onRefresh(),
           child: CustomScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
             slivers: [
+              // ── Summary Panel (same style as main/mixer) ──────────
               SliverToBoxAdapter(
-                child: Container(
-                  margin: const EdgeInsets.all(12),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        Colors.deepOrange.withOpacity(0.85),
-                        Colors.deepOrange.withOpacity(0.65),
+                child: _WarehouseSummaryPanel(
+                  items: items,
+                  color: Colors.deepOrange,
+                  label: 'المخزن المرحلي',
+                ),
+              ),
+
+              // ── Empty state ────────────────────────────────────────
+              if (filtered.isEmpty)
+                SliverFillRemaining(
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.swap_horiz,
+                            size: 64,
+                            color: Colors.deepOrange.withOpacity(0.3)),
+                        const SizedBox(height: 12),
+                        Text(
+                          items.isEmpty
+                              ? 'لا توجد مواد في المخزن المرحلي بعد'
+                              : 'لا نتائج للبحث',
+                          style: TextStyle(
+                              color: Colors.grey[500], fontSize: 14),
+                        ),
+                        if (items.isEmpty) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            'اضغط + لإنشاء طلب تحويل من المخزن الرئيسي',
+                            style: TextStyle(
+                                color: Colors.grey[400], fontSize: 12),
+                          ),
+                        ],
                       ],
                     ),
-                    borderRadius: BorderRadius.circular(14),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.deepOrange.withOpacity(0.25),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
                   ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.swap_horiz, color: Colors.white, size: 22),
-                      const SizedBox(width: 10),
-                      Text('المخزن المرحلي',
-                          style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 15)),
-                      const Spacer(),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          '${total.toStringAsFixed(1)} كجم',
-                          style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14),
-                        ),
-                      ),
-                    ],
+                )
+              else
+                SliverPadding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  sliver: SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                      (_, i) => _SummaryCard(
+                          item: filtered[i], accentColor: Colors.deepOrange),
+                      childCount: filtered.length,
+                    ),
                   ),
                 ),
-              ),
-              SliverPadding(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                sliver: SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                    (_, i) => _SummaryCard(item: items[i], accentColor: Colors.deepOrange),
-                    childCount: items.length,
-                  ),
-                ),
-              ),
             ],
           ),
         );
