@@ -12,7 +12,8 @@ import 'warehouse_manager_page.dart'
 
 final _pendingTransfersProvider = FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
   final ds = ref.read(dataSourceProvider);
-  return ds.getPendingTransfers();
+  // فلتر على main_to_mixer فقط — سندات main_to_staging تُعالج في صفحة المخزن المرحلي
+  return ds.getPendingTransfers(transferType: 'main_to_mixer');
 });
 
 final _allTransfersProvider = FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
@@ -396,8 +397,8 @@ class _ReturnVoucherCard extends ConsumerWidget {
         title: const Text('تأكيد ترحيل المرتجع'),
         content: const Text(
           'سيتم:\n'
-          '• خصم الكميات من مخزن الخلطات\n'
-          '• إعادتها للمخزن الرئيسي\n\n'
+          '• خصم الكميات من المخزن المصدر (حسب نوع السند الأصلي)\n'
+          '• إعادتها للمخزن الأصلي\n\n'
           'هل تريد المتابعة؟',
         ),
         actions: [
@@ -565,7 +566,7 @@ class _ReturnVoucherDialogState extends ConsumerState<_ReturnVoucherDialog> {
                     SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'سند المرتجع يُعيد المواد من مخزن الخلطات للمخزن الرئيسي',
+                        'سند المرتجع يُعيد المواد إلى المخزن الذي أُرسلت منه حسب نوع السند الأصلي',
                         style: TextStyle(color: Colors.orange, fontSize: 12),
                       ),
                     ),

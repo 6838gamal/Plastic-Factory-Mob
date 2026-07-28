@@ -484,7 +484,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
                     SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'سيتم تصفير كل تفاصيل هذه المادة في المخزن الرئيسي ومخزن الخلاط معاً إلى صفر: الرصيد الحالي، إجمالي الوارد، إجمالي المنصرف، التحويلات، التسويات، والرصيد الافتتاحي. هذا الإجراء لا يمكن التراجع عنه.',
+                        'سيتم تصفير كل تفاصيل هذه المادة في المخزن الرئيسي والمخزن المرحلي ومخزن الخلاط معاً إلى صفر: الرصيد الحالي، إجمالي الوارد، إجمالي المنصرف، التحويلات، التسويات، والرصيد الافتتاحي. هذا الإجراء لا يمكن التراجع عنه.',
                         style: TextStyle(fontSize: 12, color: Colors.red),
                       ),
                     ),
@@ -522,7 +522,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
                   if (ctx.mounted) {
                     Navigator.pop(ctx);
                     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                        content: Text('تم تصفير كل بيانات ${selected!.materialName} في المخزن الرئيسي والخلاط'),
+                        content: Text('تم تصفير كل بيانات ${selected!.materialName} في المخازن الثلاثة (الرئيسي، المرحلي، الخلاط)'),
                         backgroundColor: Colors.red.shade700));
                   }
                 } catch (e) {
@@ -920,6 +920,8 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
                   items: const [
                     DropdownMenuItem(
                         value: 'main', child: Text('المخزن الرئيسي')),
+                    DropdownMenuItem(
+                        value: 'staging', child: Text('المخزن المرحلي')),
                     DropdownMenuItem(
                         value: 'mixer', child: Text('مخزن الخلاط')),
                   ],

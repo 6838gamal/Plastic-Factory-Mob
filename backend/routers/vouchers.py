@@ -857,6 +857,26 @@ async def post_return_voucher(voucher_id: str, performed_by: str = "admin"):
     if v["status"] == "posted":
         raise HTTPException(400, "السند مُرحَّل مسبقاً")
 
+    # Determine the source warehouse to reverse based on the original transfer type.
+    # main_to_staging → return deducts from staging back to main
+    # main_to_mixer (default) → return deducts from mixer back to main
+    # staging_to_mixer → return deducts from mixer back to staging
+    orig = await pool.fetchrow(
+        "SELECT transfer_type FROM transfer_vouchers WHERE id=$1::uuid",
+        v["original_voucher_id"]
+    ) if v.get("original_voucher_id") else None
+    orig_type = (orig["transfer_type"] if orig else None) or "main_to_mixer"
+
+    if orig_type == "main_to_staging":
+        src_wh, dst_wh = "staging", "main"
+        src_label, dst_label = "المخزن المرحلي", "المخزن الرئيسي"
+    elif orig_type == "staging_to_mixer":
+        src_wh, dst_wh = "mixer", "staging"
+        src_label, dst_label = "مخزن الخلطات", "المخزن المرحلي"
+    else:  # main_to_mixer (legacy / default)
+        src_wh, dst_wh = "mixer", "main"
+        src_label, dst_label = "مخزن الخلطات", "المخزن الرئيسي"
+
     items = await pool.fetch(
         "SELECT * FROM return_voucher_items WHERE voucher_id=$1::uuid", voucher_id
     )
@@ -866,51 +886,53 @@ async def post_return_voucher(voucher_id: str, performed_by: str = "admin"):
             continue
         qty = float(item["quantity"])
 
-        # Deduct from mixer
-        mix_inv = await pool.fetchrow(
-            "SELECT id, balance FROM inventory WHERE material_id=$1::uuid AND warehouse_type='mixer'",
-            mat_id
+        # Deduct from source warehouse
+        src_inv = await pool.fetchrow(
+            "SELECT id, balance FROM inventory WHERE material_id=$1::uuid AND warehouse_type=$2",
+            mat_id, src_wh
         )
-        mix_before = float(mix_inv["balance"]) if mix_inv else 0.0
-        mix_after = max(0, mix_before - qty)
-        if mix_inv:
+        src_before = float(src_inv["balance"]) if src_inv else 0.0
+        src_after = max(0, src_before - qty)
+        if src_inv:
             await pool.execute(
                 "UPDATE inventory SET balance=$1, updated_at=NOW() WHERE id=$2",
-                mix_after, mix_inv["id"]
+                src_after, src_inv["id"]
             )
         await pool.execute(
             """INSERT INTO inventory_transactions
                  (material_id, warehouse_type, transaction_type, quantity,
                   balance_before, balance_after, transaction_ref, created_by, notes)
-               VALUES ($1::uuid,'mixer','transfer_out',$2,$3,$4,$5,$6,$7)""",
-            mat_id, qty, mix_before, mix_after,
-            v["voucher_number"], performed_by, f"مرتجع للمخزن الرئيسي — {v['voucher_number']}"
+               VALUES ($1::uuid,$2,'transfer_out',$3,$4,$5,$6,$7,$8)""",
+            mat_id, src_wh, qty, src_before, src_after,
+            v["voucher_number"], performed_by,
+            f"مرتجع إلى {dst_label} — {v['voucher_number']}"
         )
 
-        # Add back to main
-        main_inv = await pool.fetchrow(
-            "SELECT id, balance FROM inventory WHERE material_id=$1::uuid AND warehouse_type='main'",
-            mat_id
+        # Add back to destination warehouse
+        dst_inv = await pool.fetchrow(
+            "SELECT id, balance FROM inventory WHERE material_id=$1::uuid AND warehouse_type=$2",
+            mat_id, dst_wh
         )
-        main_before = float(main_inv["balance"]) if main_inv else 0.0
-        main_after = main_before + qty
-        if main_inv:
+        dst_before = float(dst_inv["balance"]) if dst_inv else 0.0
+        dst_after = dst_before + qty
+        if dst_inv:
             await pool.execute(
                 "UPDATE inventory SET balance=$1, updated_at=NOW() WHERE id=$2",
-                main_after, main_inv["id"]
+                dst_after, dst_inv["id"]
             )
         else:
             await pool.execute(
-                "INSERT INTO inventory (material_id, warehouse_type, balance) VALUES ($1::uuid,'main',$2)",
-                mat_id, main_after
+                "INSERT INTO inventory (material_id, warehouse_type, balance) VALUES ($1::uuid,$2,$3)",
+                mat_id, dst_wh, dst_after
             )
         await pool.execute(
             """INSERT INTO inventory_transactions
                  (material_id, warehouse_type, transaction_type, quantity,
                   balance_before, balance_after, transaction_ref, created_by, notes)
-               VALUES ($1::uuid,'main','transfer_in',$2,$3,$4,$5,$6,$7)""",
-            mat_id, qty, main_before, main_after,
-            v["voucher_number"], performed_by, f"مرتجع من الخلاط — {v['voucher_number']}"
+               VALUES ($1::uuid,$2,'transfer_in',$3,$4,$5,$6,$7,$8)""",
+            mat_id, dst_wh, qty, dst_before, dst_after,
+            v["voucher_number"], performed_by,
+            f"مرتجع من {src_label} — {v['voucher_number']}"
         )
 
     await pool.execute(
@@ -918,8 +940,11 @@ async def post_return_voucher(voucher_id: str, performed_by: str = "admin"):
         voucher_id
     )
     await _write_audit(pool, "post", "return_voucher", voucher_id, performed_by,
-                       {"items": len(items)})
-    return {"status": "posted", "items_processed": len(items)}
+                       {"items": len(items), "original_transfer_type": orig_type,
+                        "src_warehouse": src_wh, "dst_warehouse": dst_wh})
+    return {"status": "posted", "items_processed": len(items),
+            "original_transfer_type": orig_type,
+            "reversed_from": src_wh, "reversed_to": dst_wh}
 
 
 # ═══════════════════════════════════════════════════════════════════

@@ -297,7 +297,7 @@ async def reset_material_both(body: ResetMaterialBothWarehousesRequest):
     a single DB transaction — so both succeed or both fail together."""
     import json as _json
     pool = await get_pool()
-    warehouses = ("main", "mixer")
+    warehouses = ("main", "mixer", "staging")
 
     rm = await pool.fetchrow("SELECT name FROM raw_materials WHERE id=$1::uuid", body.material_id)
     material_name = rm["name"] if rm else body.material_id
