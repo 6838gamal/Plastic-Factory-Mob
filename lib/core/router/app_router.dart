@@ -28,6 +28,7 @@ import '../../presentation/pages/warehouse/warehouse_shell_page.dart';
 import '../../presentation/pages/warehouse/warehouse_home_page.dart';
 import '../../presentation/pages/production_manager/production_manager_shell_page.dart';
 import '../../presentation/pages/production_manager/production_manager_home_page.dart';
+import '../../presentation/pages/production_manager/staging_warehouse_page.dart';
 import '../../presentation/providers/auth_provider.dart';
 
 /// A ChangeNotifier that fires whenever auth state changes,

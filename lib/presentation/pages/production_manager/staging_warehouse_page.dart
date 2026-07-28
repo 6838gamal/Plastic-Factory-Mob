@@ -65,7 +65,7 @@ class _StagingWarehousePageState extends ConsumerState<StagingWarehousePage>
 
   String get _operatorName {
     final auth = ref.read(authProvider);
-    return auth.userName ?? 'مدير الإنتاج';
+    return auth.user?.name ?? auth.user?.email ?? 'مدير الإنتاج';
   }
 
   @override
@@ -486,7 +486,7 @@ class _VoucherCard extends ConsumerWidget {
                         }
                       },
                     ),
-                  // Confirm receipt (only for incoming tab with pending status)
+                  // Confirm receipt — incoming: main→staging
                   if (role == 'incoming' && voucher.isPending)
                     ElevatedButton.icon(
                       icon: const Icon(Icons.check_circle, size: 16),
@@ -504,6 +504,37 @@ class _VoucherCard extends ConsumerWidget {
                                   const SnackBar(
                                       content: Text('تم تأكيد الاستلام ونقل المواد للمخزن المرحلي'),
                                       backgroundColor: Colors.green));
+                            }
+                          } catch (e) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('خطأ: $e'), backgroundColor: Colors.red));
+                            }
+                          }
+                        }
+                      },
+                    ),
+                  // Confirm receipt — outgoing: staging→mixer
+                  if (role == 'outgoing' && voucher.isPending)
+                    ElevatedButton.icon(
+                      icon: const Icon(Icons.check_circle, size: 16),
+                      label: const Text('تأكيد استلام الخلاط'),
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
+                      onPressed: () async {
+                        final ok = await _confirm(
+                          context,
+                          'تأكيد استلام مخزن الخلاط',
+                          'هل تأكد استلام المواد من المخزن المرحلي؟\nسيتم نقل المواد لمخزن الخلطات.',
+                        );
+                        if (ok) {
+                          try {
+                            await ds.confirmTransferVoucher(voucher.id!, {'confirmed_by': operatorName});
+                            onAction();
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                      content: Text('تم تأكيد الاستلام ونقل المواد لمخزن الخلطات'),
+                                      backgroundColor: Colors.teal));
                             }
                           } catch (e) {
                             if (context.mounted) {
