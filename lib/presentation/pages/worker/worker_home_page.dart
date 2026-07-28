@@ -9,6 +9,7 @@ import 'batch_entry_page.dart';
 import 'machine_entry_page.dart';
 import 'shift_handover_page.dart';
 import '../../widgets/warehouse/warehouse_login_dialog.dart';
+import '../../widgets/production/production_manager_login_dialog.dart';
 
 class WorkerHomePage extends ConsumerStatefulWidget {
   const WorkerHomePage({super.key});
@@ -197,6 +198,30 @@ class _WorkerDrawer extends ConsumerWidget {
                 context: context,
                 barrierDismissible: false,
                 builder: (_) => const WarehouseLoginDialog(),
+              );
+            },
+          ),
+          // ── مدير الإنتاج ───────────────────────────────────────
+          ListTile(
+            leading: Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: Colors.deepOrange.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.engineering, color: Colors.deepOrange, size: 22),
+            ),
+            title: const Text(
+              'لوحة مدير الإنتاج',
+              style: TextStyle(fontWeight: FontWeight.w600, color: Colors.deepOrange),
+            ),
+            subtitle: const Text('إدارة المخزون والمواد الخام', style: TextStyle(fontSize: 11)),
+            onTap: () {
+              Navigator.pop(context);
+              showDialog(
+                context: context,
+                barrierDismissible: false,
+                builder: (_) => const ProductionManagerLoginDialog(),
               );
             },
           ),

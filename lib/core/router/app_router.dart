@@ -26,6 +26,8 @@ import '../../presentation/pages/admin/production_standards/production_standards
 import '../../presentation/pages/admin/waste_monitoring/waste_monitoring_page.dart';
 import '../../presentation/pages/warehouse/warehouse_shell_page.dart';
 import '../../presentation/pages/warehouse/warehouse_home_page.dart';
+import '../../presentation/pages/production_manager/production_manager_shell_page.dart';
+import '../../presentation/pages/production_manager/production_manager_home_page.dart';
 import '../../presentation/providers/auth_provider.dart';
 
 /// A ChangeNotifier that fires whenever auth state changes,
@@ -51,22 +53,36 @@ final routerProvider = Provider<GoRouter>((ref) {
       // Never redirect away from the splash screen — it handles its own nav
       if (path.startsWith('/splash')) return null;
 
-      final isAdmin = ref.read(authProvider).isAdmin;
-      final isWarehouseManager = ref.read(authProvider).isWarehouseManager;
+      final auth = ref.read(authProvider);
+      final isAdmin = auth.isAdmin;
+      final isWarehouseManager = auth.isWarehouseManager;
+      final isProductionManager = auth.isProductionManager;
       final onAdmin = path.startsWith('/admin');
       final onWarehouse = path.startsWith('/warehouse');
+      final onProductionManager = path.startsWith('/production-manager');
 
-      // Protect admin routes — warehouse managers go to their own section
+      // Protect admin routes
       if (onAdmin && !isAdmin) {
-        return isWarehouseManager ? '/warehouse' : '/worker';
+        if (isWarehouseManager) return '/warehouse';
+        if (isProductionManager) return '/production-manager';
+        return '/worker';
       }
-      // Protect warehouse routes — admins go to admin section
+      // Protect warehouse routes
       if (onWarehouse && !isWarehouseManager) {
-        return isAdmin ? '/admin' : '/worker';
+        if (isAdmin) return '/admin';
+        if (isProductionManager) return '/production-manager';
+        return '/worker';
+      }
+      // Protect production manager routes
+      if (onProductionManager && !isProductionManager) {
+        if (isAdmin) return '/admin';
+        if (isWarehouseManager) return '/warehouse';
+        return '/worker';
       }
       // Redirect authenticated users away from /worker
       if (isAdmin && !onAdmin) return '/admin';
       if (isWarehouseManager && !onWarehouse) return '/warehouse';
+      if (isProductionManager && !onProductionManager) return '/production-manager';
 
       return null;
     },
@@ -102,13 +118,46 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
         ],
       ),
+      // ── Production manager section ───────────────────────────────────────
+      ShellRoute(
+        builder: (context, state, child) =>
+            ProductionManagerShellPage(child: child),
+        routes: [
+          GoRoute(
+            path: '/production-manager',
+            builder: (_, __) => const ProductionManagerHomePage(),
+          ),
+          GoRoute(
+            path: '/production-manager/inventory',
+            builder: (_, __) => const InventoryPage(),
+          ),
+          GoRoute(
+            path: '/production-manager/materials',
+            builder: (_, __) => const MaterialsPage(),
+          ),
+          GoRoute(
+            path: '/production-manager/opening-balances',
+            builder: (_, __) => const OpeningBalancesPage(),
+          ),
+          GoRoute(
+            path: '/production-manager/stock-take',
+            builder: (_, __) => const StockTakePage(),
+          ),
+          GoRoute(
+            path: '/production-manager/warehouse-manager',
+            builder: (_, __) => const WarehouseManagerPage(),
+          ),
+          GoRoute(
+            path: '/production-manager/mixing-warehouse',
+            builder: (_, __) => const MixingWarehousePage(),
+          ),
+        ],
+      ),
       // ── Admin section ────────────────────────────────────────────────────
       ShellRoute(
         builder: (context, state, child) => AdminShellPage(child: child),
         routes: [
           GoRoute(path: '/admin', builder: (_, __) => const AdminDashboardPage()),
-          GoRoute(path: '/admin/inventory', builder: (_, __) => const InventoryPage()),
-          GoRoute(path: '/admin/materials', builder: (_, __) => const MaterialsPage()),
           GoRoute(path: '/admin/workers', builder: (_, __) => const WorkersPage()),
           GoRoute(path: '/admin/machines', builder: (_, __) => const MachinesPage()),
           GoRoute(path: '/admin/batches', builder: (_, __) => const BatchesAdminPage()),
@@ -117,12 +166,8 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(path: '/admin/audit', builder: (_, __) => const AuditLogPage()),
           GoRoute(path: '/admin/reports', builder: (_, __) => const ReportsPage()),
           GoRoute(path: '/admin/settings', builder: (_, __) => const SettingsPage()),
-          GoRoute(path: '/admin/stock-take', builder: (_, __) => const StockTakePage()),
           GoRoute(path: '/admin/recipes', builder: (_, __) => const RecipeManagementPage()),
           GoRoute(path: '/admin/shift-handover', builder: (_, __) => const ShiftHandoversAdminPage()),
-          GoRoute(path: '/admin/opening-balances', builder: (_, __) => const OpeningBalancesPage()),
-          GoRoute(path: '/admin/warehouse-manager', builder: (_, __) => const WarehouseManagerPage()),
-          GoRoute(path: '/admin/mixing-warehouse', builder: (_, __) => const MixingWarehousePage()),
           GoRoute(
             path: '/admin/suppliers',
             builder: (_, __) => Scaffold(

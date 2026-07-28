@@ -18,6 +18,7 @@ class AuthState {
   final AppUser? user;
   final bool isAdmin;
   final bool isWarehouseManager;
+  final bool isProductionManager;
   final bool isLoading;
   final String? error;
 
@@ -25,6 +26,7 @@ class AuthState {
     this.user,
     this.isAdmin = false,
     this.isWarehouseManager = false,
+    this.isProductionManager = false,
     this.isLoading = false,
     this.error,
   });
@@ -33,6 +35,7 @@ class AuthState {
     AppUser? user,
     bool? isAdmin,
     bool? isWarehouseManager,
+    bool? isProductionManager,
     bool? isLoading,
     String? error,
   }) =>
@@ -40,6 +43,7 @@ class AuthState {
         user: user ?? this.user,
         isAdmin: isAdmin ?? this.isAdmin,
         isWarehouseManager: isWarehouseManager ?? this.isWarehouseManager,
+        isProductionManager: isProductionManager ?? this.isProductionManager,
         isLoading: isLoading ?? this.isLoading,
         error: error,
       );
@@ -69,6 +73,7 @@ class AuthNotifier extends Notifier<AuthState> {
         user: user,
         isAdmin: role == 'admin',
         isWarehouseManager: role == 'warehouse_manager',
+        isProductionManager: role == 'production_manager',
         isLoading: false,
       );
       return true;
