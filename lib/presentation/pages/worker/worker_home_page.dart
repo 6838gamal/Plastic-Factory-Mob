@@ -9,7 +9,7 @@ import '../../widgets/common/offline_banner.dart';
 import 'batch_entry_page.dart';
 import 'machine_entry_page.dart';
 import 'shift_handover_page.dart';
-import '../warehouse/raw_material_receiving_page.dart';
+import 'raw_material_receiving_page.dart';
 import '../../widgets/warehouse/warehouse_login_dialog.dart';
 import '../../widgets/production/production_manager_login_dialog.dart';
 
