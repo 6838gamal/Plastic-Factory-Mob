@@ -8,6 +8,7 @@ import '../../../data/models/inventory_summary_model.dart';
 import '../../../data/models/voucher_models.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/reference_data_provider.dart';
+import '../production_manager/mixer_warehouse_page.dart';
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Providers خاصة بشاشة استلام المواد الخام
@@ -31,7 +32,7 @@ final _receivingOutgoingProvider = FutureProvider.autoDispose<List<TransferVouch
 });
 
 // ──────────────────────────────────────────────────────────────────────────────
-// شاشة استلام المواد الخام (الوسيطة)
+// شاشة استلام المواد الخام
 // ──────────────────────────────────────────────────────────────────────────────
 
 class RawMaterialReceivingPage extends ConsumerStatefulWidget {
@@ -70,12 +71,12 @@ class _RawMaterialReceivingPageState extends ConsumerState<RawMaterialReceivingP
     return auth.user?.name ?? auth.user?.email ?? 'مدير الاستلام';
   }
 
-  // دالة التنقل إلى مخزن الخلاط (الحلقة الأخيرة)
+  // دالة التنقل إلى مخزن الخلاط - بدون const
   void _navigateToMixerWarehouse(BuildContext context) {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => const MixerWarehousePage(),
+        builder: (context) => MixerWarehousePage(), // ✅ بدون const
       ),
     );
   }
@@ -99,6 +100,7 @@ class _RawMaterialReceivingPageState extends ConsumerState<RawMaterialReceivingP
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
+          // زر التنقل إلى مخزن الخلاط - بدون const
           IconButton(
             icon: const Icon(Icons.shuffle),
             onPressed: () => _navigateToMixerWarehouse(context),
