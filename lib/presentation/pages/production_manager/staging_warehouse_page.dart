@@ -71,12 +71,47 @@ class _StagingWarehousePageState extends ConsumerState<StagingWarehousePage>
     return auth.user?.name ?? auth.user?.email ?? 'مدير الإنتاج';
   }
 
-  // دالة التنقل إلى شاشة استلام المواد الخام
   void _navigateToReceivingWarehouse(BuildContext context) {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => RawMaterialReceivingPage(), // ✅ بدون const
+        builder: (context) => RawMaterialReceivingPage(),
+      ),
+    );
+  }
+
+  // دالة مساعدة لعرض رسائل الخطأ
+  void _showErrorSnackBar(BuildContext context, String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.error_outline, color: Colors.white),
+            const SizedBox(width: 8),
+            Expanded(child: Text(message)),
+          ],
+        ),
+        backgroundColor: Colors.red.shade700,
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 4),
+      ),
+    );
+  }
+
+  // دالة مساعدة لعرض رسائل النجاح
+  void _showSuccessSnackBar(BuildContext context, String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.check_circle_outline, color: Colors.white),
+            const SizedBox(width: 8),
+            Expanded(child: Text(message)),
+          ],
+        ),
+        backgroundColor: Colors.green.shade700,
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 3),
       ),
     );
   }
@@ -96,7 +131,6 @@ class _StagingWarehousePageState extends ConsumerState<StagingWarehousePage>
         foregroundColor: Colors.white,
         title: const Text('المخزن المرحلي'),
         actions: [
-          // زر التنقل إلى شاشة استلام المواد الخام
           IconButton(
             icon: const Icon(Icons.assignment_outlined),
             onPressed: () => _navigateToReceivingWarehouse(context),
@@ -130,8 +164,18 @@ class _StagingWarehousePageState extends ConsumerState<StagingWarehousePage>
         controller: _tabs,
         children: [
           _InventoryTab(onRefresh: _refresh),
-          _IncomingTab(operatorName: _operatorName, onRefresh: _refresh),
-          _OutgoingTab(operatorName: _operatorName, onRefresh: _refresh),
+          _IncomingTab(
+            operatorName: _operatorName,
+            onRefresh: _refresh,
+            showError: _showErrorSnackBar,
+            showSuccess: _showSuccessSnackBar,
+          ),
+          _OutgoingTab(
+            operatorName: _operatorName,
+            onRefresh: _refresh,
+            showError: _showErrorSnackBar,
+            showSuccess: _showSuccessSnackBar,
+          ),
         ],
       ),
       floatingActionButton: _tabs.index == 1
@@ -159,6 +203,8 @@ class _StagingWarehousePageState extends ConsumerState<StagingWarehousePage>
         transferType: transferType,
         createdBy: _operatorName,
         onSaved: _refresh,
+        showError: _showErrorSnackBar,
+        showSuccess: _showSuccessSnackBar,
       ),
     );
   }
@@ -177,7 +223,23 @@ class _InventoryTab extends ConsumerWidget {
     final async = ref.watch(_stagingInventoryProvider);
     return async.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(child: Text('خطأ: $e')),
+      error: (e, _) => Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.error_outline, size: 48, color: Colors.red),
+            const SizedBox(height: 12),
+            Text('حدث خطأ أثناء تحميل المخزون', style: TextStyle(color: Colors.red)),
+            const SizedBox(height: 8),
+            Text(e.toString(), style: TextStyle(color: Colors.grey, fontSize: 12)),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: onRefresh,
+              child: const Text('إعادة المحاولة'),
+            ),
+          ],
+        ),
+      ),
       data: (items) {
         if (items.isEmpty) {
           return const Center(
@@ -197,12 +259,59 @@ class _InventoryTab extends ConsumerWidget {
         final total = items.fold(0.0, (s, m) => s + m.currentBalance);
         return Column(
           children: [
-            _buildSummaryCard('إجمالي المخزون المرحلي', total, Colors.deepOrange),
+            Container(
+              margin: const EdgeInsets.all(12),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.deepOrange.shade50,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.deepOrange.shade100),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.warehouse, color: Colors.deepOrange),
+                  const SizedBox(width: 8),
+                  Text('إجمالي المخزون المرحلي',
+                      style: TextStyle(color: Colors.deepOrange.shade800, fontWeight: FontWeight.bold)),
+                  const Spacer(),
+                  Text(
+                    '${total.toStringAsFixed(1)} كجم',
+                    style: TextStyle(color: Colors.deepOrange.shade800, fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                ],
+              ),
+            ),
             Expanded(
               child: ListView.builder(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 itemCount: items.length,
-                itemBuilder: (ctx, i) => _buildMaterialCard(items[i], Colors.deepOrange),
+                itemBuilder: (ctx, i) {
+                  final m = items[i];
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    child: ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: Colors.deepOrange.shade50,
+                        child: Icon(Icons.science_outlined, color: Colors.deepOrange.shade700),
+                      ),
+                      title: Text(m.materialName, style: const TextStyle(fontWeight: FontWeight.w600)),
+                      trailing: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            '${m.currentBalance.toStringAsFixed(2)} ${m.unit}',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                              color: m.currentBalance <= 0 ? Colors.red : Colors.deepOrange.shade700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
               ),
             ),
           ],
@@ -219,14 +328,38 @@ class _InventoryTab extends ConsumerWidget {
 class _IncomingTab extends ConsumerWidget {
   final String operatorName;
   final VoidCallback onRefresh;
-  const _IncomingTab({required this.operatorName, required this.onRefresh});
+  final void Function(BuildContext, String) showError;
+  final void Function(BuildContext, String) showSuccess;
+
+  const _IncomingTab({
+    required this.operatorName,
+    required this.onRefresh,
+    required this.showError,
+    required this.showSuccess,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final async = ref.watch(_stagingIncomingProvider);
     return async.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(child: Text('خطأ: $e')),
+      error: (e, _) => Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.error_outline, size: 48, color: Colors.red),
+            const SizedBox(height: 12),
+            Text('حدث خطأ أثناء تحميل الطلبات الواردة', style: TextStyle(color: Colors.red)),
+            const SizedBox(height: 8),
+            Text(e.toString(), style: TextStyle(color: Colors.grey, fontSize: 12)),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: onRefresh,
+              child: const Text('إعادة المحاولة'),
+            ),
+          ],
+        ),
+      ),
       data: (vouchers) {
         if (vouchers.isEmpty) {
           return const Center(
@@ -253,6 +386,8 @@ class _IncomingTab extends ConsumerWidget {
               operatorName: operatorName,
               onAction: onRefresh,
               role: 'incoming',
+              showError: showError,
+              showSuccess: showSuccess,
             ),
           ),
         );
@@ -268,14 +403,38 @@ class _IncomingTab extends ConsumerWidget {
 class _OutgoingTab extends ConsumerWidget {
   final String operatorName;
   final VoidCallback onRefresh;
-  const _OutgoingTab({required this.operatorName, required this.onRefresh});
+  final void Function(BuildContext, String) showError;
+  final void Function(BuildContext, String) showSuccess;
+
+  const _OutgoingTab({
+    required this.operatorName,
+    required this.onRefresh,
+    required this.showError,
+    required this.showSuccess,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final async = ref.watch(_stagingOutgoingProvider);
     return async.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(child: Text('خطأ: $e')),
+      error: (e, _) => Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.error_outline, size: 48, color: Colors.red),
+            const SizedBox(height: 12),
+            Text('حدث خطأ أثناء تحميل السندات الصادرة', style: TextStyle(color: Colors.red)),
+            const SizedBox(height: 8),
+            Text(e.toString(), style: TextStyle(color: Colors.grey, fontSize: 12)),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: onRefresh,
+              child: const Text('إعادة المحاولة'),
+            ),
+          ],
+        ),
+      ),
       data: (vouchers) {
         if (vouchers.isEmpty) {
           return const Center(
@@ -302,6 +461,8 @@ class _OutgoingTab extends ConsumerWidget {
               operatorName: operatorName,
               onAction: onRefresh,
               role: 'outgoing',
+              showError: showError,
+              showSuccess: showSuccess,
             ),
           ),
         );
@@ -319,12 +480,16 @@ class _VoucherCard extends ConsumerWidget {
   final String operatorName;
   final VoidCallback onAction;
   final String role; // 'incoming' or 'outgoing'
+  final void Function(BuildContext, String) showError;
+  final void Function(BuildContext, String) showSuccess;
 
   const _VoucherCard({
     required this.voucher,
     required this.operatorName,
     required this.onAction,
     required this.role,
+    required this.showError,
+    required this.showSuccess,
   });
 
   Color get _statusColor {
@@ -433,17 +598,18 @@ class _VoucherCard extends ConsumerWidget {
                     icon: const Icon(Icons.cancel_outlined, color: Colors.red, size: 16),
                     label: const Text('إلغاء', style: TextStyle(color: Colors.red)),
                     onPressed: () async {
-                      final ok = await _confirm(context, 'تأكيد الإلغاء',
-                          'هل تريد إلغاء سند ${voucher.voucherNumber}؟');
+                      final ok = await _confirmDialog(
+                        context,
+                        'تأكيد الإلغاء',
+                        'هل تريد إلغاء سند ${voucher.voucherNumber}؟',
+                      );
                       if (ok) {
                         try {
                           await ds.cancelTransferVoucher(voucher.id!);
+                          showSuccess(context, 'تم إلغاء السند بنجاح');
                           onAction();
                         } catch (e) {
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('خطأ: $e'), backgroundColor: Colors.red));
-                          }
+                          showError(context, 'فشل إلغاء السند: ${e.toString()}');
                         }
                       }
                     },
@@ -458,12 +624,10 @@ class _VoucherCard extends ConsumerWidget {
                       onPressed: () async {
                         try {
                           await ds.submitTransferVoucher(voucher.id!);
+                          showSuccess(context, 'تم إرسال السند للمراجعة');
                           onAction();
                         } catch (e) {
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('خطأ: $e'), backgroundColor: Colors.red));
-                          }
+                          showError(context, 'فشل إرسال السند: ${e.toString()}');
                         }
                       },
                     ),
@@ -474,23 +638,20 @@ class _VoucherCard extends ConsumerWidget {
                       label: const Text('تأكيد الاستلام للمرحلي'),
                       style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
                       onPressed: () async {
-                        final ok = await _confirm(context, 'تأكيد الاستلام',
-                            'هل تأكد استلام المواد من المخزن الرئيسي؟\nسيتم نقل المواد للمخزن المرحلي.');
+                        final ok = await _confirmDialog(
+                          context,
+                          'تأكيد الاستلام',
+                          'هل تأكد استلام المواد من المخزن الرئيسي؟\nسيتم نقل المواد للمخزن المرحلي.',
+                        );
                         if (ok) {
                           try {
-                            await ds.confirmTransferVoucher(voucher.id!, {'confirmed_by': operatorName});
+                            await ds.confirmTransferVoucher(voucher.id!, {
+                              'confirmed_by': operatorName,
+                            });
+                            showSuccess(context, '✅ تم تأكيد الاستلام ونقل المواد للمخزن المرحلي');
                             onAction();
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                      content: Text('تم تأكيد الاستلام ونقل المواد للمخزن المرحلي'),
-                                      backgroundColor: Colors.green));
-                            }
                           } catch (e) {
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('خطأ: $e'), backgroundColor: Colors.red));
-                            }
+                            showError(context, '❌ فشل تأكيد الاستلام: ${e.toString()}');
                           }
                         }
                       },
@@ -502,26 +663,20 @@ class _VoucherCard extends ConsumerWidget {
                       label: const Text('تأكيد استلام الخلاط'),
                       style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
                       onPressed: () async {
-                        final ok = await _confirm(
+                        final ok = await _confirmDialog(
                           context,
                           'تأكيد استلام مخزن الخلاط',
                           'هل تأكد استلام المواد من المخزن المرحلي؟\nسيتم نقل المواد لمخزن الخلطات.',
                         );
                         if (ok) {
                           try {
-                            await ds.confirmTransferVoucher(voucher.id!, {'confirmed_by': operatorName});
+                            await ds.confirmTransferVoucher(voucher.id!, {
+                              'confirmed_by': operatorName,
+                            });
+                            showSuccess(context, '✅ تم تأكيد الاستلام ونقل المواد لمخزن الخلطات');
                             onAction();
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                      content: Text('تم تأكيد الاستلام ونقل المواد لمخزن الخلطات'),
-                                      backgroundColor: Colors.teal));
-                            }
                           } catch (e) {
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('خطأ: $e'), backgroundColor: Colors.red));
-                            }
+                            showError(context, '❌ فشل تأكيد الاستلام: ${e.toString()}');
                           }
                         }
                       },
@@ -548,17 +703,24 @@ class _VoucherCard extends ConsumerWidget {
     );
   }
 
-  Future<bool> _confirm(BuildContext context, String title, String msg) async {
+  Future<bool> _confirmDialog(BuildContext context, String title, String msg) async {
     final res = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(title),
         content: Text(msg),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('لا')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('لا'),
+          ),
           ElevatedButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('نعم، تأكيد')),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.deepOrange,
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('نعم، تأكيد'),
+          ),
         ],
       ),
     );
@@ -574,11 +736,15 @@ class _StagingVoucherDialog extends ConsumerStatefulWidget {
   final String transferType; // main_to_staging | staging_to_mixer
   final String? createdBy;
   final VoidCallback onSaved;
+  final void Function(BuildContext, String) showError;
+  final void Function(BuildContext, String) showSuccess;
 
   const _StagingVoucherDialog({
     required this.transferType,
     required this.onSaved,
     this.createdBy,
+    required this.showError,
+    required this.showSuccess,
   });
 
   @override
@@ -614,27 +780,25 @@ class _StagingVoucherDialogState extends ConsumerState<_StagingVoucherDialog> {
 
   Future<void> _save() async {
     if (_items.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('أضف بنداً واحداً على الأقل'), backgroundColor: Colors.red),
-      );
+      widget.showError(context, '⚠️ أضف بنداً واحداً على الأقل');
       return;
     }
+
     final incomplete = <int>[
       for (var i = 0; i < _items.length; i++)
         if (_items[i].name.isEmpty || _items[i].qty <= 0) i + 1,
     ];
+
     if (incomplete.isNotEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('أكمل بيانات البند رقم ${incomplete.join("، ")} قبل الحفظ'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      widget.showError(context, '⚠️ أكمل بيانات البند رقم ${incomplete.join("، ")} قبل الحفظ');
       return;
     }
+
     setState(() => _loading = true);
+
     try {
       final ds = ref.read(dataSourceProvider);
+
       await ds.createTransferVoucher({
         'notes': _notesCtrl.text.trim(),
         'created_by': widget.createdBy ?? 'مدير الإنتاج',
@@ -648,12 +812,15 @@ class _StagingVoucherDialogState extends ConsumerState<_StagingVoucherDialog> {
                 })
             .toList(),
       });
-      if (mounted) Navigator.pop(context);
-      widget.onSaved();
+
+      if (mounted) {
+        Navigator.pop(context);
+        widget.showSuccess(context, '✅ تم إنشاء السند بنجاح');
+        widget.onSaved();
+      }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('خطأ: $e'), backgroundColor: Colors.red));
+        widget.showError(context, '❌ فشل إنشاء السند: ${e.toString()}');
       }
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -701,7 +868,10 @@ class _StagingVoucherDialogState extends ConsumerState<_StagingVoucherDialog> {
               TextField(
                 controller: _notesCtrl,
                 maxLines: 2,
-                decoration: const InputDecoration(labelText: 'ملاحظات (اختياري)'),
+                decoration: const InputDecoration(
+                  labelText: 'ملاحظات (اختياري)',
+                  border: OutlineInputBorder(),
+                ),
               ),
               const SizedBox(height: 16),
               Row(
@@ -736,13 +906,28 @@ class _StagingVoucherDialogState extends ConsumerState<_StagingVoucherDialog> {
         ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('إلغاء')),
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('إلغاء'),
+        ),
         ElevatedButton(
-          style: ElevatedButton.styleFrom(backgroundColor: Colors.deepOrange),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.deepOrange,
+          ),
           onPressed: _loading ? null : _save,
           child: _loading
-              ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-              : const Text('حفظ', style: TextStyle(color: Colors.white)),
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
+              : const Text(
+                  'حفظ',
+                  style: TextStyle(color: Colors.white),
+                ),
         ),
       ],
     );
@@ -852,14 +1037,20 @@ class _VItemRow extends StatelessWidget {
               Text('البند $itemNo',
                   style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.deepOrange)),
               const Spacer(),
-              InkWell(onTap: onRemove, child: const Icon(Icons.remove_circle_outline, color: Colors.red, size: 20)),
+              InkWell(
+                onTap: onRemove,
+                child: const Icon(Icons.remove_circle_outline, color: Colors.red, size: 20),
+              ),
             ],
           ),
           const SizedBox(height: 8),
           // Material dropdown
           materials.isEmpty
               ? TextField(
-                  decoration: const InputDecoration(labelText: 'اسم المادة', border: OutlineInputBorder()),
+                  decoration: const InputDecoration(
+                    labelText: 'اسم المادة',
+                    border: OutlineInputBorder(),
+                  ),
                   onChanged: (v) {
                     entry.name = v;
                     onChanged();
@@ -867,7 +1058,10 @@ class _VItemRow extends StatelessWidget {
                 )
               : DropdownButtonFormField<String>(
                   value: entry.name.isNotEmpty ? entry.name : null,
-                  decoration: const InputDecoration(labelText: 'المادة', border: OutlineInputBorder()),
+                  decoration: const InputDecoration(
+                    labelText: 'المادة',
+                    border: OutlineInputBorder(),
+                  ),
                   items: materials
                       .map((m) => DropdownMenuItem(
                             value: m.materialName,
@@ -879,8 +1073,10 @@ class _VItemRow extends StatelessWidget {
                       .toList(),
                   onChanged: (v) {
                     entry.name = v ?? '';
-                    final mat = materials.firstWhere((m) => m.materialName == v,
-                        orElse: () => materials.first);
+                    final mat = materials.firstWhere(
+                      (m) => m.materialName == v,
+                      orElse: () => materials.first,
+                    );
                     entry.materialId = mat.materialId;
                     entry.unit = mat.unit;
                     onChanged();
@@ -910,7 +1106,10 @@ class _VItemRow extends StatelessWidget {
                 width: 80,
                 child: DropdownButtonFormField<String>(
                   value: entry.unit,
-                  decoration: const InputDecoration(labelText: 'الوحدة', border: OutlineInputBorder()),
+                  decoration: const InputDecoration(
+                    labelText: 'الوحدة',
+                    border: OutlineInputBorder(),
+                  ),
                   items: const [
                     DropdownMenuItem(value: 'كجم', child: Text('كجم')),
                     DropdownMenuItem(value: 'جرام', child: Text('جرام')),
