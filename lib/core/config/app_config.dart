@@ -15,7 +15,7 @@ class AppConfig {
 
     const injected = String.fromEnvironment(
       'API_BASE_URL',
-      defaultValue: '',
+      defaultValue: 'https://plastic-factory-api-backend.onrender.com',
     );
 
     if (injected.isNotEmpty) {
