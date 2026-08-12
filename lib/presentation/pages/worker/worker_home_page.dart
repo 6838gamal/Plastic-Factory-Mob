@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -10,7 +9,7 @@ import '../../widgets/common/offline_banner.dart';
 import 'batch_entry_page.dart';
 import 'machine_entry_page.dart';
 import 'shift_handover_page.dart';
-import 'raw_material_receiving_page.dart';
+import '../warehouse/raw_material_receiving_page.dart';
 import '../../widgets/warehouse/warehouse_login_dialog.dart';
 import '../../widgets/production/production_manager_login_dialog.dart';
 
@@ -51,6 +50,9 @@ class _WorkerHomePageState extends ConsumerState<WorkerHomePage> {
         ],
       ),
 
+      // ============================================================
+      // القائمة الجانبية
+      // ============================================================
       drawer: _WorkerDrawer(
         selectedIndex: _selectedIndex,
         onNavigate: (index) {
@@ -66,8 +68,9 @@ class _WorkerHomePageState extends ConsumerState<WorkerHomePage> {
 
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedIndex,
-        onDestinationSelected: (index) =>
-            setState(() => _selectedIndex = index),
+        onDestinationSelected: (index) {
+          setState(() => _selectedIndex = index);
+        },
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.blender_outlined),
@@ -94,6 +97,9 @@ class _WorkerHomePageState extends ConsumerState<WorkerHomePage> {
     );
   }
 
+  // ================================================================
+  // تسجيل دخول الإدارة
+  // ================================================================
   void _showAdminLogin() {
     showDialog(
       context: context,
@@ -110,6 +116,10 @@ class _WorkerHomePageState extends ConsumerState<WorkerHomePage> {
   }
 }
 
+// ==================================================================
+// القائمة الجانبية
+// ==================================================================
+
 class _WorkerDrawer extends ConsumerWidget {
   final int selectedIndex;
   final ValueChanged<int> onNavigate;
@@ -124,229 +134,289 @@ class _WorkerDrawer extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Drawer(
-      child: Column(
-        children: [
-          // ── رأس الدرج ────────────────────────────────────────
-          DrawerHeader(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  Color(0xFF1565C0),
-                  Color(0xFF0D47A1),
+      child: SafeArea(
+        child: Column(
+          children: [
+            // ========================================================
+            // رأس القائمة - ثابت
+            // ========================================================
+            DrawerHeader(
+              margin: EdgeInsets.zero,
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Color(0xFF1565C0),
+                    Color(0xFF0D47A1),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    width: 76,
+                    height: 76,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.factory,
+                      size: 44,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  const Text(
+                    AppStrings.appName,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 19,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
               ),
             ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  width: 80,
-                  height: 80,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.factory,
-                    size: 48,
-                    color: Colors.white,
-                  ),
+
+            // ========================================================
+            // محتوى القائمة - قابل للتمرير
+            // ========================================================
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.symmetric(
+                  vertical: 8,
                 ),
-                const SizedBox(height: 12),
-                const Text(
-                  AppStrings.appName,
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
+                physics: const BouncingScrollPhysics(),
+                children: [
+                  // ==================================================
+                  // عناصر العامل
+                  // ==================================================
+
+                  _DrawerItem(
+                    icon: Icons.blender_outlined,
+                    selectedIcon: Icons.blender,
+                    label: AppStrings.batchEntry,
+                    selected: selectedIndex == 0,
+                    onTap: () => onNavigate(0),
                   ),
-                ),
-              ],
-            ),
-          ),
 
-          // ── عناصر التنقل ─────────────────────────────────────
-          _DrawerItem(
-            icon: Icons.blender_outlined,
-            selectedIcon: Icons.blender,
-            label: AppStrings.batchEntry,
-            selected: selectedIndex == 0,
-            onTap: () => onNavigate(0),
-          ),
+                  _DrawerItem(
+                    icon: Icons.precision_manufacturing_outlined,
+                    selectedIcon: Icons.precision_manufacturing,
+                    label: AppStrings.machineEntry,
+                    selected: selectedIndex == 1,
+                    onTap: () => onNavigate(1),
+                  ),
 
-          _DrawerItem(
-            icon: Icons.precision_manufacturing_outlined,
-            selectedIcon: Icons.precision_manufacturing,
-            label: AppStrings.machineEntry,
-            selected: selectedIndex == 1,
-            onTap: () => onNavigate(1),
-          ),
+                  _DrawerItem(
+                    icon: Icons.swap_horiz_outlined,
+                    selectedIcon: Icons.swap_horiz,
+                    label: 'تسليم الوردية',
+                    selected: selectedIndex == 2,
+                    onTap: () => onNavigate(2),
+                  ),
 
-          _DrawerItem(
-            icon: Icons.swap_horiz_outlined,
-            selectedIcon: Icons.swap_horiz,
-            label: 'تسليم الوردية',
-            selected: selectedIndex == 2,
-            onTap: () => onNavigate(2),
-          ),
+                  // ==================================================
+                  // استلام المواد الخام
+                  // ==================================================
 
-          // ── استلام المواد الخام ─────────────────────────────
-          _DrawerItem(
-            icon: Icons.move_to_inbox_outlined,
-            selectedIcon: Icons.move_to_inbox,
-            label: 'استلام المواد الخام',
-            selected: false,
-            onTap: () {
-              Navigator.pop(context);
+                  _DrawerItem(
+                    icon: Icons.move_to_inbox_outlined,
+                    selectedIcon: Icons.move_to_inbox,
+                    label: 'استلام المواد الخام',
+                    selected: false,
+                    onTap: () {
+                      Navigator.pop(context);
 
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) =>
-                      const RawMaterialReceivingPage(),
-                ),
-              );
-            },
-          ),
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              const RawMaterialReceivingPage(),
+                        ),
+                      );
+                    },
+                  ),
 
-          _DrawerItem(
-            icon: Icons.info_outline,
-            selectedIcon: Icons.info,
-            label: AppStrings.appInfo,
-            selected: selectedIndex == 3,
-            onTap: () => onNavigate(3),
-          ),
+                  _DrawerItem(
+                    icon: Icons.info_outline,
+                    selectedIcon: Icons.info,
+                    label: AppStrings.appInfo,
+                    selected: selectedIndex == 3,
+                    onTap: () => onNavigate(3),
+                  ),
 
-          const Spacer(),
-          const Divider(),
+                  const Divider(
+                    height: 24,
+                    indent: 16,
+                    endIndent: 16,
+                  ),
 
-          // ── أمين المخزن ─────────────────────────────────────
-          ListTile(
-            leading: Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: Colors.teal.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
+                  // ==================================================
+                  // لوحة أمين المخزن
+                  // ==================================================
+
+                  ListTile(
+                    leading: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: Colors.teal.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        Icons.warehouse,
+                        color: Colors.teal,
+                        size: 22,
+                      ),
+                    ),
+                    title: const Text(
+                      'لوحة أمين المخزن',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: Colors.teal,
+                      ),
+                    ),
+                    subtitle: const Text(
+                      'سندات الاستلام والتحويل',
+                      style: TextStyle(
+                        fontSize: 11,
+                      ),
+                    ),
+                    onTap: () {
+                      Navigator.pop(context);
+
+                      showDialog(
+                        context: context,
+                        barrierDismissible: false,
+                        builder: (_) =>
+                            const WarehouseLoginDialog(),
+                      );
+                    },
+                  ),
+
+                  // ==================================================
+                  // لوحة مدير الإنتاج
+                  // ==================================================
+
+                  ListTile(
+                    leading: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color:
+                            Colors.deepOrange.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        Icons.engineering,
+                        color: Colors.deepOrange,
+                        size: 22,
+                      ),
+                    ),
+                    title: const Text(
+                      'لوحة مدير الإنتاج',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: Colors.deepOrange,
+                      ),
+                    ),
+                    subtitle: const Text(
+                      'إدارة المخزون والمواد الخام',
+                      style: TextStyle(
+                        fontSize: 11,
+                      ),
+                    ),
+                    onTap: () {
+                      Navigator.pop(context);
+
+                      showDialog(
+                        context: context,
+                        barrierDismissible: false,
+                        builder: (_) =>
+                            const ProductionManagerLoginDialog(),
+                      );
+                    },
+                  ),
+
+                  const Divider(
+                    height: 24,
+                    indent: 16,
+                    endIndent: 16,
+                  ),
+
+                  // ==================================================
+                  // لوحة الإدارة
+                  // ==================================================
+
+                  ListTile(
+                    leading: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1565C0)
+                            .withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        Icons.admin_panel_settings,
+                        color: Color(0xFF1565C0),
+                        size: 22,
+                      ),
+                    ),
+                    title: const Text(
+                      'لوحة الإدارة',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF1565C0),
+                      ),
+                    ),
+                    subtitle: const Text(
+                      'تسجيل الدخول كمسؤول',
+                      style: TextStyle(
+                        fontSize: 11,
+                      ),
+                    ),
+                    onTap: () {
+                      Navigator.pop(context);
+                      onAdminAccess();
+                    },
+                  ),
+
+                  // ==================================================
+                  // الإصدار
+                  // ==================================================
+
+                  const SizedBox(height: 12),
+
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
+                    child: Text(
+                      AppStrings.appVersion,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.grey[500],
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+                ],
               ),
-              child: const Icon(
-                Icons.warehouse,
-                color: Colors.teal,
-                size: 22,
-              ),
             ),
-            title: const Text(
-              'لوحة أمين المخزن',
-              style: TextStyle(
-                fontWeight: FontWeight.w600,
-                color: Colors.teal,
-              ),
-            ),
-            subtitle: const Text(
-              'سندات الاستلام والتحويل',
-              style: TextStyle(fontSize: 11),
-            ),
-            onTap: () {
-              Navigator.pop(context);
-
-              showDialog(
-                context: context,
-                barrierDismissible: false,
-                builder: (_) =>
-                    const WarehouseLoginDialog(),
-              );
-            },
-          ),
-
-          // ── مدير الإنتاج ─────────────────────────────────────
-          ListTile(
-            leading: Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: Colors.deepOrange.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Icon(
-                Icons.engineering,
-                color: Colors.deepOrange,
-                size: 22,
-              ),
-            ),
-            title: const Text(
-              'لوحة مدير الإنتاج',
-              style: TextStyle(
-                fontWeight: FontWeight.w600,
-                color: Colors.deepOrange,
-              ),
-            ),
-            subtitle: const Text(
-              'إدارة المخزون والمواد الخام',
-              style: TextStyle(fontSize: 11),
-            ),
-            onTap: () {
-              Navigator.pop(context);
-
-              showDialog(
-                context: context,
-                barrierDismissible: false,
-                builder: (_) =>
-                    const ProductionManagerLoginDialog(),
-              );
-            },
-          ),
-
-          const Divider(),
-
-          // ── لوحة الإدارة ────────────────────────────────────
-          ListTile(
-            leading: Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1565C0)
-                    .withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Icon(
-                Icons.admin_panel_settings,
-                color: Color(0xFF1565C0),
-                size: 22,
-              ),
-            ),
-            title: const Text(
-              'لوحة الإدارة',
-              style: TextStyle(
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF1565C0),
-              ),
-            ),
-            subtitle: const Text(
-              'تسجيل الدخول كمسؤول',
-              style: TextStyle(fontSize: 11),
-            ),
-            onTap: () {
-              Navigator.pop(context);
-              onAdminAccess();
-            },
-          ),
-
-          Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 8,
-            ),
-            child: Text(
-              AppStrings.appVersion,
-              style: TextStyle(
-                color: Colors.grey[500],
-                fontSize: 12,
-              ),
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 }
+
+// ==================================================================
+// عنصر القائمة
+// ==================================================================
 
 class _DrawerItem extends StatelessWidget {
   final IconData icon;
@@ -395,6 +465,10 @@ class _DrawerItem extends StatelessWidget {
   }
 }
 
+// ==================================================================
+// شاشة معلومات التطبيق
+// ==================================================================
+
 class _AppInfoPage extends StatelessWidget {
   const _AppInfoPage();
 
@@ -420,7 +494,9 @@ class _AppInfoPage extends StatelessWidget {
               size: 70,
               color: Theme.of(context).primaryColor,
             ),
-          ).animate().scale(duration: 500.ms),
+          ).animate().scale(
+                duration: 500.ms,
+              ),
 
           const SizedBox(height: 24),
 
@@ -479,7 +555,9 @@ class _AppInfoPage extends StatelessWidget {
             ),
           ),
         ]
-            .animate(interval: 100.ms)
+            .animate(
+              interval: 100.ms,
+            )
             .fadeIn()
             .slideY(
               begin: 0.1,
@@ -489,6 +567,10 @@ class _AppInfoPage extends StatelessWidget {
     );
   }
 }
+
+// ==================================================================
+// بطاقة معلومات
+// ==================================================================
 
 class _InfoCard extends StatelessWidget {
   final IconData icon;
@@ -504,7 +586,9 @@ class _InfoCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(
+        bottom: 12,
+      ),
       child: ListTile(
         leading: Container(
           padding: const EdgeInsets.all(10),
