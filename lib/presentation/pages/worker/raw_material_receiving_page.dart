@@ -28,14 +28,14 @@ final _receivingIncomingProvider = FutureProvider.autoDispose<List<TransferVouch
 // شاشة استلام وارد المواد
 // ──────────────────────────────────────────────────────────────────────────────
 
-class ReceivingWarehousePage extends ConsumerStatefulWidget {
-  const ReceivingWarehousePage({super.key});
+class RawMaterialReceivingPage extends ConsumerStatefulWidget {
+  const RawMaterialReceivingPage({super.key});
 
   @override
-  ConsumerState<ReceivingWarehousePage> createState() => _ReceivingWarehousePageState();
+  ConsumerState<RawMaterialReceivingPage> createState() => _RawMaterialReceivingPageState();
 }
 
-class _ReceivingWarehousePageState extends ConsumerState<ReceivingWarehousePage>
+class _RawMaterialReceivingPageState extends ConsumerState<RawMaterialReceivingPage>
     with SingleTickerProviderStateMixin {
   late TabController _tabs;
 
