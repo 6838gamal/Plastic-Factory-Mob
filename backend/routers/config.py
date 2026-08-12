@@ -3,7 +3,7 @@ from fastapi import APIRouter, Request
 
 router = APIRouter(prefix="/api", tags=["config"])
 
-_DEFAULT_API_BASE_URL = "postgresql://gamalalmaqtary:vy0rPUFfCzjNhyE9HtYpgWf10ckOojZp@dpg-d9u8i2vavr4c73eo49a0-a.oregon-postgres.render.com/plastic_factory_db_l3qx" //"http://localhost:5000"
+_DEFAULT_API_BASE_URL = "postgresql://gamalalmaqtary:vy0rPUFfCzjNhyE9HtYpgWf10ckOojZp@dpg-d9u8i2vavr4c73eo49a0-a.oregon-postgres.render.com/plastic_factory_db_l3qx"
 
 @router.get("/config")
 async def get_config(request: Request):
