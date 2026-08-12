@@ -8,7 +8,6 @@ import '../../../data/models/inventory_summary_model.dart';
 import '../../../data/models/voucher_models.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/reference_data_provider.dart';
-import '../production_manager/mixer_warehouse_page.dart';
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Providers خاصة بشاشة استلام المواد الخام
@@ -71,16 +70,6 @@ class _RawMaterialReceivingPageState extends ConsumerState<RawMaterialReceivingP
     return auth.user?.name ?? auth.user?.email ?? 'مدير الاستلام';
   }
 
-  // دالة التنقل إلى مخزن الخلاط - بدون const
-  void _navigateToMixerWarehouse(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => MixerWarehousePage(), // ✅ بدون const
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final pendingCount = ref
@@ -100,12 +89,6 @@ class _RawMaterialReceivingPageState extends ConsumerState<RawMaterialReceivingP
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
-          // زر التنقل إلى مخزن الخلاط - بدون const
-          IconButton(
-            icon: const Icon(Icons.shuffle),
-            onPressed: () => _navigateToMixerWarehouse(context),
-            tooltip: 'مخزن الخلاط',
-          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _refresh,
