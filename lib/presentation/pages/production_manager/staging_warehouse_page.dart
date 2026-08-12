@@ -8,7 +8,7 @@ import '../../../data/models/inventory_summary_model.dart';
 import '../../../data/models/voucher_models.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/reference_data_provider.dart';
-import '../worker/raw_material_receiving_page.dart'; // استيراد الشاشة المستقلة
+import '../worker/raw_material_receiving_page.dart';
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Providers
@@ -71,12 +71,12 @@ class _StagingWarehousePageState extends ConsumerState<StagingWarehousePage>
     return auth.user?.name ?? auth.user?.email ?? 'مدير الإنتاج';
   }
 
-  // دالة التنقل إلى شاشة الاستلام (في مجلد worker)
+  // دالة التنقل إلى شاشة استلام المواد الخام
   void _navigateToReceivingWarehouse(BuildContext context) {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => const ReceivingWarehousePage(),
+        builder: (context) => RawMaterialReceivingPage(), // ✅ بدون const
       ),
     );
   }
@@ -96,11 +96,11 @@ class _StagingWarehousePageState extends ConsumerState<StagingWarehousePage>
         foregroundColor: Colors.white,
         title: const Text('المخزن المرحلي'),
         actions: [
-          // زر التنقل إلى شاشة الاستلام
+          // زر التنقل إلى شاشة استلام المواد الخام
           IconButton(
             icon: const Icon(Icons.assignment_outlined),
             onPressed: () => _navigateToReceivingWarehouse(context),
-            tooltip: 'شاشة استلام وارد المواد',
+            tooltip: 'استلام المواد الخام',
           ),
           IconButton(
             icon: const Icon(Icons.refresh),
