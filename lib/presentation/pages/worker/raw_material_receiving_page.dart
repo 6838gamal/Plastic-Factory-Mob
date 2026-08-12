@@ -1,4 +1,4 @@
-// lib/presentation/pages/worker/receiving_warehouse_page.dart
+// lib/presentation/pages/worker/raw_material_receiving_page.dart
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,7 +10,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/reference_data_provider.dart';
 
 // ──────────────────────────────────────────────────────────────────────────────
-// Providers خاصة بشاشة استلام وارد المواد
+// Providers خاصة بشاشة استلام المواد الخام
 // ──────────────────────────────────────────────────────────────────────────────
 
 final _receivingInventoryProvider = FutureProvider.autoDispose<List<InventorySummaryModel>>((ref) async {
@@ -20,12 +20,18 @@ final _receivingInventoryProvider = FutureProvider.autoDispose<List<InventorySum
 
 final _receivingIncomingProvider = FutureProvider.autoDispose<List<TransferVoucherModel>>((ref) async {
   final ds = ref.read(dataSourceProvider);
-  final raw = await ds.getTransferVouchers(transferType: 'mixer_to_receiving');
+  final raw = await ds.getTransferVouchers(transferType: 'staging_to_receiving');
+  return raw.map(TransferVoucherModel.fromJson).toList();
+});
+
+final _receivingOutgoingProvider = FutureProvider.autoDispose<List<TransferVoucherModel>>((ref) async {
+  final ds = ref.read(dataSourceProvider);
+  final raw = await ds.getTransferVouchers(transferType: 'receiving_to_mixer');
   return raw.map(TransferVoucherModel.fromJson).toList();
 });
 
 // ──────────────────────────────────────────────────────────────────────────────
-// شاشة استلام وارد المواد
+// شاشة استلام المواد الخام (الوسيطة)
 // ──────────────────────────────────────────────────────────────────────────────
 
 class RawMaterialReceivingPage extends ConsumerStatefulWidget {
@@ -42,7 +48,7 @@ class _RawMaterialReceivingPageState extends ConsumerState<RawMaterialReceivingP
   @override
   void initState() {
     super.initState();
-    _tabs = TabController(length: 2, vsync: this);
+    _tabs = TabController(length: 3, vsync: this);
     _tabs.addListener(() => setState(() {}));
   }
 
@@ -55,12 +61,23 @@ class _RawMaterialReceivingPageState extends ConsumerState<RawMaterialReceivingP
   void _refresh() {
     ref.invalidate(_receivingInventoryProvider);
     ref.invalidate(_receivingIncomingProvider);
+    ref.invalidate(_receivingOutgoingProvider);
     ref.invalidate(inventorySummaryProvider);
   }
 
   String get _operatorName {
     final auth = ref.read(authProvider);
     return auth.user?.name ?? auth.user?.email ?? 'مدير الاستلام';
+  }
+
+  // دالة التنقل إلى مخزن الخلاط (الحلقة الأخيرة)
+  void _navigateToMixerWarehouse(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const MixerWarehousePage(),
+      ),
+    );
   }
 
   @override
@@ -76,12 +93,17 @@ class _RawMaterialReceivingPageState extends ConsumerState<RawMaterialReceivingP
       appBar: AppBar(
         backgroundColor: Colors.deepPurple,
         foregroundColor: Colors.white,
-        title: const Text('شاشة استلام وارد المواد'),
+        title: const Text('استلام المواد الخام'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.shuffle),
+            onPressed: () => _navigateToMixerWarehouse(context),
+            tooltip: 'مخزن الخلاط',
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _refresh,
@@ -92,16 +114,10 @@ class _RawMaterialReceivingPageState extends ConsumerState<RawMaterialReceivingP
           indicatorColor: Colors.white,
           labelColor: Colors.white,
           unselectedLabelColor: Colors.white70,
-          tabs: [
-            const Tab(icon: Icon(Icons.inventory_2_outlined), text: 'المخزون'),
-            Tab(
-              icon: Badge(
-                isLabelVisible: pendingCount > 0,
-                label: Text('$pendingCount'),
-                child: const Icon(Icons.arrow_downward),
-              ),
-              text: 'وارد من الخلاط',
-            ),
+          tabs: const [
+            Tab(icon: Icon(Icons.inventory_2_outlined), text: 'المخزون'),
+            Tab(icon: Icon(Icons.arrow_downward), text: 'وارد من المرحلي'),
+            Tab(icon: Icon(Icons.arrow_upward), text: 'صادر للخلاط'),
           ],
         ),
       ),
@@ -110,7 +126,27 @@ class _RawMaterialReceivingPageState extends ConsumerState<RawMaterialReceivingP
         children: [
           _ReceivingInventoryTab(onRefresh: _refresh),
           _ReceivingIncomingTab(operatorName: _operatorName, onRefresh: _refresh),
+          _ReceivingOutgoingTab(operatorName: _operatorName, onRefresh: _refresh),
         ],
+      ),
+      floatingActionButton: _tabs.index == 2
+          ? FloatingActionButton.extended(
+              backgroundColor: Colors.deepPurple,
+              icon: const Icon(Icons.add, color: Colors.white),
+              label: const Text('إرسال للخلاط', style: TextStyle(color: Colors.white)),
+              onPressed: () => _openReceivingVoucherDialog(context, 'receiving_to_mixer'),
+            )
+          : null,
+    );
+  }
+
+  Future<void> _openReceivingVoucherDialog(BuildContext context, String transferType) async {
+    await showDialog(
+      context: context,
+      builder: (_) => _ReceivingVoucherDialog(
+        transferType: transferType,
+        createdBy: _operatorName,
+        onSaved: _refresh,
       ),
     );
   }
@@ -138,9 +174,9 @@ class _ReceivingInventoryTab extends ConsumerWidget {
               children: [
                 Icon(Icons.assignment_outlined, size: 64, color: Colors.grey),
                 SizedBox(height: 12),
-                Text('لا توجد مواد في شاشة الاستلام', style: TextStyle(color: Colors.grey)),
+                Text('لا توجد مواد خام في شاشة الاستلام', style: TextStyle(color: Colors.grey)),
                 SizedBox(height: 6),
-                Text('المواد تصل هنا بعد تأكيدها من مخزن الخلاط',
+                Text('المواد الخام تصل هنا من المخزن المرحلي',
                     style: TextStyle(color: Colors.grey, fontSize: 12)),
               ],
             ),
@@ -149,7 +185,7 @@ class _ReceivingInventoryTab extends ConsumerWidget {
         final total = items.fold(0.0, (s, m) => s + m.currentBalance);
         return Column(
           children: [
-            _buildSummaryCard('إجمالي مواد الاستلام', total, Colors.deepPurple),
+            _buildSummaryCard('إجمالي المواد الخام المستلمة', total, Colors.deepPurple),
             Expanded(
               child: ListView.builder(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -165,7 +201,7 @@ class _ReceivingInventoryTab extends ConsumerWidget {
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
-// تبويب وارد من الخلاط
+// تبويب وارد من المرحلي
 // ──────────────────────────────────────────────────────────────────────────────
 
 class _ReceivingIncomingTab extends ConsumerWidget {
@@ -187,9 +223,9 @@ class _ReceivingIncomingTab extends ConsumerWidget {
               children: [
                 Icon(Icons.arrow_downward, size: 64, color: Colors.grey),
                 SizedBox(height: 12),
-                Text('لا توجد طلبات واردة من مخزن الخلاط', style: TextStyle(color: Colors.grey)),
+                Text('لا توجد طلبات واردة من المخزن المرحلي', style: TextStyle(color: Colors.grey)),
                 SizedBox(height: 6),
-                Text('سيتم استلام المواد هنا بعد تأكيدها من مخزن الخلاط',
+                Text('سيتم استلام المواد الخام هنا من المخزن المرحلي',
                     style: TextStyle(color: Colors.grey, fontSize: 12)),
               ],
             ),
@@ -204,6 +240,7 @@ class _ReceivingIncomingTab extends ConsumerWidget {
               voucher: vouchers[i],
               operatorName: operatorName,
               onAction: onRefresh,
+              role: 'incoming',
             ),
           ),
         );
@@ -213,18 +250,69 @@ class _ReceivingIncomingTab extends ConsumerWidget {
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
-// بطاقة السند لشاشة الاستلام
+// تبويب صادر للخلاط
+// ──────────────────────────────────────────────────────────────────────────────
+
+class _ReceivingOutgoingTab extends ConsumerWidget {
+  final String operatorName;
+  final VoidCallback onRefresh;
+  const _ReceivingOutgoingTab({required this.operatorName, required this.onRefresh});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final async = ref.watch(_receivingOutgoingProvider);
+    return async.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => Center(child: Text('خطأ: $e')),
+      data: (vouchers) {
+        if (vouchers.isEmpty) {
+          return const Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.arrow_upward, size: 64, color: Colors.grey),
+                SizedBox(height: 12),
+                Text('لا توجد سندات صادرة للخلاط', style: TextStyle(color: Colors.grey)),
+                SizedBox(height: 6),
+                Text('اضغط + لإنشاء سند تحويل للخلاط',
+                    style: TextStyle(color: Colors.grey, fontSize: 12)),
+              ],
+            ),
+          );
+        }
+        return RefreshIndicator(
+          onRefresh: () async => onRefresh(),
+          child: ListView.builder(
+            padding: const EdgeInsets.all(12),
+            itemCount: vouchers.length,
+            itemBuilder: (ctx, i) => _ReceivingVoucherCard(
+              voucher: vouchers[i],
+              operatorName: operatorName,
+              onAction: onRefresh,
+              role: 'outgoing',
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// بطاقة السند لشاشة استلام المواد الخام
 // ──────────────────────────────────────────────────────────────────────────────
 
 class _ReceivingVoucherCard extends ConsumerWidget {
   final TransferVoucherModel voucher;
   final String operatorName;
   final VoidCallback onAction;
+  final String role;
 
   const _ReceivingVoucherCard({
     required this.voucher,
     required this.operatorName,
     required this.onAction,
+    required this.role,
   });
 
   Color get _statusColor {
@@ -275,7 +363,10 @@ class _ReceivingVoucherCard extends ConsumerWidget {
                   materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
                 const SizedBox(width: 8),
-                const Icon(Icons.assignment_outlined, size: 16, color: Colors.deepPurple),
+                if (role == 'incoming')
+                  const Icon(Icons.arrow_downward, size: 16, color: Colors.deepPurple),
+                if (role == 'outgoing')
+                  const Icon(Icons.arrow_upward, size: 16, color: Colors.deepPurple),
                 const SizedBox(width: 4),
                 Text(
                   voucher.voucherNumber ?? '',
@@ -364,17 +455,17 @@ class _ReceivingVoucherCard extends ConsumerWidget {
                         }
                       },
                     ),
-                  // Confirm receipt
-                  if (voucher.isPending)
+                  // Confirm receipt — incoming: staging→receiving
+                  if (role == 'incoming' && voucher.isPending)
                     ElevatedButton.icon(
                       icon: const Icon(Icons.check_circle, size: 16),
-                      label: const Text('تأكيد استلام المواد'),
+                      label: const Text('تأكيد استلام المواد الخام'),
                       style: ElevatedButton.styleFrom(backgroundColor: Colors.deepPurple),
                       onPressed: () async {
                         final ok = await _confirm(
                           context,
-                          'تأكيد استلام المواد',
-                          'هل تأكد استلام جميع المواد من مخزن الخلاط؟\nسيتم تأكيد استلام المواد في شاشة الاستلام.',
+                          'تأكيد استلام المواد الخام',
+                          'هل تأكد استلام المواد الخام من المخزن المرحلي؟\nسيتم نقل المواد لشاشة الاستلام.',
                         );
                         if (ok) {
                           try {
@@ -383,8 +474,39 @@ class _ReceivingVoucherCard extends ConsumerWidget {
                             if (context.mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(
-                                      content: Text('تم تأكيد استلام المواد بنجاح'),
+                                      content: Text('تم تأكيد استلام المواد الخام ونقلها لشاشة الاستلام'),
                                       backgroundColor: Colors.deepPurple));
+                            }
+                          } catch (e) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('خطأ: $e'), backgroundColor: Colors.red));
+                            }
+                          }
+                        }
+                      },
+                    ),
+                  // Confirm receipt — outgoing: receiving→mixer
+                  if (role == 'outgoing' && voucher.isPending)
+                    ElevatedButton.icon(
+                      icon: const Icon(Icons.check_circle, size: 16),
+                      label: const Text('تأكيد استلام الخلاط'),
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
+                      onPressed: () async {
+                        final ok = await _confirm(
+                          context,
+                          'تأكيد استلام مخزن الخلاط',
+                          'هل تأكد استلام المواد الخام من شاشة الاستلام؟\nسيتم نقل المواد لمخزن الخلطات.',
+                        );
+                        if (ok) {
+                          try {
+                            await ds.confirmTransferVoucher(voucher.id!, {'confirmed_by': operatorName});
+                            onAction();
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                      content: Text('تم تأكيد استلام المواد الخام ونقلها لمخزن الخلطات'),
+                                      backgroundColor: Colors.teal));
                             }
                           } catch (e) {
                             if (context.mounted) {
@@ -436,6 +558,180 @@ class _ReceivingVoucherCard extends ConsumerWidget {
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
+// حوار إنشاء سند لشاشة استلام المواد الخام
+// ──────────────────────────────────────────────────────────────────────────────
+
+class _ReceivingVoucherDialog extends ConsumerStatefulWidget {
+  final String transferType; // receiving_to_mixer
+  final String? createdBy;
+  final VoidCallback onSaved;
+
+  const _ReceivingVoucherDialog({
+    required this.transferType,
+    required this.onSaved,
+    this.createdBy,
+  });
+
+  @override
+  ConsumerState<_ReceivingVoucherDialog> createState() => _ReceivingVoucherDialogState();
+}
+
+class _ReceivingVoucherDialogState extends ConsumerState<_ReceivingVoucherDialog> {
+  final _notesCtrl = TextEditingController();
+  final List<_VItemEntry> _items = [];
+  bool _loading = false;
+
+  @override
+  void dispose() {
+    _notesCtrl.dispose();
+    super.dispose();
+  }
+
+  String get _fromWarehouse => 'receiving';
+  String get _title => 'سند صادر للخلاط';
+  String get _flowLabel => 'شاشة استلام المواد الخام ← مخزن الخلطات';
+
+  void _addItem() => setState(() => _items.add(_VItemEntry()));
+  void _removeItem(int i) => setState(() => _items.removeAt(i));
+
+  Future<void> _save() async {
+    if (_items.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('أضف بنداً واحداً على الأقل'), backgroundColor: Colors.red),
+      );
+      return;
+    }
+    final incomplete = <int>[
+      for (var i = 0; i < _items.length; i++)
+        if (_items[i].name.isEmpty || _items[i].qty <= 0) i + 1,
+    ];
+    if (incomplete.isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('أكمل بيانات البند رقم ${incomplete.join("، ")} قبل الحفظ'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+    setState(() => _loading = true);
+    try {
+      final ds = ref.read(dataSourceProvider);
+      await ds.createTransferVoucher({
+        'notes': _notesCtrl.text.trim(),
+        'created_by': widget.createdBy ?? 'مدير الاستلام',
+        'transfer_type': widget.transferType,
+        'items': _items
+            .map((e) => {
+                  'material_name': e.name,
+                  'unit': e.unit,
+                  'requested_qty': e.qty,
+                  if (e.materialId != null) 'material_id': e.materialId,
+                })
+            .toList(),
+      });
+      if (mounted) Navigator.pop(context);
+      widget.onSaved();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('خطأ: $e'), backgroundColor: Colors.red));
+      }
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final summaryAsync = ref.watch(inventorySummaryProvider);
+    final materials = summaryAsync.valueOrNull
+            ?.where((m) => m.warehouseType == _fromWarehouse)
+            .toList() ??
+        [];
+
+    return AlertDialog(
+      title: Text(_title),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Flow indicator
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.deepPurple.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.swap_horiz, color: Colors.deepPurple, size: 16),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _flowLabel,
+                        style: const TextStyle(color: Colors.deepPurple, fontSize: 13),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _notesCtrl,
+                maxLines: 2,
+                decoration: const InputDecoration(labelText: 'ملاحظات (اختياري)'),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  const Text('المواد الخام', style: TextStyle(fontWeight: FontWeight.bold)),
+                  const Spacer(),
+                  TextButton.icon(
+                    icon: const Icon(Icons.add, size: 16),
+                    label: const Text('إضافة بند'),
+                    onPressed: _addItem,
+                  ),
+                ],
+              ),
+              const Divider(),
+              ..._items.asMap().entries.map((e) => _VItemRow(
+                    index: e.key,
+                    entry: e.value,
+                    materials: materials,
+                    onRemove: () => _removeItem(e.key),
+                    onChanged: () => setState(() {}),
+                  )),
+              if (_items.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 8),
+                  child: Center(
+                    child: Text('اضغط "إضافة بند" لإضافة مادة خام',
+                        style: TextStyle(color: Colors.grey)),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('إلغاء')),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(backgroundColor: Colors.deepPurple),
+          onPressed: _loading ? null : _save,
+          child: _loading
+              ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+              : const Text('حفظ', style: TextStyle(color: Colors.white)),
+        ),
+      ],
+    );
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
 // مكونات مساعدة
 // ──────────────────────────────────────────────────────────────────────────────
 
@@ -482,4 +778,136 @@ Widget _buildMaterialCard(InventorySummaryModel item, MaterialColor color) {
       ),
     ),
   );
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// مكونات إدخال البنود
+// ──────────────────────────────────────────────────────────────────────────────
+
+class _VItemEntry {
+  String name = '';
+  String unit = 'كجم';
+  double qty = 0;
+  String? materialId;
+}
+
+class _VItemRow extends StatelessWidget {
+  final int index;
+  final _VItemEntry entry;
+  final List<InventorySummaryModel> materials;
+  final VoidCallback onRemove;
+  final VoidCallback onChanged;
+
+  const _VItemRow({
+    required this.index,
+    required this.entry,
+    required this.materials,
+    required this.onRemove,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final itemNo = index + 1;
+    final selected = entry.name.isNotEmpty
+        ? materials
+            .where((m) => (entry.materialId != null && entry.materialId!.isNotEmpty)
+                ? m.materialId == entry.materialId
+                : m.materialName == entry.name)
+            .firstOrNull
+        : null;
+    final available = selected?.currentBalance ?? 0.0;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.grey.shade300),
+        borderRadius: BorderRadius.circular(8),
+        color: Colors.grey.shade50,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text('البند $itemNo',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.deepPurple)),
+              const Spacer(),
+              InkWell(onTap: onRemove, child: const Icon(Icons.remove_circle_outline, color: Colors.red, size: 20)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          // Material dropdown
+          materials.isEmpty
+              ? TextField(
+                  decoration: const InputDecoration(labelText: 'اسم المادة الخام', border: OutlineInputBorder()),
+                  onChanged: (v) {
+                    entry.name = v;
+                    onChanged();
+                  },
+                )
+              : DropdownButtonFormField<String>(
+                  value: entry.name.isNotEmpty ? entry.name : null,
+                  decoration: const InputDecoration(labelText: 'المادة الخام', border: OutlineInputBorder()),
+                  items: materials
+                      .map((m) => DropdownMenuItem(
+                            value: m.materialName,
+                            child: Text(
+                              '${m.materialName} (${m.currentBalance.toStringAsFixed(1)} ${m.unit})',
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ))
+                      .toList(),
+                  onChanged: (v) {
+                    entry.name = v ?? '';
+                    final mat = materials.firstWhere((m) => m.materialName == v,
+                        orElse: () => materials.first);
+                    entry.materialId = mat.materialId;
+                    entry.unit = mat.unit;
+                    onChanged();
+                  },
+                ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: TextFormField(
+                  initialValue: entry.qty > 0 ? entry.qty.toString() : '',
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: InputDecoration(
+                    labelText: 'الكمية',
+                    border: const OutlineInputBorder(),
+                    helperText: available > 0 ? 'متاح: ${available.toStringAsFixed(2)}' : null,
+                    helperStyle: const TextStyle(color: Colors.grey),
+                  ),
+                  onChanged: (v) {
+                    entry.qty = double.tryParse(v) ?? 0;
+                    onChanged();
+                  },
+                ),
+              ),
+              const SizedBox(width: 8),
+              SizedBox(
+                width: 80,
+                child: DropdownButtonFormField<String>(
+                  value: entry.unit,
+                  decoration: const InputDecoration(labelText: 'الوحدة', border: OutlineInputBorder()),
+                  items: const [
+                    DropdownMenuItem(value: 'كجم', child: Text('كجم')),
+                    DropdownMenuItem(value: 'جرام', child: Text('جرام')),
+                    DropdownMenuItem(value: 'لتر', child: Text('لتر')),
+                  ],
+                  onChanged: (v) {
+                    entry.unit = v ?? 'كجم';
+                    onChanged();
+                  },
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 }
