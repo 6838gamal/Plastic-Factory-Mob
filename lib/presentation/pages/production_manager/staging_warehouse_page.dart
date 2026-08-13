@@ -59,11 +59,14 @@ class _StagingWarehousePageState extends ConsumerState<StagingWarehousePage>
     super.dispose();
   }
 
+  // ✅ استخدام refresh بدلاً من invalidate للتحديث التلقائي
   void _refresh() {
-    ref.invalidate(_stagingInventoryProvider);
-    ref.invalidate(_stagingIncomingProvider);
-    ref.invalidate(_stagingOutgoingProvider);
-    ref.invalidate(inventorySummaryProvider);
+    ref.refresh(_stagingInventoryProvider);
+    ref.refresh(_stagingIncomingProvider);
+    ref.refresh(_stagingOutgoingProvider);
+    ref.refresh(inventorySummaryProvider);
+    // إعادة بناء واجهة المستخدم
+    setState(() {});
   }
 
   String get _operatorName {
@@ -519,6 +522,14 @@ class _VoucherCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final ds = ref.read(dataSourceProvider);
+    
+    // طباعة حالة السند للتتبع
+    print('🔵 ====== سند: ${voucher.voucherNumber} ======');
+    print('🔵 الحالة: ${voucher.status}');
+    print('🔵 isDraft: ${voucher.isDraft}');
+    print('🔵 isPending: ${voucher.isPending}');
+    print('🔵 isConfirmed: ${voucher.isConfirmed}');
+    
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -605,6 +616,7 @@ class _VoucherCard extends ConsumerWidget {
                         try {
                           await ds.cancelTransferVoucher(voucher.id!);
                           showSuccess(context, 'تم إلغاء السند بنجاح');
+                          // تحديث البيانات بعد الإلغاء
                           onAction();
                         } catch (e) {
                           showError(context, 'فشل إلغاء السند: ${e.toString()}');
@@ -613,7 +625,7 @@ class _VoucherCard extends ConsumerWidget {
                     },
                   ),
                   const SizedBox(width: 8),
-                  // Submit (if draft)
+                  // ✅ Submit (if draft) - إرسال للمراجعة
                   if (voucher.isDraft)
                     ElevatedButton.icon(
                       icon: const Icon(Icons.send, size: 16),
@@ -625,6 +637,7 @@ class _VoucherCard extends ConsumerWidget {
                           final response = await ds.submitTransferVoucher(voucher.id!);
                           print('✅ [Submit] تم الإرسال: $response');
                           showSuccess(context, '✅ تم إرسال السند للمراجعة');
+                          // تحديث البيانات بعد الإرسال
                           onAction();
                         } catch (e) {
                           print('❌ [Submit] فشل الإرسال: $e');
@@ -636,7 +649,6 @@ class _VoucherCard extends ConsumerWidget {
                   if (voucher.isPending)
                     ElevatedButton.icon(
                       icon: const Icon(Icons.check_circle, size: 16),
-                      // ✅ التصحيح: استخدام Text() بدلاً من String مباشر
                       label: Text(role == 'incoming' 
                           ? 'تأكيد الاستلام للمرحلي' 
                           : 'تأكيد استلام الخلاط'),
@@ -668,6 +680,7 @@ class _VoucherCard extends ConsumerWidget {
                                 : '✅ تم تأكيد الاستلام ونقل المواد لمخزن الخلطات';
                             
                             showSuccess(context, successMsg);
+                            // تحديث البيانات بعد التأكيد
                             onAction();
                           } catch (e) {
                             print('❌ [Confirm] فشل التأكيد: $e');
@@ -813,6 +826,7 @@ class _StagingVoucherDialogState extends ConsumerState<_StagingVoucherDialog> {
       if (mounted) {
         Navigator.pop(context);
         widget.showSuccess(context, '✅ تم إنشاء السند بنجاح');
+        // تحديث البيانات بعد الإنشاء
         widget.onSaved();
       }
     } catch (e) {
