@@ -1,3 +1,5 @@
+// lib/data/datasources/api_datasource.dart
+
 import 'dart:convert';
 import 'dart:typed_data';
 // ignore: avoid_web_libraries_in_flutter
@@ -40,7 +42,7 @@ class ApiDataSource {
     return injected;
   }
 
-  return 'https://plastic-factory-api-backend.onrender.com';
+  return 'http://localhost:5000';
   }
 
   static String get baseUrl => _baseUrl;
@@ -85,8 +87,12 @@ class ApiDataSource {
   }
 
   Future<dynamic> _post(String path, Map<String, dynamic> data) async {
+    print('🔵 [_post] $path');
+    print('🔵 [_post] data: $data');
     final uri = Uri.parse('$_baseUrl$path');
     final res = await http.post(uri, headers: _headers, body: jsonEncode(data));
+    print('🔵 [_post] status: ${res.statusCode}');
+    print('🔵 [_post] body: ${res.body}');
     if (res.statusCode >= 400) {
       throw Exception(_extractError(jsonDecode(res.body)));
     }
@@ -774,7 +780,10 @@ class ApiDataSource {
   }
 
   Future<Map<String, dynamic>> createTransferVoucher(Map<String, dynamic> data) async {
+    print('🔵 [createTransferVoucher] بدء إنشاء سند');
+    print('🔵 [createTransferVoucher] data: $data');
     final res = await _post('/api/vouchers/transfer', data);
+    print('✅ [createTransferVoucher] تم الإنشاء: $res');
     return Map<String, dynamic>.from(res as Map);
   }
 
@@ -786,17 +795,33 @@ class ApiDataSource {
   }
 
   Future<Map<String, dynamic>> submitTransferVoucher(String id) async {
+    print('🔵 [submitTransferVoucher] إرسال سند للمراجعة: $id');
     final res = await _post('/api/vouchers/transfer/$id/submit', {});
+    print('✅ [submitTransferVoucher] تم الإرسال: $res');
     return Map<String, dynamic>.from(res as Map);
   }
 
+  // ⭐ الدالة الأهم - المسؤولة عن نقل البيانات
   Future<Map<String, dynamic>> confirmTransferVoucher(String id, Map<String, dynamic> data) async {
-    final res = await _post('/api/vouchers/transfer/$id/confirm', data);
-    return Map<String, dynamic>.from(res as Map);
+    try {
+      print('🔵 [confirmTransferVoucher] بدء تأكيد السند');
+      print('🔵 [confirmTransferVoucher] ID: $id');
+      print('🔵 [confirmTransferVoucher] Data: $data');
+      
+      final res = await _post('/api/vouchers/transfer/$id/confirm', data);
+      
+      print('✅ [confirmTransferVoucher] تم التأكيد بنجاح: $res');
+      return Map<String, dynamic>.from(res as Map);
+    } catch (e) {
+      print('❌ [confirmTransferVoucher] فشل التأكيد: $e');
+      rethrow;
+    }
   }
 
   Future<Map<String, dynamic>> cancelTransferVoucher(String id) async {
+    print('🔵 [cancelTransferVoucher] إلغاء سند: $id');
     final res = await _post('/api/vouchers/transfer/$id/cancel', {});
+    print('✅ [cancelTransferVoucher] تم الإلغاء: $res');
     return Map<String, dynamic>.from(res as Map);
   }
 
