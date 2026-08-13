@@ -61,7 +61,7 @@ class ReceiptVoucherCreate(BaseModel):
 class TransferVoucherCreate(BaseModel):
     notes: Optional[str] = None
     created_by: Optional[str] = "admin"
-    transfer_type: Optional[str] = "main_to_mixer"  # main_to_mixer | main_to_staging | staging_to_mixer
+    transfer_type: Optional[str] = "main_to_mixer"  # main_to_mixer | main_to_staging | staging_to_mixer | mixer_to_receiving | staging_to_receiving | receiving_to_mixer
     items: List[VoucherItem] = []
 
 
@@ -623,8 +623,23 @@ async def submit_transfer_voucher(voucher_id: str, submitted_by: str = "admin"):
     return {"status": "pending", "message": "السند في انتظار التأكيد من مشرف الخلطات"}
 
 
+# ═══════════════════════════════════════════════════════════════════
+#  CONFIRM TRANSFER VOUCHER  (تأكيد التحويل - الأهم)
+# ═══════════════════════════════════════════════════════════════════
+
 @router.post("/transfer/{voucher_id}/confirm")
 async def confirm_transfer_voucher(voucher_id: str, body: ConfirmTransferRequest):
+    """
+    تأكيد سند التحويل ونقل الكميات بين المخازن.
+    
+    الأنواع المدعومة:
+    - main_to_staging: الرئيسي ← المرحلي
+    - staging_to_mixer: المرحلي ← الخلاط
+    - mixer_to_receiving: الخلاط ← شاشة الاستلام (جديد)
+    - staging_to_receiving: المرحلي ← شاشة الاستلام (جديد)
+    - receiving_to_mixer: شاشة الاستلام ← الخلاط (جديد)
+    - main_to_mixer: الرئيسي ← الخلاط (افتراضي)
+    """
     pool = await get_pool()
     v = await pool.fetchrow("SELECT * FROM transfer_vouchers WHERE id=$1::uuid", voucher_id)
     if not v:
@@ -640,22 +655,35 @@ async def confirm_transfer_voucher(voucher_id: str, body: ConfirmTransferRequest
     if not items_db:
         raise HTTPException(400, "لا يوجد بنود في السند")
 
-    # ── Determine source / destination warehouses from transfer_type ──────────
+    # ── تحديد المخزن المصدر والهدف حسب نوع التحويل ──────────────────────────
     transfer_type = (v.get("transfer_type") or "main_to_mixer")
+    
+    # أسماء المخازن للعرض
     _wh_names = {
-        "main":    "المخزن الرئيسي",
-        "staging": "المخزن المرحلي",
-        "mixer":   "مخزن الخلطات",
+        "main":      "المخزن الرئيسي",
+        "staging":   "المخزن المرحلي",
+        "mixer":     "مخزن الخلطات",
+        "receiving": "شاشة استلام المواد الخام",  # ✅ جديد
     }
+    
+    # ✅ دعم جميع أنواع التحويل المطلوبة
     if transfer_type == "main_to_staging":
         from_wh, to_wh = "main", "staging"
     elif transfer_type == "staging_to_mixer":
         from_wh, to_wh = "staging", "mixer"
+    elif transfer_type == "mixer_to_receiving":
+        from_wh, to_wh = "mixer", "receiving"
+    elif transfer_type == "staging_to_receiving":
+        from_wh, to_wh = "staging", "receiving"
+    elif transfer_type == "receiving_to_mixer":
+        from_wh, to_wh = "receiving", "mixer"
     else:  # main_to_mixer (default / legacy)
         from_wh, to_wh = "main", "mixer"
 
     from_name = _wh_names.get(from_wh, from_wh)
     to_name   = _wh_names.get(to_wh,   to_wh)
+
+    logger.info(f"[confirm_transfer] تحويل من {from_name} إلى {to_name} — السند: {v['voucher_number']}")
 
     # Build confirmed quantities map (override from body if provided)
     override_map = {}
@@ -697,18 +725,26 @@ async def confirm_transfer_voucher(voucher_id: str, body: ConfirmTransferRequest
             confirmed_qty, item["id"]
         )
 
-        # ── Deduct from source warehouse ──────────────────────────────────
+        # ── الخصم من المخزن المصدر ──────────────────────────────────────────
         src_inv = await pool.fetchrow(
             "SELECT id, balance FROM inventory WHERE material_id=$1::uuid AND warehouse_type=$2",
             mat_id, from_wh,
         )
         src_balance_before = float(src_inv["balance"]) if src_inv else 0.0
         src_balance_after  = max(0, src_balance_before - confirmed_qty)
+        
         if src_inv:
             await pool.execute(
                 "UPDATE inventory SET balance=$1, updated_at=NOW() WHERE id=$2",
                 src_balance_after, src_inv["id"]
             )
+        else:
+            # إذا لم توجد المادة في المخزن المصدر، ننشئها برصيد صفر ثم نخصم
+            await pool.execute(
+                "INSERT INTO inventory (material_id, warehouse_type, balance) VALUES ($1::uuid, $2, $3)",
+                mat_id, from_wh, src_balance_after
+            )
+            
         await pool.execute(
             """INSERT INTO inventory_transactions
                  (material_id, warehouse_type, transaction_type, quantity,
@@ -719,13 +755,14 @@ async def confirm_transfer_voucher(voucher_id: str, body: ConfirmTransferRequest
             f"تحويل إلى {to_name} — سند {v['voucher_number']}"
         )
 
-        # ── Add to destination warehouse ──────────────────────────────────
+        # ── الإضافة إلى المخزن الهدف ────────────────────────────────────────
         dst_inv = await pool.fetchrow(
             "SELECT id, balance FROM inventory WHERE material_id=$1::uuid AND warehouse_type=$2",
             mat_id, to_wh,
         )
         dst_balance_before = float(dst_inv["balance"]) if dst_inv else 0.0
         dst_balance_after  = dst_balance_before + confirmed_qty
+        
         if dst_inv:
             await pool.execute(
                 "UPDATE inventory SET balance=$1, updated_at=NOW() WHERE id=$2",
@@ -736,6 +773,7 @@ async def confirm_transfer_voucher(voucher_id: str, body: ConfirmTransferRequest
                 "INSERT INTO inventory (material_id, warehouse_type, balance) VALUES ($1::uuid, $2, $3)",
                 mat_id, to_wh, dst_balance_after
             )
+            
         await pool.execute(
             """INSERT INTO inventory_transactions
                  (material_id, warehouse_type, transaction_type, quantity,
@@ -754,12 +792,27 @@ async def confirm_transfer_voucher(voucher_id: str, body: ConfirmTransferRequest
            WHERE id=$3::uuid""",
         body.confirmed_by, now, voucher_id
     )
+    
     await _write_audit(pool, "confirm", "transfer_voucher", voucher_id,
                        body.confirmed_by or "مشرف",
-                       {"voucher_number": v["voucher_number"], "transfer_type": transfer_type,
-                        "items_processed": processed, "items_skipped": skipped})
-    return {"status": "confirmed", "items_processed": processed, "items_skipped": skipped,
-            "transfer_type": transfer_type, "from_warehouse": from_wh, "to_warehouse": to_wh}
+                       {
+                           "voucher_number": v["voucher_number"], 
+                           "transfer_type": transfer_type,
+                           "from_warehouse": from_wh, 
+                           "to_warehouse": to_wh,
+                           "items_processed": processed, 
+                           "items_skipped": skipped
+                       })
+    
+    return {
+        "status": "confirmed", 
+        "items_processed": processed, 
+        "items_skipped": skipped,
+        "transfer_type": transfer_type, 
+        "from_warehouse": from_wh, 
+        "to_warehouse": to_wh,
+        "message": f"تم تأكيد التحويل من {from_name} إلى {to_name}"
+    }
 
 
 @router.post("/transfer/{voucher_id}/cancel")
@@ -873,6 +926,9 @@ async def post_return_voucher(voucher_id: str, performed_by: str = "admin"):
     elif orig_type == "staging_to_mixer":
         src_wh, dst_wh = "mixer", "staging"
         src_label, dst_label = "مخزن الخلطات", "المخزن المرحلي"
+    elif orig_type == "mixer_to_receiving":
+        src_wh, dst_wh = "receiving", "mixer"
+        src_label, dst_label = "شاشة الاستلام", "مخزن الخلطات"
     else:  # main_to_mixer (legacy / default)
         src_wh, dst_wh = "mixer", "main"
         src_label, dst_label = "مخزن الخلطات", "المخزن الرئيسي"
