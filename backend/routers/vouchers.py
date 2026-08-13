@@ -12,7 +12,7 @@ Flows:
   Transfer Vouchers (تحويل داخلي) - الأنواع المدعومة:
     main_to_staging    : الرئيسي → المرحلي
     staging_to_mixer   : المرحلي → الخلاط
-    mixer_to_receiving : الخلاط → شاشة الاستلام ✅
+    mixer_to_receiving : الخلاط → شاشة الاستلام
     main_to_mixer      : الرئيسي → الخلاط (افتراضي)
 
   Return Vouchers (مرتجع):
@@ -600,26 +600,43 @@ async def update_transfer_voucher(voucher_id: str, body: ItemsUpdate):
     return {"status": "updated"}
 
 
+# ═══════════════════════════════════════════════════════════════════
+#  ⭐ SUBMIT TRANSFER VOUCHER  (إرسال للمراجعة)
+# ═══════════════════════════════════════════════════════════════════
+
 @router.post("/transfer/{voucher_id}/submit")
 async def submit_transfer_voucher(voucher_id: str, submitted_by: str = "admin"):
     """Submit draft for approval (draft → pending)."""
+    print(f"🔵 [submit_transfer_voucher] استلام طلب إرسال للمراجعة")
+    print(f"🔵 [submit_transfer_voucher] voucher_id: {voucher_id}")
+    
     pool = await get_pool()
     v = await pool.fetchrow("SELECT * FROM transfer_vouchers WHERE id=$1::uuid", voucher_id)
+    
     if not v:
+        print("❌ السند غير موجود")
         raise HTTPException(404, "سند التحويل غير موجود")
+    
+    print(f"🔵 [submit_transfer_voucher] الحالة الحالية: {v['status']}")
+    
     if v["status"] != "draft":
+        print(f"❌ حالة غير صالحة: {v['status']}")
         raise HTTPException(400, f"لا يمكن إرسال سند بحالة: {v['status']}")
 
     items = await pool.fetch(
         "SELECT * FROM transfer_voucher_items WHERE voucher_id=$1::uuid", voucher_id
     )
     if not items:
+        print("❌ لا يوجد بنود في السند")
         raise HTTPException(400, "لا يوجد بنود في السند")
 
     await pool.execute(
         "UPDATE transfer_vouchers SET status='pending', updated_at=NOW() WHERE id=$1::uuid",
         voucher_id
     )
+    
+    print(f"✅ [submit_transfer_voucher] تم تغيير الحالة إلى pending")
+    
     await _write_audit(pool, "submit", "transfer_voucher", voucher_id, submitted_by,
                        {"voucher_number": v["voucher_number"]})
     return {"status": "pending", "message": "السند في انتظار التأكيد من مشرف الخلطات"}
@@ -638,7 +655,7 @@ async def confirm_transfer_voucher(voucher_id: str, body: ConfirmTransferRequest
     الأنواع المدعومة:
     - main_to_staging: الرئيسي → المرحلي
     - staging_to_mixer: المرحلي → الخلاط
-    - mixer_to_receiving: الخلاط → شاشة الاستلام ✅
+    - mixer_to_receiving: الخلاط → شاشة الاستلام
     - main_to_mixer: الرئيسي → الخلاط (افتراضي)
     """
     print(f"🔵 [confirm_transfer_voucher] استلام طلب تأكيد")
@@ -657,7 +674,7 @@ async def confirm_transfer_voucher(voucher_id: str, body: ConfirmTransferRequest
         print("❌ السند مؤكد مسبقاً")
         raise HTTPException(400, "السند مُؤكَّد مسبقاً")
     
-    if v["status"] not in ("pending", "draft"):
+    if v["status"] != "pending":
         print(f"❌ حالة غير صالحة: {v['status']}")
         raise HTTPException(400, f"لا يمكن تأكيد سند بحالة: {v['status']}")
 
@@ -931,6 +948,9 @@ async def post_return_voucher(voucher_id: str, performed_by: str = "admin"):
         raise HTTPException(400, "السند مُرحَّل مسبقاً")
 
     # Determine the source warehouse to reverse based on the original transfer type.
+    # main_to_staging → return deducts from staging back to main
+    # main_to_mixer (default) → return deducts from mixer back to main
+    # staging_to_mixer → return deducts from mixer back to staging
     orig = await pool.fetchrow(
         "SELECT transfer_type FROM transfer_vouchers WHERE id=$1::uuid",
         v["original_voucher_id"]
