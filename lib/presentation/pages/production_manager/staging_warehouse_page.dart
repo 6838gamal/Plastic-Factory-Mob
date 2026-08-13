@@ -384,6 +384,7 @@ class _IncomingTab extends ConsumerWidget {
               operatorName: operatorName,
               onAction: onRefresh,
               role: 'incoming',
+              transferType: 'main_to_staging',
               showError: showError,
               showSuccess: showSuccess,
             ),
@@ -459,6 +460,7 @@ class _OutgoingTab extends ConsumerWidget {
               operatorName: operatorName,
               onAction: onRefresh,
               role: 'outgoing',
+              transferType: 'staging_to_mixer',
               showError: showError,
               showSuccess: showSuccess,
             ),
@@ -478,6 +480,7 @@ class _VoucherCard extends ConsumerWidget {
   final String operatorName;
   final VoidCallback onAction;
   final String role; // 'incoming' or 'outgoing'
+  final String transferType;
   final void Function(BuildContext, String) showError;
   final void Function(BuildContext, String) showSuccess;
 
@@ -486,6 +489,7 @@ class _VoucherCard extends ConsumerWidget {
     required this.operatorName,
     required this.onAction,
     required this.role,
+    required this.transferType,
     required this.showError,
     required this.showSuccess,
   });
@@ -613,7 +617,7 @@ class _VoucherCard extends ConsumerWidget {
                     },
                   ),
                   const SizedBox(width: 8),
-                  // Submit (if draft)
+                  // ✅ Submit (if draft) - إرسال للمراجعة
                   if (voucher.isDraft)
                     ElevatedButton.icon(
                       icon: const Icon(Icons.send, size: 16),
@@ -621,65 +625,56 @@ class _VoucherCard extends ConsumerWidget {
                       style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
                       onPressed: () async {
                         try {
-                          await ds.submitTransferVoucher(voucher.id!);
-                          showSuccess(context, 'تم إرسال السند للمراجعة');
+                          print('🔵 [Submit] إرسال سند للمراجعة: ${voucher.id}');
+                          final response = await ds.submitTransferVoucher(voucher.id!);
+                          print('✅ [Submit] تم الإرسال: $response');
+                          showSuccess(context, '✅ تم إرسال السند للمراجعة');
                           onAction();
                         } catch (e) {
-                          showError(context, 'فشل إرسال السند: ${e.toString()}');
+                          print('❌ [Submit] فشل الإرسال: $e');
+                          showError(context, '❌ فشل إرسال السند: ${e.toString()}');
                         }
                       },
                     ),
-                  // Confirm receipt — incoming: main→staging
-                  if (role == 'incoming' && voucher.isPending)
+                  // ✅ Confirm receipt - هذا الزر يظهر فقط عندما يكون السند في حالة pending
+                  if (voucher.isPending)
                     ElevatedButton.icon(
                       icon: const Icon(Icons.check_circle, size: 16),
-                      label: const Text('تأكيد الاستلام للمرحلي'),
-                      style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+                      label: role == 'incoming' 
+                          ? 'تأكيد الاستلام للمرحلي' 
+                          : 'تأكيد استلام الخلاط',
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: role == 'incoming' ? Colors.green : Colors.teal,
+                      ),
                       onPressed: () async {
+                        final confirmMsg = role == 'incoming'
+                            ? 'هل تأكد استلام المواد من المخزن الرئيسي؟\nسيتم نقل المواد للمخزن المرحلي.'
+                            : 'هل تأكد استلام المواد من المخزن المرحلي؟\nسيتم نقل المواد لمخزن الخلطات.';
+                        
                         final ok = await _confirmDialog(
                           context,
                           'تأكيد الاستلام',
-                          'هل تأكد استلام المواد من المخزن الرئيسي؟\nسيتم نقل المواد للمخزن المرحلي.',
+                          confirmMsg,
                         );
                         if (ok) {
                           try {
-                            print('🔵 [Incoming] تأكيد سند: ${voucher.id}');
+                            print('🔵 [Confirm] تأكيد سند: ${voucher.id}');
+                            print('🔵 [Confirm] transferType: $transferType');
+                            
                             final response = await ds.confirmTransferVoucher(voucher.id!, {
                               'confirmed_by': operatorName,
                             });
-                            print('✅ [Incoming] تم التأكيد: $response');
-                            showSuccess(context, '✅ تم تأكيد الاستلام ونقل المواد للمخزن المرحلي');
+                            
+                            print('✅ [Confirm] تم التأكيد: $response');
+                            
+                            final successMsg = role == 'incoming'
+                                ? '✅ تم تأكيد الاستلام ونقل المواد للمخزن المرحلي'
+                                : '✅ تم تأكيد الاستلام ونقل المواد لمخزن الخلطات';
+                            
+                            showSuccess(context, successMsg);
                             onAction();
                           } catch (e) {
-                            print('❌ [Incoming] فشل التأكيد: $e');
-                            showError(context, '❌ فشل تأكيد الاستلام: ${e.toString()}');
-                          }
-                        }
-                      },
-                    ),
-                  // Confirm receipt — outgoing: staging→mixer
-                  if (role == 'outgoing' && voucher.isPending)
-                    ElevatedButton.icon(
-                      icon: const Icon(Icons.check_circle, size: 16),
-                      label: const Text('تأكيد استلام الخلاط'),
-                      style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
-                      onPressed: () async {
-                        final ok = await _confirmDialog(
-                          context,
-                          'تأكيد استلام مخزن الخلاط',
-                          'هل تأكد استلام المواد من المخزن المرحلي؟\nسيتم نقل المواد لمخزن الخلطات.',
-                        );
-                        if (ok) {
-                          try {
-                            print('🔵 [Outgoing] تأكيد سند: ${voucher.id}');
-                            final response = await ds.confirmTransferVoucher(voucher.id!, {
-                              'confirmed_by': operatorName,
-                            });
-                            print('✅ [Outgoing] تم التأكيد: $response');
-                            showSuccess(context, '✅ تم تأكيد الاستلام ونقل المواد لمخزن الخلطات');
-                            onAction();
-                          } catch (e) {
-                            print('❌ [Outgoing] فشل التأكيد: $e');
+                            print('❌ [Confirm] فشل التأكيد: $e');
                             showError(context, '❌ فشل تأكيد الاستلام: ${e.toString()}');
                           }
                         }
@@ -803,6 +798,8 @@ class _StagingVoucherDialogState extends ConsumerState<_StagingVoucherDialog> {
     try {
       final ds = ref.read(dataSourceProvider);
 
+      print('🔵 [Dialog] إنشاء سند تحويل: ${widget.transferType}');
+      
       await ds.createTransferVoucher({
         'notes': _notesCtrl.text.trim(),
         'created_by': widget.createdBy ?? 'مدير الإنتاج',
