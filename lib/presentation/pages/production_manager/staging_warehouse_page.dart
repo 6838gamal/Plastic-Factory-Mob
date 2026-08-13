@@ -14,18 +14,21 @@ import '../worker/raw_material_receiving_page.dart';
 // Providers
 // ──────────────────────────────────────────────────────────────────────────────
 
-final _stagingInventoryProvider = FutureProvider.autoDispose<List<InventorySummaryModel>>((ref) async {
+/// مخزون المخزن المرحلي
+final stagingInventoryProvider = FutureProvider.autoDispose<List<InventorySummaryModel>>((ref) async {
   final summary = await ref.watch(inventorySummaryProvider.future);
   return summary.where((m) => m.warehouseType == 'staging').toList();
 });
 
-final _stagingIncomingProvider = FutureProvider.autoDispose<List<TransferVoucherModel>>((ref) async {
+/// سندات وارد من الرئيسي (main → staging)
+final stagingIncomingProvider = FutureProvider.autoDispose<List<TransferVoucherModel>>((ref) async {
   final ds = ref.read(dataSourceProvider);
   final raw = await ds.getTransferVouchers(transferType: 'main_to_staging');
   return raw.map(TransferVoucherModel.fromJson).toList();
 });
 
-final _stagingOutgoingProvider = FutureProvider.autoDispose<List<TransferVoucherModel>>((ref) async {
+/// سندات صادر للخلاط (staging → mixer)
+final stagingOutgoingProvider = FutureProvider.autoDispose<List<TransferVoucherModel>>((ref) async {
   final ds = ref.read(dataSourceProvider);
   final raw = await ds.getTransferVouchers(transferType: 'staging_to_mixer');
   return raw.map(TransferVoucherModel.fromJson).toList();
@@ -59,14 +62,12 @@ class _StagingWarehousePageState extends ConsumerState<StagingWarehousePage>
     super.dispose();
   }
 
-  // ✅ استخدام refresh بدلاً من invalidate للتحديث التلقائي
+  /// تحديث جميع البيانات
   void _refresh() {
-    ref.refresh(_stagingInventoryProvider);
-    ref.refresh(_stagingIncomingProvider);
-    ref.refresh(_stagingOutgoingProvider);
-    ref.refresh(inventorySummaryProvider);
-    // إعادة بناء واجهة المستخدم
-    setState(() {});
+    ref.invalidate(stagingInventoryProvider);
+    ref.invalidate(stagingIncomingProvider);
+    ref.invalidate(stagingOutgoingProvider);
+    ref.invalidate(inventorySummaryProvider);
   }
 
   String get _operatorName {
@@ -78,7 +79,7 @@ class _StagingWarehousePageState extends ConsumerState<StagingWarehousePage>
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => RawMaterialReceivingPage(),
+        builder: (context) => const RawMaterialReceivingPage(),
       ),
     );
   }
@@ -120,7 +121,7 @@ class _StagingWarehousePageState extends ConsumerState<StagingWarehousePage>
   @override
   Widget build(BuildContext context) {
     final pendingCount = ref
-            .watch(_stagingIncomingProvider)
+            .watch(stagingIncomingProvider)
             .valueOrNull
             ?.where((v) => v.isPending)
             .length ??
@@ -157,7 +158,10 @@ class _StagingWarehousePageState extends ConsumerState<StagingWarehousePage>
               ),
               text: 'وارد من الرئيسي',
             ),
-            const Tab(icon: Icon(Icons.arrow_upward), text: 'صادر للخلاط'),
+            const Tab(
+              icon: Icon(Icons.arrow_upward),
+              text: 'صادر للخلاط',
+            ),
           ],
         ),
       ),
@@ -221,7 +225,8 @@ class _InventoryTab extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final async = ref.watch(_stagingInventoryProvider);
+    final async = ref.watch(stagingInventoryProvider);
+    
     return async.when(
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, _) => Center(
@@ -230,7 +235,7 @@ class _InventoryTab extends ConsumerWidget {
           children: [
             Icon(Icons.error_outline, size: 48, color: Colors.red),
             const SizedBox(height: 12),
-            Text('حدث خطأ أثناء تحميل المخزون', style: TextStyle(color: Colors.red)),
+            const Text('حدث خطأ أثناء تحميل المخزون', style: TextStyle(color: Colors.red)),
             const SizedBox(height: 8),
             Text(e.toString(), style: TextStyle(color: Colors.grey, fontSize: 12)),
             const SizedBox(height: 16),
@@ -257,30 +262,15 @@ class _InventoryTab extends ConsumerWidget {
             ),
           );
         }
+        
         final total = items.fold(0.0, (s, m) => s + m.currentBalance);
+        
         return Column(
           children: [
-            Container(
-              margin: const EdgeInsets.all(12),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: Colors.deepOrange.shade50,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.deepOrange.shade100),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.warehouse, color: Colors.deepOrange),
-                  const SizedBox(width: 8),
-                  Text('إجمالي المخزون المرحلي',
-                      style: TextStyle(color: Colors.deepOrange.shade800, fontWeight: FontWeight.bold)),
-                  const Spacer(),
-                  Text(
-                    '${total.toStringAsFixed(1)} كجم',
-                    style: TextStyle(color: Colors.deepOrange.shade800, fontWeight: FontWeight.bold, fontSize: 16),
-                  ),
-                ],
-              ),
+            _buildSummaryCard(
+              title: 'إجمالي المخزون المرحلي',
+              total: total,
+              color: Colors.deepOrange,
             ),
             Expanded(
               child: ListView.builder(
@@ -288,30 +278,7 @@ class _InventoryTab extends ConsumerWidget {
                 itemCount: items.length,
                 itemBuilder: (ctx, i) {
                   final m = items[i];
-                  return Card(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    child: ListTile(
-                      leading: CircleAvatar(
-                        backgroundColor: Colors.deepOrange.shade50,
-                        child: Icon(Icons.science_outlined, color: Colors.deepOrange.shade700),
-                      ),
-                      title: Text(m.materialName, style: const TextStyle(fontWeight: FontWeight.w600)),
-                      trailing: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Text(
-                            '${m.currentBalance.toStringAsFixed(2)} ${m.unit}',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 15,
-                              color: m.currentBalance <= 0 ? Colors.red : Colors.deepOrange.shade700,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
+                  return _buildMaterialCard(m, Colors.deepOrange);
                 },
               ),
             ),
@@ -341,7 +308,8 @@ class _IncomingTab extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final async = ref.watch(_stagingIncomingProvider);
+    final async = ref.watch(stagingIncomingProvider);
+    
     return async.when(
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, _) => Center(
@@ -350,7 +318,7 @@ class _IncomingTab extends ConsumerWidget {
           children: [
             Icon(Icons.error_outline, size: 48, color: Colors.red),
             const SizedBox(height: 12),
-            Text('حدث خطأ أثناء تحميل الطلبات الواردة', style: TextStyle(color: Colors.red)),
+            const Text('حدث خطأ أثناء تحميل الطلبات الواردة', style: TextStyle(color: Colors.red)),
             const SizedBox(height: 8),
             Text(e.toString(), style: TextStyle(color: Colors.grey, fontSize: 12)),
             const SizedBox(height: 16),
@@ -377,12 +345,14 @@ class _IncomingTab extends ConsumerWidget {
             ),
           );
         }
+        
         return RefreshIndicator(
           onRefresh: () async => onRefresh(),
           child: ListView.builder(
             padding: const EdgeInsets.all(12),
             itemCount: vouchers.length,
             itemBuilder: (ctx, i) => _VoucherCard(
+              key: ValueKey(vouchers[i].id),
               voucher: vouchers[i],
               operatorName: operatorName,
               onAction: onRefresh,
@@ -416,7 +386,8 @@ class _OutgoingTab extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final async = ref.watch(_stagingOutgoingProvider);
+    final async = ref.watch(stagingOutgoingProvider);
+    
     return async.when(
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, _) => Center(
@@ -425,7 +396,7 @@ class _OutgoingTab extends ConsumerWidget {
           children: [
             Icon(Icons.error_outline, size: 48, color: Colors.red),
             const SizedBox(height: 12),
-            Text('حدث خطأ أثناء تحميل السندات الصادرة', style: TextStyle(color: Colors.red)),
+            const Text('حدث خطأ أثناء تحميل السندات الصادرة', style: TextStyle(color: Colors.red)),
             const SizedBox(height: 8),
             Text(e.toString(), style: TextStyle(color: Colors.grey, fontSize: 12)),
             const SizedBox(height: 16),
@@ -452,12 +423,14 @@ class _OutgoingTab extends ConsumerWidget {
             ),
           );
         }
+        
         return RefreshIndicator(
           onRefresh: () async => onRefresh(),
           child: ListView.builder(
             padding: const EdgeInsets.all(12),
             itemCount: vouchers.length,
             itemBuilder: (ctx, i) => _VoucherCard(
+              key: ValueKey(vouchers[i].id),
               voucher: vouchers[i],
               operatorName: operatorName,
               onAction: onRefresh,
@@ -473,7 +446,7 @@ class _OutgoingTab extends ConsumerWidget {
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
-// بطاقة السند
+// بطاقة السند الموحدة
 // ──────────────────────────────────────────────────────────────────────────────
 
 class _VoucherCard extends ConsumerWidget {
@@ -485,6 +458,7 @@ class _VoucherCard extends ConsumerWidget {
   final void Function(BuildContext, String) showSuccess;
 
   const _VoucherCard({
+    super.key,
     required this.voucher,
     required this.operatorName,
     required this.onAction,
@@ -519,16 +493,19 @@ class _VoucherCard extends ConsumerWidget {
     }
   }
 
+  String get _transferLabel {
+    return role == 'incoming' 
+        ? 'المخزن الرئيسي ← المخزن المرحلي'
+        : 'المخزن المرحلي ← مخزن الخلطات';
+  }
+
+  Color get _transferColor {
+    return role == 'incoming' ? Colors.blue : Colors.orange;
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final ds = ref.read(dataSourceProvider);
-    
-    // طباعة حالة السند للتتبع
-    print('🔵 ====== سند: ${voucher.voucherNumber} ======');
-    print('🔵 الحالة: ${voucher.status}');
-    print('🔵 isDraft: ${voucher.isDraft}');
-    print('🔵 isPending: ${voucher.isPending}');
-    print('🔵 isConfirmed: ${voucher.isConfirmed}');
     
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
@@ -538,21 +515,21 @@ class _VoucherCard extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header
+            // رأس البطاقة
             Row(
               children: [
                 Chip(
-                  label: Text(_statusLabel,
-                      style: const TextStyle(color: Colors.white, fontSize: 12)),
+                  label: Text(_statusLabel, style: const TextStyle(color: Colors.white, fontSize: 12)),
                   backgroundColor: _statusColor,
                   padding: EdgeInsets.zero,
                   materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
                 const SizedBox(width: 8),
-                if (role == 'incoming')
-                  const Icon(Icons.arrow_downward, size: 16, color: Colors.blue),
-                if (role == 'outgoing')
-                  const Icon(Icons.arrow_upward, size: 16, color: Colors.orange),
+                Icon(
+                  role == 'incoming' ? Icons.arrow_downward : Icons.arrow_upward,
+                  size: 16,
+                  color: _transferColor,
+                ),
                 const SizedBox(width: 4),
                 Text(
                   voucher.voucherNumber ?? '',
@@ -561,13 +538,28 @@ class _VoucherCard extends ConsumerWidget {
                 const Spacer(),
                 if (voucher.createdAt != null)
                   Text(
-                    voucher.createdAt!.split('T').first,
+                    _formatDate(voucher.createdAt!),
                     style: const TextStyle(color: Colors.grey, fontSize: 12),
                   ),
               ],
             ),
+            
+            // نوع التحويل
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                _transferLabel,
+                style: TextStyle(
+                  fontSize: 11,
+                  color: _transferColor,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+            
             const SizedBox(height: 8),
-            // Items
+            
+            // المواد
             if (voucher.itemNames.isNotEmpty)
               Wrap(
                 spacing: 4,
@@ -580,29 +572,39 @@ class _VoucherCard extends ConsumerWidget {
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(color: Colors.deepOrange.shade100),
                     ),
-                    child: Text(name, style: TextStyle(fontSize: 11, color: Colors.deepOrange.shade800)),
+                    child: Text(
+                      name, 
+                      style: TextStyle(fontSize: 11, color: Colors.deepOrange.shade800),
+                    ),
                   );
                 }).toList(),
               ),
+            
             if (voucher.itemNames.length > 4)
               Padding(
                 padding: const EdgeInsets.only(top: 4),
-                child: Text('+${voucher.itemNames.length - 4} مواد أخرى',
-                    style: const TextStyle(color: Colors.grey, fontSize: 11)),
+                child: Text(
+                  '+${voucher.itemNames.length - 4} مواد أخرى',
+                  style: const TextStyle(color: Colors.grey, fontSize: 11),
+                ),
               ),
+            
             if (voucher.notes?.isNotEmpty == true)
               Padding(
                 padding: const EdgeInsets.only(top: 6),
-                child: Text('ملاحظات: ${voucher.notes}',
-                    style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                child: Text(
+                  'ملاحظات: ${voucher.notes}',
+                  style: const TextStyle(color: Colors.grey, fontSize: 12),
+                ),
               ),
-            // Actions
+            
+            // ─── الأزرار ──────────────────────────────────────────────────────
             if (!voucher.isConfirmed && !voucher.isCancelled) ...[
               const Divider(height: 16),
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  // Cancel
+                  // إلغاء
                   TextButton.icon(
                     icon: const Icon(Icons.cancel_outlined, color: Colors.red, size: 16),
                     label: const Text('إلغاء', style: TextStyle(color: Colors.red)),
@@ -616,7 +618,6 @@ class _VoucherCard extends ConsumerWidget {
                         try {
                           await ds.cancelTransferVoucher(voucher.id!);
                           showSuccess(context, 'تم إلغاء السند بنجاح');
-                          // تحديث البيانات بعد الإلغاء
                           onAction();
                         } catch (e) {
                           showError(context, 'فشل إلغاء السند: ${e.toString()}');
@@ -625,7 +626,8 @@ class _VoucherCard extends ConsumerWidget {
                     },
                   ),
                   const SizedBox(width: 8),
-                  // ✅ Submit (if draft) - إرسال للمراجعة
+                  
+                  // إرسال للمراجعة (إذا كان مسودة)
                   if (voucher.isDraft)
                     ElevatedButton.icon(
                       icon: const Icon(Icons.send, size: 16),
@@ -633,25 +635,24 @@ class _VoucherCard extends ConsumerWidget {
                       style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
                       onPressed: () async {
                         try {
-                          print('🔵 [Submit] إرسال سند للمراجعة: ${voucher.id}');
-                          final response = await ds.submitTransferVoucher(voucher.id!);
-                          print('✅ [Submit] تم الإرسال: $response');
+                          await ds.submitTransferVoucher(voucher.id!);
                           showSuccess(context, '✅ تم إرسال السند للمراجعة');
-                          // تحديث البيانات بعد الإرسال
                           onAction();
                         } catch (e) {
-                          print('❌ [Submit] فشل الإرسال: $e');
                           showError(context, '❌ فشل إرسال السند: ${e.toString()}');
                         }
                       },
                     ),
-                  // ✅ Confirm receipt - يظهر فقط عندما يكون السند في حالة pending
+                  
+                  // تأكيد الاستلام (إذا كان في انتظار)
                   if (voucher.isPending)
                     ElevatedButton.icon(
                       icon: const Icon(Icons.check_circle, size: 16),
-                      label: Text(role == 'incoming' 
-                          ? 'تأكيد الاستلام للمرحلي' 
-                          : 'تأكيد استلام الخلاط'),
+                      label: Text(
+                        role == 'incoming' 
+                            ? 'تأكيد الاستلام للمرحلي' 
+                            : 'تأكيد استلام الخلاط',
+                      ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: role == 'incoming' ? Colors.green : Colors.teal,
                       ),
@@ -665,25 +666,20 @@ class _VoucherCard extends ConsumerWidget {
                           'تأكيد الاستلام',
                           confirmMsg,
                         );
+                        
                         if (ok) {
                           try {
-                            print('🔵 [Confirm] تأكيد سند: ${voucher.id}');
-                            
-                            final response = await ds.confirmTransferVoucher(voucher.id!, {
+                            await ds.confirmTransferVoucher(voucher.id!, {
                               'confirmed_by': operatorName,
                             });
-                            
-                            print('✅ [Confirm] تم التأكيد: $response');
                             
                             final successMsg = role == 'incoming'
                                 ? '✅ تم تأكيد الاستلام ونقل المواد للمخزن المرحلي'
                                 : '✅ تم تأكيد الاستلام ونقل المواد لمخزن الخلطات';
                             
                             showSuccess(context, successMsg);
-                            // تحديث البيانات بعد التأكيد
                             onAction();
                           } catch (e) {
-                            print('❌ [Confirm] فشل التأكيد: $e');
                             showError(context, '❌ فشل تأكيد الاستلام: ${e.toString()}');
                           }
                         }
@@ -692,7 +688,8 @@ class _VoucherCard extends ConsumerWidget {
                 ],
               ),
             ],
-            // Confirmed info
+            
+            // معلومات التأكيد
             if (voucher.isConfirmed && voucher.confirmedBy != null)
               Padding(
                 padding: const EdgeInsets.only(top: 6),
@@ -700,8 +697,10 @@ class _VoucherCard extends ConsumerWidget {
                   children: [
                     const Icon(Icons.check_circle, color: Colors.green, size: 14),
                     const SizedBox(width: 4),
-                    Text('تم التنفيذ بواسطة: ${voucher.confirmedBy}',
-                        style: const TextStyle(color: Colors.green, fontSize: 12)),
+                    Text(
+                      'تم التنفيذ بواسطة: ${voucher.confirmedBy}',
+                      style: const TextStyle(color: Colors.green, fontSize: 12),
+                    ),
                   ],
                 ),
               ),
@@ -734,6 +733,15 @@ class _VoucherCard extends ConsumerWidget {
     );
     return res ?? false;
   }
+
+  String _formatDate(String dateStr) {
+    try {
+      final date = DateTime.parse(dateStr);
+      return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+    } catch (_) {
+      return dateStr.split('T').first;
+    }
+  }
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -741,7 +749,7 @@ class _VoucherCard extends ConsumerWidget {
 // ──────────────────────────────────────────────────────────────────────────────
 
 class _StagingVoucherDialog extends ConsumerStatefulWidget {
-  final String transferType; // main_to_staging | staging_to_mixer
+  final String transferType;
   final String? createdBy;
   final VoidCallback onSaved;
   final void Function(BuildContext, String) showError;
@@ -806,8 +814,6 @@ class _StagingVoucherDialogState extends ConsumerState<_StagingVoucherDialog> {
 
     try {
       final ds = ref.read(dataSourceProvider);
-
-      print('🔵 [Dialog] إنشاء سند تحويل: ${widget.transferType}');
       
       await ds.createTransferVoucher({
         'notes': _notesCtrl.text.trim(),
@@ -826,7 +832,6 @@ class _StagingVoucherDialogState extends ConsumerState<_StagingVoucherDialog> {
       if (mounted) {
         Navigator.pop(context);
         widget.showSuccess(context, '✅ تم إنشاء السند بنجاح');
-        // تحديث البيانات بعد الإنشاء
         widget.onSaved();
       }
     } catch (e) {
@@ -855,7 +860,7 @@ class _StagingVoucherDialogState extends ConsumerState<_StagingVoucherDialog> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Flow indicator
+              // مؤشر التدفق
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
@@ -876,6 +881,8 @@ class _StagingVoucherDialogState extends ConsumerState<_StagingVoucherDialog> {
                 ),
               ),
               const SizedBox(height: 12),
+              
+              // ملاحظات
               TextField(
                 controller: _notesCtrl,
                 maxLines: 2,
@@ -885,6 +892,8 @@ class _StagingVoucherDialogState extends ConsumerState<_StagingVoucherDialog> {
                 ),
               ),
               const SizedBox(height: 16),
+              
+              // قائمة المواد
               Row(
                 children: [
                   const Text('المواد', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -897,6 +906,7 @@ class _StagingVoucherDialogState extends ConsumerState<_StagingVoucherDialog> {
                 ],
               ),
               const Divider(),
+              
               ..._items.asMap().entries.map((e) => _VItemRow(
                     index: e.key,
                     entry: e.value,
@@ -904,6 +914,7 @@ class _StagingVoucherDialogState extends ConsumerState<_StagingVoucherDialog> {
                     onRemove: () => _removeItem(e.key),
                     onChanged: () => setState(() {}),
                   )),
+              
               if (_items.isEmpty)
                 const Padding(
                   padding: EdgeInsets.symmetric(vertical: 8),
@@ -949,7 +960,11 @@ class _StagingVoucherDialogState extends ConsumerState<_StagingVoucherDialog> {
 // مكونات مساعدة
 // ──────────────────────────────────────────────────────────────────────────────
 
-Widget _buildSummaryCard(String title, double total, MaterialColor color) {
+Widget _buildSummaryCard({
+  required String title,
+  required double total,
+  required MaterialColor color,
+}) {
   return Container(
     margin: const EdgeInsets.all(12),
     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -982,13 +997,19 @@ Widget _buildMaterialCard(InventorySummaryModel item, MaterialColor color) {
         child: Icon(Icons.science_outlined, color: color.shade700),
       ),
       title: Text(item.materialName, style: const TextStyle(fontWeight: FontWeight.w600)),
-      trailing: Text(
-        '${item.currentBalance.toStringAsFixed(2)} ${item.unit}',
-        style: TextStyle(
-          fontWeight: FontWeight.bold,
-          fontSize: 15,
-          color: item.currentBalance <= 0 ? Colors.red : color.shade700,
-        ),
+      trailing: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Text(
+            '${item.currentBalance.toStringAsFixed(2)} ${item.unit}',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 15,
+              color: item.currentBalance <= 0 ? Colors.red : color.shade700,
+            ),
+          ),
+        ],
       ),
     ),
   );
@@ -1055,7 +1076,8 @@ class _VItemRow extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 8),
-          // Material dropdown
+          
+          // اختيار المادة
           materials.isEmpty
               ? TextField(
                   decoration: const InputDecoration(
@@ -1094,6 +1116,8 @@ class _VItemRow extends StatelessWidget {
                   },
                 ),
           const SizedBox(height: 8),
+          
+          // الكمية والوحدة
           Row(
             children: [
               Expanded(
