@@ -384,7 +384,6 @@ class _IncomingTab extends ConsumerWidget {
               operatorName: operatorName,
               onAction: onRefresh,
               role: 'incoming',
-              transferType: 'main_to_staging',
               showError: showError,
               showSuccess: showSuccess,
             ),
@@ -460,7 +459,6 @@ class _OutgoingTab extends ConsumerWidget {
               operatorName: operatorName,
               onAction: onRefresh,
               role: 'outgoing',
-              transferType: 'staging_to_mixer',
               showError: showError,
               showSuccess: showSuccess,
             ),
@@ -480,7 +478,6 @@ class _VoucherCard extends ConsumerWidget {
   final String operatorName;
   final VoidCallback onAction;
   final String role; // 'incoming' or 'outgoing'
-  final String transferType;
   final void Function(BuildContext, String) showError;
   final void Function(BuildContext, String) showSuccess;
 
@@ -489,7 +486,6 @@ class _VoucherCard extends ConsumerWidget {
     required this.operatorName,
     required this.onAction,
     required this.role,
-    required this.transferType,
     required this.showError,
     required this.showSuccess,
   });
@@ -617,7 +613,7 @@ class _VoucherCard extends ConsumerWidget {
                     },
                   ),
                   const SizedBox(width: 8),
-                  // ✅ Submit (if draft) - إرسال للمراجعة
+                  // Submit (if draft)
                   if (voucher.isDraft)
                     ElevatedButton.icon(
                       icon: const Icon(Icons.send, size: 16),
@@ -636,13 +632,14 @@ class _VoucherCard extends ConsumerWidget {
                         }
                       },
                     ),
-                  // ✅ Confirm receipt - هذا الزر يظهر فقط عندما يكون السند في حالة pending
+                  // ✅ Confirm receipt - يظهر فقط عندما يكون السند في حالة pending
                   if (voucher.isPending)
                     ElevatedButton.icon(
                       icon: const Icon(Icons.check_circle, size: 16),
-                      label: role == 'incoming' 
+                      // ✅ التصحيح: استخدام Text() بدلاً من String مباشر
+                      label: Text(role == 'incoming' 
                           ? 'تأكيد الاستلام للمرحلي' 
-                          : 'تأكيد استلام الخلاط',
+                          : 'تأكيد استلام الخلاط'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: role == 'incoming' ? Colors.green : Colors.teal,
                       ),
@@ -659,7 +656,6 @@ class _VoucherCard extends ConsumerWidget {
                         if (ok) {
                           try {
                             print('🔵 [Confirm] تأكيد سند: ${voucher.id}');
-                            print('🔵 [Confirm] transferType: $transferType');
                             
                             final response = await ds.confirmTransferVoucher(voucher.id!, {
                               'confirmed_by': operatorName,
