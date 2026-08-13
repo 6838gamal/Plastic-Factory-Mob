@@ -22,7 +22,7 @@ class AppConfig {
       return injected;
     }
 
-    return 'http://localhost:5000';
+    return 'https://plastic-factory-api-backend.onrender.com';
   }
 
   static const String environment = String.fromEnvironment(
