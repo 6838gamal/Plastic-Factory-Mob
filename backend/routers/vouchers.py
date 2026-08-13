@@ -550,6 +550,10 @@ async def create_transfer_voucher(body: TransferVoucherCreate):
     voucher_no = await _next_voucher_number(pool, "transfer")
     transfer_type = body.transfer_type or "main_to_mixer"
 
+    print(f"🔵 [create_transfer_voucher] إنشاء سند: {voucher_no}")
+    print(f"🔵 [create_transfer_voucher] type: {transfer_type}")
+    print(f"🔵 [create_transfer_voucher] items: {len(body.items)}")
+
     vid = await pool.fetchval(
         """INSERT INTO transfer_vouchers (voucher_number, notes, created_by, transfer_type)
            VALUES ($1, $2, $3, $4) RETURNING id""",
@@ -633,37 +637,54 @@ async def confirm_transfer_voucher(voucher_id: str, body: ConfirmTransferRequest
     تأكيد سند التحويل ونقل الكميات بين المخازن.
     
     الأنواع المدعومة:
-    - main_to_staging: الرئيسي ← المرحلي
-    - staging_to_mixer: المرحلي ← الخلاط
-    - mixer_to_receiving: الخلاط ← شاشة الاستلام (جديد)
-    - staging_to_receiving: المرحلي ← شاشة الاستلام (جديد)
-    - receiving_to_mixer: شاشة الاستلام ← الخلاط (جديد)
-    - main_to_mixer: الرئيسي ← الخلاط (افتراضي)
+    - main_to_staging: الرئيسي → المرحلي
+    - staging_to_mixer: المرحلي → الخلاط
+    - mixer_to_receiving: الخلاط → شاشة الاستلام (جديد)
+    - staging_to_receiving: المرحلي → شاشة الاستلام (جديد)
+    - receiving_to_mixer: شاشة الاستلام → الخلاط (جديد)
+    - main_to_mixer: الرئيسي → الخلاط (افتراضي)
     """
+    print(f"🔵 [confirm_transfer_voucher] استلام طلب تأكيد")
+    print(f"🔵 [confirm_transfer_voucher] voucher_id: {voucher_id}")
+    print(f"🔵 [confirm_transfer_voucher] body: {body}")
+    
     pool = await get_pool()
     v = await pool.fetchrow("SELECT * FROM transfer_vouchers WHERE id=$1::uuid", voucher_id)
+    
+    print(f"🔵 [confirm_transfer_voucher] السند المسترجع: {dict(v) if v else 'غير موجود'}")
+    
     if not v:
+        print("❌ السند غير موجود")
         raise HTTPException(404, "سند التحويل غير موجود")
+    
+    print(f"🔵 [confirm_transfer_voucher] الحالة الحالية: {v['status']}")
+    
     if v["status"] == "confirmed":
+        print("❌ السند مؤكد مسبقاً")
         raise HTTPException(400, "السند مُؤكَّد مسبقاً")
+    
     if v["status"] not in ("pending", "draft"):
+        print(f"❌ حالة غير صالحة: {v['status']}")
         raise HTTPException(400, f"لا يمكن تأكيد سند بحالة: {v['status']}")
 
     items_db = await pool.fetch(
         "SELECT * FROM transfer_voucher_items WHERE voucher_id=$1::uuid", voucher_id
     )
     if not items_db:
+        print("❌ لا يوجد بنود في السند")
         raise HTTPException(400, "لا يوجد بنود في السند")
 
     # ── تحديد المخزن المصدر والهدف حسب نوع التحويل ──────────────────────────
     transfer_type = (v.get("transfer_type") or "main_to_mixer")
+    
+    print(f"🔵 [confirm_transfer_voucher] نوع التحويل: {transfer_type}")
     
     # أسماء المخازن للعرض
     _wh_names = {
         "main":      "المخزن الرئيسي",
         "staging":   "المخزن المرحلي",
         "mixer":     "مخزن الخلطات",
-        "receiving": "شاشة استلام المواد الخام",  # ✅ جديد
+        "receiving": "شاشة استلام المواد الخام",
     }
     
     # ✅ دعم جميع أنواع التحويل المطلوبة
@@ -683,7 +704,7 @@ async def confirm_transfer_voucher(voucher_id: str, body: ConfirmTransferRequest
     from_name = _wh_names.get(from_wh, from_wh)
     to_name   = _wh_names.get(to_wh,   to_wh)
 
-    logger.info(f"[confirm_transfer] تحويل من {from_name} إلى {to_name} — السند: {v['voucher_number']}")
+    print(f"🔵 [confirm_transfer_voucher] من: {from_name} ({from_wh}) → إلى: {to_name} ({to_wh})")
 
     # Build confirmed quantities map (override from body if provided)
     override_map = {}
@@ -733,6 +754,11 @@ async def confirm_transfer_voucher(voucher_id: str, body: ConfirmTransferRequest
         src_balance_before = float(src_inv["balance"]) if src_inv else 0.0
         src_balance_after  = max(0, src_balance_before - confirmed_qty)
         
+        print(f"🔵 [confirm_transfer_voucher] مادة: {item['material_name']}")
+        print(f"🔵 [confirm_transfer_voucher]   رصيد المصدر قبل: {src_balance_before}")
+        print(f"🔵 [confirm_transfer_voucher]   الكمية: {confirmed_qty}")
+        print(f"🔵 [confirm_transfer_voucher]   رصيد المصدر بعد: {src_balance_after}")
+        
         if src_inv:
             await pool.execute(
                 "UPDATE inventory SET balance=$1, updated_at=NOW() WHERE id=$2",
@@ -763,6 +789,9 @@ async def confirm_transfer_voucher(voucher_id: str, body: ConfirmTransferRequest
         dst_balance_before = float(dst_inv["balance"]) if dst_inv else 0.0
         dst_balance_after  = dst_balance_before + confirmed_qty
         
+        print(f"🔵 [confirm_transfer_voucher]   رصيد الهدف قبل: {dst_balance_before}")
+        print(f"🔵 [confirm_transfer_voucher]   رصيد الهدف بعد: {dst_balance_after}")
+        
         if dst_inv:
             await pool.execute(
                 "UPDATE inventory SET balance=$1, updated_at=NOW() WHERE id=$2",
@@ -792,6 +821,8 @@ async def confirm_transfer_voucher(voucher_id: str, body: ConfirmTransferRequest
            WHERE id=$3::uuid""",
         body.confirmed_by, now, voucher_id
     )
+    
+    print(f"✅ [confirm_transfer_voucher] تم تأكيد {processed} بند بنجاح")
     
     await _write_audit(pool, "confirm", "transfer_voucher", voucher_id,
                        body.confirmed_by or "مشرف",
