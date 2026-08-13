@@ -80,7 +80,6 @@ class _StagingWarehousePageState extends ConsumerState<StagingWarehousePage>
     );
   }
 
-  // دالة مساعدة لعرض رسائل الخطأ
   void _showErrorSnackBar(BuildContext context, String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -98,7 +97,6 @@ class _StagingWarehousePageState extends ConsumerState<StagingWarehousePage>
     );
   }
 
-  // دالة مساعدة لعرض رسائل النجاح
   void _showSuccessSnackBar(BuildContext context, String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -645,12 +643,15 @@ class _VoucherCard extends ConsumerWidget {
                         );
                         if (ok) {
                           try {
-                            await ds.confirmTransferVoucher(voucher.id!, {
+                            print('🔵 [Incoming] تأكيد سند: ${voucher.id}');
+                            final response = await ds.confirmTransferVoucher(voucher.id!, {
                               'confirmed_by': operatorName,
                             });
+                            print('✅ [Incoming] تم التأكيد: $response');
                             showSuccess(context, '✅ تم تأكيد الاستلام ونقل المواد للمخزن المرحلي');
                             onAction();
                           } catch (e) {
+                            print('❌ [Incoming] فشل التأكيد: $e');
                             showError(context, '❌ فشل تأكيد الاستلام: ${e.toString()}');
                           }
                         }
@@ -670,12 +671,15 @@ class _VoucherCard extends ConsumerWidget {
                         );
                         if (ok) {
                           try {
-                            await ds.confirmTransferVoucher(voucher.id!, {
+                            print('🔵 [Outgoing] تأكيد سند: ${voucher.id}');
+                            final response = await ds.confirmTransferVoucher(voucher.id!, {
                               'confirmed_by': operatorName,
                             });
+                            print('✅ [Outgoing] تم التأكيد: $response');
                             showSuccess(context, '✅ تم تأكيد الاستلام ونقل المواد لمخزن الخلطات');
                             onAction();
                           } catch (e) {
+                            print('❌ [Outgoing] فشل التأكيد: $e');
                             showError(context, '❌ فشل تأكيد الاستلام: ${e.toString()}');
                           }
                         }
