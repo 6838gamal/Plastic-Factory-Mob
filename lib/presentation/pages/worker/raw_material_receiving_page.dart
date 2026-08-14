@@ -21,18 +21,24 @@ final receivingInventoryProvider = FutureProvider.autoDispose<List<InventorySumm
   return summary.where((m) => m.warehouseType == 'receiving').toList();
 });
 
-/// سندات وارد من مخزن الخلاط (mixer → receiving)
+/// سندات وارد من الخلاط (mixer → receiving)
 final receivingIncomingProvider = FutureProvider.autoDispose<List<TransferVoucherModel>>((ref) async {
   final ds = ref.read(dataSourceProvider);
   final raw = await ds.getTransferVouchers(transferType: 'mixer_to_receiving');
   return raw.map(TransferVoucherModel.fromJson).toList();
 });
 
-/// سندات صادر للجاهز للاستخدام (receiving → ready_for_use)
+/// سندات صادر للجاهز للاستخدام (receiving → ready)
 final receivingOutgoingProvider = FutureProvider.autoDispose<List<TransferVoucherModel>>((ref) async {
   final ds = ref.read(dataSourceProvider);
   final raw = await ds.getTransferVouchers(transferType: 'receiving_to_ready');
   return raw.map(TransferVoucherModel.fromJson).toList();
+});
+
+/// المواد الجاهزة للاستخدام
+final readyForUseProvider = FutureProvider.autoDispose<List<InventorySummaryModel>>((ref) async {
+  final summary = await ref.watch(inventorySummaryProvider.future);
+  return summary.where((m) => m.warehouseType == 'ready_for_use').toList();
 });
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -40,18 +46,7 @@ final receivingOutgoingProvider = FutureProvider.autoDispose<List<TransferVouche
 // ──────────────────────────────────────────────────────────────────────────────
 
 class RawMaterialReceivingPage extends ConsumerStatefulWidget {
-  final List<InventorySummaryModel>? preSelectedMaterials;
-  final String? sourceWarehouse;
-  final String? title;
-  final Map<String, double>? selectedQuantities;
-
-  const RawMaterialReceivingPage({
-    super.key,
-    this.preSelectedMaterials,
-    this.sourceWarehouse,
-    this.title,
-    this.selectedQuantities,
-  });
+  const RawMaterialReceivingPage({super.key});
 
   @override
   ConsumerState<RawMaterialReceivingPage> createState() => _RawMaterialReceivingPageState();
@@ -64,7 +59,7 @@ class _RawMaterialReceivingPageState extends ConsumerState<RawMaterialReceivingP
   @override
   void initState() {
     super.initState();
-    _tabs = TabController(length: 3, vsync: this);
+    _tabs = TabController(length: 4, vsync: this);
     _tabs.addListener(() => setState(() {}));
   }
 
@@ -78,6 +73,7 @@ class _RawMaterialReceivingPageState extends ConsumerState<RawMaterialReceivingP
     ref.invalidate(receivingInventoryProvider);
     ref.invalidate(receivingIncomingProvider);
     ref.invalidate(receivingOutgoingProvider);
+    ref.invalidate(readyForUseProvider);
     ref.invalidate(inventorySummaryProvider);
   }
 
@@ -120,7 +116,6 @@ class _RawMaterialReceivingPageState extends ConsumerState<RawMaterialReceivingP
     );
   }
 
-  // ── إنشاء سند جديد ──
   Future<void> _openVoucherDialog(BuildContext context, String transferType) async {
     await showDialog(
       context: context,
@@ -130,16 +125,21 @@ class _RawMaterialReceivingPageState extends ConsumerState<RawMaterialReceivingP
         onSaved: _refresh,
         showError: _showErrorSnackBar,
         showSuccess: _showSuccessSnackBar,
-        preSelectedMaterials: widget.preSelectedMaterials,
-        selectedQuantities: widget.selectedQuantities,
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final pendingCount = ref
+    final pendingIncoming = ref
             .watch(receivingIncomingProvider)
+            .valueOrNull
+            ?.where((v) => v.isPending)
+            .length ??
+        0;
+
+    final pendingOutgoing = ref
+            .watch(receivingOutgoingProvider)
             .valueOrNull
             ?.where((v) => v.isPending)
             .length ??
@@ -149,7 +149,7 @@ class _RawMaterialReceivingPageState extends ConsumerState<RawMaterialReceivingP
       appBar: AppBar(
         backgroundColor: Colors.deepPurple,
         foregroundColor: Colors.white,
-        title: Text(widget.title ?? 'استلام المواد الخام'),
+        title: const Text('استلام المواد الخام'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.pop(context),
@@ -169,15 +169,23 @@ class _RawMaterialReceivingPageState extends ConsumerState<RawMaterialReceivingP
             const Tab(icon: Icon(Icons.inventory_2_outlined), text: 'المخزون'),
             Tab(
               icon: Badge(
-                isLabelVisible: pendingCount > 0,
-                label: Text('$pendingCount'),
+                isLabelVisible: pendingIncoming > 0,
+                label: Text('$pendingIncoming'),
                 child: const Icon(Icons.arrow_downward),
               ),
               text: 'وارد من الخلاط',
             ),
-            const Tab(
-              icon: Icon(Icons.arrow_upward),
+            Tab(
+              icon: Badge(
+                isLabelVisible: pendingOutgoing > 0,
+                label: Text('$pendingOutgoing'),
+                child: const Icon(Icons.arrow_upward),
+              ),
               text: 'صادر للجاهز',
+            ),
+            const Tab(
+              icon: Icon(Icons.check_circle_outline),
+              text: 'جاهز للاستخدام',
             ),
           ],
         ),
@@ -185,7 +193,11 @@ class _RawMaterialReceivingPageState extends ConsumerState<RawMaterialReceivingP
       body: TabBarView(
         controller: _tabs,
         children: [
-          _InventoryTab(onRefresh: _refresh),
+          _InventoryTab(
+            onRefresh: _refresh,
+            showError: _showErrorSnackBar,
+            showSuccess: _showSuccessSnackBar,
+          ),
           _IncomingTab(
             operatorName: _operatorName,
             onRefresh: _refresh,
@@ -198,15 +210,11 @@ class _RawMaterialReceivingPageState extends ConsumerState<RawMaterialReceivingP
             showError: _showErrorSnackBar,
             showSuccess: _showSuccessSnackBar,
           ),
+          _ReadyForUseTab(onRefresh: _refresh),
         ],
       ),
       floatingActionButton: _tabs.index == 1
-          ? FloatingActionButton.extended(
-              backgroundColor: Colors.deepPurple,
-              icon: const Icon(Icons.add, color: Colors.white),
-              label: const Text('طلب من الخلاط', style: TextStyle(color: Colors.white)),
-              onPressed: () => _openVoucherDialog(context, 'mixer_to_receiving'),
-            )
+          ? null
           : _tabs.index == 2
               ? FloatingActionButton.extended(
                   backgroundColor: Colors.deepPurple,
@@ -225,7 +233,14 @@ class _RawMaterialReceivingPageState extends ConsumerState<RawMaterialReceivingP
 
 class _InventoryTab extends ConsumerWidget {
   final VoidCallback onRefresh;
-  const _InventoryTab({required this.onRefresh});
+  final void Function(BuildContext, String) showError;
+  final void Function(BuildContext, String) showSuccess;
+
+  const _InventoryTab({
+    required this.onRefresh,
+    required this.showError,
+    required this.showSuccess,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -260,7 +275,7 @@ class _InventoryTab extends ConsumerWidget {
                 SizedBox(height: 12),
                 Text('لا توجد مواد في شاشة الاستلام', style: TextStyle(color: Colors.grey)),
                 SizedBox(height: 6),
-                Text('استخدم "وارد من الخلاط" لاستلام مواد',
+                Text('انتظر وصول مواد من مخزن الخلاط',
                     style: TextStyle(color: Colors.grey, fontSize: 12)),
               ],
             ),
@@ -343,7 +358,7 @@ class _IncomingTab extends ConsumerWidget {
                 SizedBox(height: 12),
                 Text('لا توجد طلبات واردة من مخزن الخلاط', style: TextStyle(color: Colors.grey)),
                 SizedBox(height: 6),
-                Text('اضغط + لإنشاء طلب استلام من الخلاط',
+                Text('سيتم عرض الطلبات هنا بعد إنشائها من مخزن الخلاط',
                     style: TextStyle(color: Colors.grey, fontSize: 12)),
               ],
             ),
@@ -450,7 +465,78 @@ class _OutgoingTab extends ConsumerWidget {
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
-// بطاقة السند الموحدة (مثل staging)
+// تبويب جاهز للاستخدام
+// ──────────────────────────────────────────────────────────────────────────────
+
+class _ReadyForUseTab extends ConsumerWidget {
+  final VoidCallback onRefresh;
+  const _ReadyForUseTab({required this.onRefresh});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final async = ref.watch(readyForUseProvider);
+    
+    return async.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.error_outline, size: 48, color: Colors.red),
+            const SizedBox(height: 12),
+            const Text('حدث خطأ أثناء تحميل المواد الجاهزة', style: TextStyle(color: Colors.red)),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: onRefresh,
+              child: const Text('إعادة المحاولة'),
+            ),
+          ],
+        ),
+      ),
+      data: (items) {
+        if (items.isEmpty) {
+          return const Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.check_circle_outline, size: 64, color: Colors.grey),
+                SizedBox(height: 12),
+                Text('لا توجد مواد جاهزة للاستخدام', style: TextStyle(color: Colors.grey)),
+                SizedBox(height: 6),
+                Text('المواد تظهر هنا بعد تأكيد استلامها من شاشة الاستلام',
+                    style: TextStyle(color: Colors.grey, fontSize: 12)),
+              ],
+            ),
+          );
+        }
+        
+        final total = items.fold(0.0, (s, m) => s + m.currentBalance);
+        return Column(
+          children: [
+            _buildSummaryCard(
+              title: 'إجمالي المواد الجاهزة للاستخدام',
+              total: total,
+              color: Colors.green,
+            ),
+            Expanded(
+              child: ListView.builder(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                itemCount: items.length,
+                itemBuilder: (ctx, i) {
+                  final m = items[i];
+                  return _buildMaterialCard(m, Colors.green);
+                },
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// بطاقة السند الموحدة
 // ──────────────────────────────────────────────────────────────────────────────
 
 class _VoucherCard extends ConsumerWidget {
@@ -749,7 +835,7 @@ class _VoucherCard extends ConsumerWidget {
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
-// حوار إنشاء السند (مثل staging)
+// حوار إنشاء السند
 // ──────────────────────────────────────────────────────────────────────────────
 
 class _ReceivingVoucherDialog extends ConsumerStatefulWidget {
@@ -758,8 +844,6 @@ class _ReceivingVoucherDialog extends ConsumerStatefulWidget {
   final VoidCallback onSaved;
   final void Function(BuildContext, String) showError;
   final void Function(BuildContext, String) showSuccess;
-  final List<InventorySummaryModel>? preSelectedMaterials;
-  final Map<String, double>? selectedQuantities;
 
   const _ReceivingVoucherDialog({
     required this.transferType,
@@ -767,8 +851,6 @@ class _ReceivingVoucherDialog extends ConsumerStatefulWidget {
     this.createdBy,
     required this.showError,
     required this.showSuccess,
-    this.preSelectedMaterials,
-    this.selectedQuantities,
   });
 
   @override
@@ -781,40 +863,16 @@ class _ReceivingVoucherDialogState extends ConsumerState<_ReceivingVoucherDialog
   bool _loading = false;
 
   @override
-  void initState() {
-    super.initState();
-    // إذا كانت هناك مواد محددة مسبقاً، أضفها تلقائياً
-    if (widget.preSelectedMaterials != null && widget.preSelectedMaterials!.isNotEmpty) {
-      for (final material in widget.preSelectedMaterials!) {
-        final qty = widget.selectedQuantities?[material.materialId] ?? material.currentBalance;
-        _items.add(_VItemEntry(
-          name: material.materialName,
-          materialId: material.materialId,
-          unit: material.unit,
-          qty: qty,
-        ));
-      }
-    }
-  }
-
-  @override
   void dispose() {
     _notesCtrl.dispose();
     super.dispose();
   }
 
   String get _fromWarehouse =>
-      widget.transferType == 'mixer_to_receiving' ? 'mixer' : 'receiving';
+      widget.transferType == 'receiving_to_ready' ? 'receiving' : 'receiving';
 
-  String get _title =>
-      widget.transferType == 'mixer_to_receiving'
-          ? 'طلب استلام من مخزن الخلاط'
-          : 'سند صادر للجاهز للاستخدام';
-
-  String get _flowLabel =>
-      widget.transferType == 'mixer_to_receiving'
-          ? 'مخزن الخلاط ← شاشة الاستلام'
-          : 'شاشة الاستلام ← جاهز للاستخدام';
+  String get _title => 'سند صادر للجاهز للاستخدام';
+  String get _flowLabel => 'شاشة الاستلام ← جاهز للاستخدام';
 
   void _addItem() => setState(() => _items.add(_VItemEntry()));
   void _removeItem(int i) => setState(() => _items.removeAt(i));
@@ -1043,13 +1101,6 @@ class _VItemEntry {
   String unit = 'كجم';
   double qty = 0;
   String? materialId;
-
-  _VItemEntry({
-    this.name = '',
-    this.unit = 'كجم',
-    this.qty = 0,
-    this.materialId,
-  });
 }
 
 class _VItemRow extends StatelessWidget {
