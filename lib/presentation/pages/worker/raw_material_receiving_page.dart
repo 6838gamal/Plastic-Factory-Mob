@@ -8,6 +8,7 @@ import '../../../data/models/inventory_summary_model.dart';
 import '../../../data/models/voucher_models.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/reference_data_provider.dart';
+import '../../../core/constants/app_constants.dart';
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Providers خاصة بشاشة استلام المواد الخام
@@ -31,11 +32,21 @@ final _receivingOutgoingProvider = FutureProvider.autoDispose<List<TransferVouch
 });
 
 // ──────────────────────────────────────────────────────────────────────────────
-// شاشة استلام المواد الخام
+// شاشة استلام المواد الخام - معدلة لاستقبال البيانات من مخزن الخلاط
 // ──────────────────────────────────────────────────────────────────────────────
 
 class RawMaterialReceivingPage extends ConsumerStatefulWidget {
-  const RawMaterialReceivingPage({super.key});
+  // ── معاملات لاستقبال البيانات من مخزن الخلاط ──
+  final List<InventorySummaryModel>? preSelectedMaterials;
+  final String? sourceWarehouse;
+  final String? title;
+
+  const RawMaterialReceivingPage({
+    super.key,
+    this.preSelectedMaterials,
+    this.sourceWarehouse,
+    this.title,
+  });
 
   @override
   ConsumerState<RawMaterialReceivingPage> createState() => _RawMaterialReceivingPageState();
@@ -44,12 +55,87 @@ class RawMaterialReceivingPage extends ConsumerStatefulWidget {
 class _RawMaterialReceivingPageState extends ConsumerState<RawMaterialReceivingPage>
     with SingleTickerProviderStateMixin {
   late TabController _tabs;
+  List<InventorySummaryModel> _incomingMaterials = [];
+  bool _isProcessing = false;
 
   @override
   void initState() {
     super.initState();
     _tabs = TabController(length: 3, vsync: this);
     _tabs.addListener(() => setState(() {}));
+    
+    // ── معالجة المواد المستلمة من مخزن الخلاط ──
+    if (widget.preSelectedMaterials != null && widget.preSelectedMaterials!.isNotEmpty) {
+      _incomingMaterials = widget.preSelectedMaterials!;
+      // نقل المواد إلى مخزن الاستلام
+      _transferMaterialsToReceiving();
+    }
+  }
+
+  // ── نقل المواد من مخزن الخلاط إلى مخزن الاستلام ──
+  Future<void> _transferMaterialsToReceiving() async {
+    if (_incomingMaterials.isEmpty || _isProcessing) return;
+    
+    setState(() => _isProcessing = true);
+    
+    try {
+      final ds = ref.read(dataSourceProvider);
+      final authState = ref.read(authProvider);
+      final operatorName = authState.user?.name ?? authState.user?.email ?? 'مدير الاستلام';
+      
+      int successCount = 0;
+      int failCount = 0;
+      
+      for (final material in _incomingMaterials) {
+        try {
+          // نقل المادة من مخزن الخلاط إلى مخزن الاستلام
+          await ds.transferInventory(
+            materialId: material.materialId,
+            quantity: material.currentBalance,
+            fromWarehouse: widget.sourceWarehouse ?? AppConstants.warehouseMixer,
+            toWarehouse: 'receiving',
+            notes: 'نقل تلقائي من مخزن الخلاط إلى شاشة الاستلام',
+            createdBy: operatorName,
+          );
+          successCount++;
+        } catch (e) {
+          failCount++;
+          debugPrint('خطأ في نقل المادة ${material.materialName}: $e');
+        }
+      }
+      
+      if (mounted) {
+        // عرض رسالة بنتيجة العملية
+        if (successCount > 0) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('تم نقل $successCount مادة بنجاح إلى شاشة الاستلام${failCount > 0 ? '، وفشل نقل $failCount مادة' : ''}'),
+              backgroundColor: failCount > 0 ? Colors.orange : Colors.green,
+            ),
+          );
+        } else if (failCount > 0) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('فشل نقل المواد إلى شاشة الاستلام'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        
+        // تحديث البيانات
+        _refresh();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('خطأ: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isProcessing = false);
+      }
+    }
   }
 
   @override
@@ -63,6 +149,7 @@ class _RawMaterialReceivingPageState extends ConsumerState<RawMaterialReceivingP
     ref.invalidate(_receivingIncomingProvider);
     ref.invalidate(_receivingOutgoingProvider);
     ref.invalidate(inventorySummaryProvider);
+    setState(() {});
   }
 
   String get _operatorName {
@@ -79,11 +166,14 @@ class _RawMaterialReceivingPageState extends ConsumerState<RawMaterialReceivingP
             .length ??
         0;
 
+    // ── عرض إشعار بوجود مواد مستلمة من الخلاط ──
+    final hasIncomingFromMixer = _incomingMaterials.isNotEmpty;
+
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.deepPurple,
         foregroundColor: Colors.white,
-        title: const Text('استلام المواد الخام'),
+        title: Text(widget.title ?? 'استلام المواد الخام'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.pop(context),
@@ -106,12 +196,73 @@ class _RawMaterialReceivingPageState extends ConsumerState<RawMaterialReceivingP
           ],
         ),
       ),
-      body: TabBarView(
-        controller: _tabs,
+      body: Column(
         children: [
-          _ReceivingInventoryTab(onRefresh: _refresh),
-          _ReceivingIncomingTab(operatorName: _operatorName, onRefresh: _refresh),
-          _ReceivingOutgoingTab(operatorName: _operatorName, onRefresh: _refresh),
+          // ── عرض إشعار المواد المستلمة من الخلاط ──
+          if (hasIncomingFromMixer)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.green.shade50,
+                border: Border(
+                  bottom: BorderSide(color: Colors.green.shade200),
+                ),
+              ),
+              child: Row(
+                children: [
+                  if (_isProcessing)
+                    const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.green,
+                      ),
+                    )
+                  else
+                    Icon(Icons.check_circle, color: Colors.green.shade700),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _isProcessing
+                          ? 'جاري نقل ${_incomingMaterials.length} مادة من مخزن الخلاط...'
+                          : 'تم استلام ${_incomingMaterials.length} مادة من مخزن الخلاط',
+                      style: TextStyle(
+                        color: Colors.green.shade700,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  if (!_isProcessing)
+                    TextButton(
+                      onPressed: () {
+                        _showReceivedMaterialsDialog(context);
+                      },
+                      child: const Text('عرض التفاصيل'),
+                    ),
+                ],
+              ),
+            ),
+          // ── تبويبات المحتوى ──
+          Expanded(
+            child: TabBarView(
+              controller: _tabs,
+              children: [
+                _ReceivingInventoryTab(
+                  onRefresh: _refresh,
+                  preLoadedMaterials: _incomingMaterials,
+                ),
+                _ReceivingIncomingTab(
+                  operatorName: _operatorName,
+                  onRefresh: _refresh,
+                ),
+                _ReceivingOutgoingTab(
+                  operatorName: _operatorName,
+                  onRefresh: _refresh,
+                ),
+              ],
+            ),
+          ),
         ],
       ),
       floatingActionButton: _tabs.index == 2
@@ -122,6 +273,85 @@ class _RawMaterialReceivingPageState extends ConsumerState<RawMaterialReceivingP
               onPressed: () => _openReceivingVoucherDialog(context, 'receiving_to_mixer'),
             )
           : null,
+    );
+  }
+
+  // ── عرض تفاصيل المواد المستلمة من الخلاط ──
+  void _showReceivedMaterialsDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('المواد المستلمة من مخزن الخلاط'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.green.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline, color: Colors.green.shade700),
+                    const SizedBox(width: 8),
+                    Text(
+                      'إجمالي: ${_incomingMaterials.length} مادة',
+                      style: TextStyle(
+                        color: Colors.green.shade700,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              LimitedBox(
+                maxHeight: 300,
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: _incomingMaterials.length,
+                  itemBuilder: (ctx, i) => ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: Colors.deepPurple.shade50,
+                      child: Icon(
+                        Icons.science_outlined,
+                        color: Colors.deepPurple.shade700,
+                      ),
+                    ),
+                    title: Text(
+                      _incomingMaterials[i].materialName,
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    trailing: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.deepPurple.shade50,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        '${_incomingMaterials[i].currentBalance.toStringAsFixed(2)} ${_incomingMaterials[i].unit}',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.deepPurple.shade700,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('إغلاق'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -138,21 +368,37 @@ class _RawMaterialReceivingPageState extends ConsumerState<RawMaterialReceivingP
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
-// تبويب المخزون
+// تبويب المخزون - معدل لاستقبال المواد المستلمة من الخلاط
 // ──────────────────────────────────────────────────────────────────────────────
 
 class _ReceivingInventoryTab extends ConsumerWidget {
   final VoidCallback onRefresh;
-  const _ReceivingInventoryTab({required this.onRefresh});
+  final List<InventorySummaryModel> preLoadedMaterials;
+
+  const _ReceivingInventoryTab({
+    required this.onRefresh,
+    this.preLoadedMaterials = const [],
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final async = ref.watch(_receivingInventoryProvider);
+    
     return async.when(
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, _) => Center(child: Text('خطأ: $e')),
       data: (items) {
-        if (items.isEmpty) {
+        // ── دمج المواد المستلمة من الخلاط مع المواد الموجودة ──
+        final allItems = [...items, ...preLoadedMaterials];
+        // إزالة التكرارات بناءً على materialId
+        final uniqueItems = allItems.fold<List<InventorySummaryModel>>([], (list, item) {
+          if (!list.any((m) => m.materialId == item.materialId)) {
+            list.add(item);
+          }
+          return list;
+        });
+
+        if (uniqueItems.isEmpty) {
           return const Center(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -161,21 +407,33 @@ class _ReceivingInventoryTab extends ConsumerWidget {
                 SizedBox(height: 12),
                 Text('لا توجد مواد خام في شاشة الاستلام', style: TextStyle(color: Colors.grey)),
                 SizedBox(height: 6),
-                Text('المواد الخام تصل هنا من المخزن المرحلي',
+                Text('المواد الخام تصل هنا من المخزن المرحلي أو من مخزن الخلاط',
                     style: TextStyle(color: Colors.grey, fontSize: 12)),
               ],
             ),
           );
         }
-        final total = items.fold(0.0, (s, m) => s + m.currentBalance);
+        
+        final total = uniqueItems.fold(0.0, (s, m) => s + m.currentBalance);
         return Column(
           children: [
-            _buildSummaryCard('إجمالي المواد الخام المستلمة', total, Colors.deepPurple),
+            _buildSummaryCard(
+              'إجمالي المواد الخام المستلمة', 
+              total, 
+              Colors.deepPurple,
+              preLoadedMaterials.isNotEmpty 
+                ? '(${preLoadedMaterials.length} من الخلاط)' 
+                : null,
+            ),
             Expanded(
               child: ListView.builder(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
-                itemCount: items.length,
-                itemBuilder: (ctx, i) => _buildMaterialCard(items[i], Colors.deepPurple),
+                itemCount: uniqueItems.length,
+                itemBuilder: (ctx, i) => _buildMaterialCard(
+                  uniqueItems[i], 
+                  Colors.deepPurple,
+                  isFromMixer: preLoadedMaterials.any((m) => m.materialId == uniqueItems[i].materialId),
+                ),
               ),
             ),
           ],
@@ -720,7 +978,7 @@ class _ReceivingVoucherDialogState extends ConsumerState<_ReceivingVoucherDialog
 // مكونات مساعدة
 // ──────────────────────────────────────────────────────────────────────────────
 
-Widget _buildSummaryCard(String title, double total, MaterialColor color) {
+Widget _buildSummaryCard(String title, double total, MaterialColor color, [String? badge]) {
   return Container(
     margin: const EdgeInsets.all(12),
     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -734,6 +992,20 @@ Widget _buildSummaryCard(String title, double total, MaterialColor color) {
         Icon(Icons.assignment_outlined, color: color),
         const SizedBox(width: 8),
         Text(title, style: TextStyle(color: color.shade800, fontWeight: FontWeight.bold)),
+        if (badge != null) ...[
+          const SizedBox(width: 6),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: Colors.green.shade100,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              badge,
+              style: TextStyle(color: Colors.green.shade700, fontSize: 10, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
         const Spacer(),
         Text(
           '${total.toStringAsFixed(1)} كجم',
@@ -744,21 +1016,60 @@ Widget _buildSummaryCard(String title, double total, MaterialColor color) {
   );
 }
 
-Widget _buildMaterialCard(InventorySummaryModel item, MaterialColor color) {
+Widget _buildMaterialCard(InventorySummaryModel item, MaterialColor color, {bool isFromMixer = false}) {
   return Card(
     margin: const EdgeInsets.only(bottom: 8),
-    child: ListTile(
-      leading: CircleAvatar(
-        backgroundColor: color.shade50,
-        child: Icon(Icons.science_outlined, color: color.shade700),
+    child: Container(
+      decoration: BoxDecoration(
+        border: isFromMixer 
+            ? Border.all(color: Colors.green.shade300, width: 2)
+            : null,
+        borderRadius: BorderRadius.circular(8),
       ),
-      title: Text(item.materialName, style: const TextStyle(fontWeight: FontWeight.w600)),
-      trailing: Text(
-        '${item.currentBalance.toStringAsFixed(2)} ${item.unit}',
-        style: TextStyle(
-          fontWeight: FontWeight.bold,
-          fontSize: 15,
-          color: item.currentBalance <= 0 ? Colors.red : color.shade700,
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: isFromMixer ? Colors.green.shade100 : color.shade50,
+          child: Icon(
+            isFromMixer ? Icons.check_circle : Icons.science_outlined,
+            color: isFromMixer ? Colors.green.shade700 : color.shade700,
+          ),
+        ),
+        title: Row(
+          children: [
+            Expanded(
+              child: Text(
+                item.materialName,
+                style: const TextStyle(fontWeight: FontWeight.w600),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            if (isFromMixer) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.green.shade100,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  'من الخلاط',
+                  style: TextStyle(
+                    color: Colors.green.shade700,
+                    fontSize: 9,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+        trailing: Text(
+          '${item.currentBalance.toStringAsFixed(2)} ${item.unit}',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 15,
+            color: item.currentBalance <= 0 ? Colors.red : color.shade700,
+          ),
         ),
       ),
     ),
