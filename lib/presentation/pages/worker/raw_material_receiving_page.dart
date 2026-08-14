@@ -15,9 +15,24 @@ import '../../../core/constants/app_constants.dart';
 // Providers
 // ──────────────────────────────────────────────────────────────────────────────
 
-final _receivingInventoryProvider = FutureProvider.autoDispose<List<InventorySummaryModel>>((ref) async {
+/// مخزون شاشة الاستلام
+final receivingInventoryProvider = FutureProvider.autoDispose<List<InventorySummaryModel>>((ref) async {
   final summary = await ref.watch(inventorySummaryProvider.future);
   return summary.where((m) => m.warehouseType == 'receiving').toList();
+});
+
+/// سندات وارد من مخزن الخلاط (mixer → receiving)
+final receivingIncomingProvider = FutureProvider.autoDispose<List<TransferVoucherModel>>((ref) async {
+  final ds = ref.read(dataSourceProvider);
+  final raw = await ds.getTransferVouchers(transferType: 'mixer_to_receiving');
+  return raw.map(TransferVoucherModel.fromJson).toList();
+});
+
+/// سندات صادر للجاهز للاستخدام (receiving → ready_for_use)
+final receivingOutgoingProvider = FutureProvider.autoDispose<List<TransferVoucherModel>>((ref) async {
+  final ds = ref.read(dataSourceProvider);
+  final raw = await ds.getTransferVouchers(transferType: 'receiving_to_ready');
+  return raw.map(TransferVoucherModel.fromJson).toList();
 });
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -45,36 +60,12 @@ class RawMaterialReceivingPage extends ConsumerStatefulWidget {
 class _RawMaterialReceivingPageState extends ConsumerState<RawMaterialReceivingPage>
     with SingleTickerProviderStateMixin {
   late TabController _tabs;
-  List<InventorySummaryModel> _incomingMaterials = [];
-  List<String> _confirmedMaterialIds = [];
-  Map<String, double> _receivedQuantities = {};
 
   @override
   void initState() {
     super.initState();
     _tabs = TabController(length: 3, vsync: this);
     _tabs.addListener(() => setState(() {}));
-    
-    if (widget.preSelectedMaterials != null && widget.preSelectedMaterials!.isNotEmpty) {
-      _incomingMaterials = widget.preSelectedMaterials!;
-      
-      for (final material in _incomingMaterials) {
-        final qty = widget.selectedQuantities?[material.materialId] ?? material.currentBalance;
-        _receivedQuantities[material.materialId] = qty;
-      }
-      
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('📦 تم استلام ${_incomingMaterials.length} مادة من مخزن الخلاط'),
-              backgroundColor: Colors.green,
-              duration: const Duration(seconds: 3),
-            ),
-          );
-        }
-      });
-    }
   }
 
   @override
@@ -84,9 +75,10 @@ class _RawMaterialReceivingPageState extends ConsumerState<RawMaterialReceivingP
   }
 
   void _refresh() {
-    ref.invalidate(_receivingInventoryProvider);
+    ref.invalidate(receivingInventoryProvider);
+    ref.invalidate(receivingIncomingProvider);
+    ref.invalidate(receivingOutgoingProvider);
     ref.invalidate(inventorySummaryProvider);
-    setState(() {});
   }
 
   String get _operatorName {
@@ -128,9 +120,30 @@ class _RawMaterialReceivingPageState extends ConsumerState<RawMaterialReceivingP
     );
   }
 
+  // ── إنشاء سند جديد ──
+  Future<void> _openVoucherDialog(BuildContext context, String transferType) async {
+    await showDialog(
+      context: context,
+      builder: (_) => _ReceivingVoucherDialog(
+        transferType: transferType,
+        createdBy: _operatorName,
+        onSaved: _refresh,
+        showError: _showErrorSnackBar,
+        showSuccess: _showSuccessSnackBar,
+        preSelectedMaterials: widget.preSelectedMaterials,
+        selectedQuantities: widget.selectedQuantities,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final hasIncomingFromMixer = _incomingMaterials.isNotEmpty;
+    final pendingCount = ref
+            .watch(receivingIncomingProvider)
+            .valueOrNull
+            ?.where((v) => v.isPending)
+            .length ??
+        0;
 
     return Scaffold(
       appBar: AppBar(
@@ -152,197 +165,71 @@ class _RawMaterialReceivingPageState extends ConsumerState<RawMaterialReceivingP
           indicatorColor: Colors.white,
           labelColor: Colors.white,
           unselectedLabelColor: Colors.white70,
-          tabs: const [
-            Tab(icon: Icon(Icons.inventory_2_outlined), text: 'قيد الاستلام'),
-            Tab(icon: Icon(Icons.check_circle_outline), text: 'جاهز للاستخدام'),
-            Tab(icon: Icon(Icons.history), text: 'سجل الاستلام'),
+          tabs: [
+            const Tab(icon: Icon(Icons.inventory_2_outlined), text: 'المخزون'),
+            Tab(
+              icon: Badge(
+                isLabelVisible: pendingCount > 0,
+                label: Text('$pendingCount'),
+                child: const Icon(Icons.arrow_downward),
+              ),
+              text: 'وارد من الخلاط',
+            ),
+            const Tab(
+              icon: Icon(Icons.arrow_upward),
+              text: 'صادر للجاهز',
+            ),
           ],
         ),
       ),
-      body: Column(
+      body: TabBarView(
+        controller: _tabs,
         children: [
-          if (hasIncomingFromMixer)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: Colors.green.shade50,
-                border: Border(
-                  bottom: BorderSide(color: Colors.green.shade200),
-                ),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.check_circle, color: Colors.green.shade700),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      '📦 تم استلام ${_incomingMaterials.length} مادة من مخزن الخلاط',
-                      style: TextStyle(
-                        color: Colors.green.shade700,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: () {
-                      _showReceivedMaterialsDialog(context);
-                    },
-                    child: const Text('عرض التفاصيل'),
-                  ),
-                ],
-              ),
-            ),
-          Expanded(
-            child: TabBarView(
-              controller: _tabs,
-              children: [
-                _ReceivingInventoryTab(
-                  onRefresh: _refresh,
-                  preLoadedMaterials: _incomingMaterials,
-                  confirmedIds: _confirmedMaterialIds,
-                  receivedQuantities: _receivedQuantities,
-                  onMaterialConfirmed: (materialId) {
-                    setState(() {
-                      if (!_confirmedMaterialIds.contains(materialId)) {
-                        _confirmedMaterialIds.add(materialId);
-                      }
-                    });
-                    _tabs.animateTo(1);
-                  },
-                  showError: _showErrorSnackBar,
-                  showSuccess: _showSuccessSnackBar,
-                  operatorName: _operatorName,
-                ),
-                _ReadyForUseTab(
-                  onRefresh: _refresh,
-                  confirmedIds: _confirmedMaterialIds,
-                  receivedQuantities: _receivedQuantities,
-                ),
-                _ReceivingHistoryTab(
-                  onRefresh: _refresh,
-                  confirmedIds: _confirmedMaterialIds,
-                  receivedQuantities: _receivedQuantities,
-                ),
-              ],
-            ),
+          _InventoryTab(onRefresh: _refresh),
+          _IncomingTab(
+            operatorName: _operatorName,
+            onRefresh: _refresh,
+            showError: _showErrorSnackBar,
+            showSuccess: _showSuccessSnackBar,
+          ),
+          _OutgoingTab(
+            operatorName: _operatorName,
+            onRefresh: _refresh,
+            showError: _showErrorSnackBar,
+            showSuccess: _showSuccessSnackBar,
           ),
         ],
       ),
-    );
-  }
-
-  void _showReceivedMaterialsDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('المواد المستلمة من مخزن الخلاط'),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.green.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.info_outline, color: Colors.green.shade700),
-                    const SizedBox(width: 8),
-                    Text(
-                      'إجمالي: ${_incomingMaterials.length} مادة',
-                      style: TextStyle(
-                        color: Colors.green.shade700,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 12),
-              LimitedBox(
-                maxHeight: 300,
-                child: ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: _incomingMaterials.length,
-                  itemBuilder: (ctx, i) {
-                    final material = _incomingMaterials[i];
-                    final qty = _receivedQuantities[material.materialId] ?? material.currentBalance;
-                    return ListTile(
-                      leading: CircleAvatar(
-                        backgroundColor: Colors.deepPurple.shade50,
-                        child: Icon(
-                          Icons.science_outlined,
-                          color: Colors.deepPurple.shade700,
-                        ),
-                      ),
-                      title: Text(
-                        material.materialName,
-                        style: const TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                      subtitle: Text('الكمية المطلوبة: ${qty.toStringAsFixed(2)} ${material.unit}'),
-                      trailing: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.deepPurple.shade50,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          '${material.currentBalance.toStringAsFixed(2)} ${material.unit}',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: Colors.deepPurple.shade700,
-                          ),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('إغلاق'),
-          ),
-        ],
-      ),
+      floatingActionButton: _tabs.index == 1
+          ? FloatingActionButton.extended(
+              backgroundColor: Colors.deepPurple,
+              icon: const Icon(Icons.add, color: Colors.white),
+              label: const Text('طلب من الخلاط', style: TextStyle(color: Colors.white)),
+              onPressed: () => _openVoucherDialog(context, 'mixer_to_receiving'),
+            )
+          : _tabs.index == 2
+              ? FloatingActionButton.extended(
+                  backgroundColor: Colors.deepPurple,
+                  icon: const Icon(Icons.add, color: Colors.white),
+                  label: const Text('إرسال للجاهز', style: TextStyle(color: Colors.white)),
+                  onPressed: () => _openVoucherDialog(context, 'receiving_to_ready'),
+                )
+              : null,
     );
   }
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
-// تبويب قيد الاستلام
+// تبويب المخزون
 // ──────────────────────────────────────────────────────────────────────────────
 
-class _ReceivingInventoryTab extends ConsumerWidget {
+class _InventoryTab extends ConsumerWidget {
   final VoidCallback onRefresh;
-  final List<InventorySummaryModel> preLoadedMaterials;
-  final List<String> confirmedIds;
-  final Map<String, double> receivedQuantities;
-  final Function(String) onMaterialConfirmed;
-  final void Function(BuildContext, String) showError;
-  final void Function(BuildContext, String) showSuccess;
-  final String operatorName;
-
-  const _ReceivingInventoryTab({
-    required this.onRefresh,
-    this.preLoadedMaterials = const [],
-    this.confirmedIds = const [],
-    required this.receivedQuantities,
-    required this.onMaterialConfirmed,
-    required this.showError,
-    required this.showSuccess,
-    required this.operatorName,
-  });
+  const _InventoryTab({required this.onRefresh});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final async = ref.watch(_receivingInventoryProvider);
+    final async = ref.watch(receivingInventoryProvider);
     
     return async.when(
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -364,61 +251,38 @@ class _ReceivingInventoryTab extends ConsumerWidget {
         ),
       ),
       data: (items) {
-        final allItems = [...items, ...preLoadedMaterials];
-        final uniqueItems = allItems.fold<List<InventorySummaryModel>>([], (list, item) {
-          if (!list.any((m) => m.materialId == item.materialId)) {
-            list.add(item);
-          }
-          return list;
-        });
-
-        if (uniqueItems.isEmpty) {
+        if (items.isEmpty) {
           return const Center(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.assignment_outlined, size: 64, color: Colors.grey),
+                Icon(Icons.inventory_2_outlined, size: 64, color: Colors.grey),
                 SizedBox(height: 12),
-                Text('لا توجد مواد قيد الاستلام', style: TextStyle(color: Colors.grey)),
+                Text('لا توجد مواد في شاشة الاستلام', style: TextStyle(color: Colors.grey)),
                 SizedBox(height: 6),
-                Text('المواد تصل هنا من مخزن الخلاط',
+                Text('استخدم "وارد من الخلاط" لاستلام مواد',
                     style: TextStyle(color: Colors.grey, fontSize: 12)),
               ],
             ),
           );
         }
         
-        final total = uniqueItems.fold(0.0, (s, m) => s + m.currentBalance);
+        final total = items.fold(0.0, (s, m) => s + m.currentBalance);
+        
         return Column(
           children: [
             _buildSummaryCard(
-              title: 'إجمالي المواد قيد الاستلام',
+              title: 'إجمالي المخزون في شاشة الاستلام',
               total: total,
               color: Colors.deepPurple,
-              badge: preLoadedMaterials.isNotEmpty 
-                ? '(${preLoadedMaterials.length} من الخلاط)' 
-                : null,
             ),
             Expanded(
               child: ListView.builder(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
-                itemCount: uniqueItems.length,
+                itemCount: items.length,
                 itemBuilder: (ctx, i) {
-                  final material = uniqueItems[i];
-                  final isConfirmed = confirmedIds.contains(material.materialId);
-                  final requestedQty = receivedQuantities[material.materialId] ?? material.currentBalance;
-                  
-                  return _buildMaterialCard(
-                    material, 
-                    Colors.deepPurple,
-                    isFromMixer: preLoadedMaterials.any((m) => m.materialId == material.materialId),
-                    isConfirmed: isConfirmed,
-                    requestedQty: requestedQty,
-                    showConfirmButton: true,
-                    onConfirm: () {
-                      _confirmReceiving(context, ref, material);
-                    },
-                  );
+                  final m = items[i];
+                  return _buildMaterialCard(m, Colors.deepPurple);
                 },
               ),
             ),
@@ -427,356 +291,692 @@ class _ReceivingInventoryTab extends ConsumerWidget {
       },
     );
   }
+}
 
-  void _confirmReceiving(BuildContext context, WidgetRef ref, InventorySummaryModel item) async {
-    final requestedQty = receivedQuantities[item.materialId] ?? item.currentBalance;
+// ──────────────────────────────────────────────────────────────────────────────
+// تبويب وارد من الخلاط
+// ──────────────────────────────────────────────────────────────────────────────
+
+class _IncomingTab extends ConsumerWidget {
+  final String operatorName;
+  final VoidCallback onRefresh;
+  final void Function(BuildContext, String) showError;
+  final void Function(BuildContext, String) showSuccess;
+
+  const _IncomingTab({
+    required this.operatorName,
+    required this.onRefresh,
+    required this.showError,
+    required this.showSuccess,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final async = ref.watch(receivingIncomingProvider);
     
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('تأكيد استلام المادة'),
-        content: Column(
+    return async.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => Center(
+        child: Column(
           mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.error_outline, size: 48, color: Colors.red),
+            const SizedBox(height: 12),
+            const Text('حدث خطأ أثناء تحميل الطلبات الواردة', style: TextStyle(color: Colors.red)),
+            const SizedBox(height: 8),
+            Text(e.toString(), style: TextStyle(color: Colors.grey, fontSize: 12)),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: onRefresh,
+              child: const Text('إعادة المحاولة'),
+            ),
+          ],
+        ),
+      ),
+      data: (vouchers) {
+        if (vouchers.isEmpty) {
+          return const Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.arrow_downward, size: 64, color: Colors.grey),
+                SizedBox(height: 12),
+                Text('لا توجد طلبات واردة من مخزن الخلاط', style: TextStyle(color: Colors.grey)),
+                SizedBox(height: 6),
+                Text('اضغط + لإنشاء طلب استلام من الخلاط',
+                    style: TextStyle(color: Colors.grey, fontSize: 12)),
+              ],
+            ),
+          );
+        }
+        
+        return RefreshIndicator(
+          onRefresh: () async => onRefresh(),
+          child: ListView.builder(
+            padding: const EdgeInsets.all(12),
+            itemCount: vouchers.length,
+            itemBuilder: (ctx, i) => _VoucherCard(
+              key: ValueKey(vouchers[i].id),
+              voucher: vouchers[i],
+              operatorName: operatorName,
+              onAction: onRefresh,
+              role: 'incoming',
+              showError: showError,
+              showSuccess: showSuccess,
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// تبويب صادر للجاهز
+// ──────────────────────────────────────────────────────────────────────────────
+
+class _OutgoingTab extends ConsumerWidget {
+  final String operatorName;
+  final VoidCallback onRefresh;
+  final void Function(BuildContext, String) showError;
+  final void Function(BuildContext, String) showSuccess;
+
+  const _OutgoingTab({
+    required this.operatorName,
+    required this.onRefresh,
+    required this.showError,
+    required this.showSuccess,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final async = ref.watch(receivingOutgoingProvider);
+    
+    return async.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.error_outline, size: 48, color: Colors.red),
+            const SizedBox(height: 12),
+            const Text('حدث خطأ أثناء تحميل السندات الصادرة', style: TextStyle(color: Colors.red)),
+            const SizedBox(height: 8),
+            Text(e.toString(), style: TextStyle(color: Colors.grey, fontSize: 12)),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: onRefresh,
+              child: const Text('إعادة المحاولة'),
+            ),
+          ],
+        ),
+      ),
+      data: (vouchers) {
+        if (vouchers.isEmpty) {
+          return const Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.arrow_upward, size: 64, color: Colors.grey),
+                SizedBox(height: 12),
+                Text('لا توجد سندات صادرة للجاهز للاستخدام', style: TextStyle(color: Colors.grey)),
+                SizedBox(height: 6),
+                Text('اضغط + لإنشاء سند تحويل للجاهز للاستخدام',
+                    style: TextStyle(color: Colors.grey, fontSize: 12)),
+              ],
+            ),
+          );
+        }
+        
+        return RefreshIndicator(
+          onRefresh: () async => onRefresh(),
+          child: ListView.builder(
+            padding: const EdgeInsets.all(12),
+            itemCount: vouchers.length,
+            itemBuilder: (ctx, i) => _VoucherCard(
+              key: ValueKey(vouchers[i].id),
+              voucher: vouchers[i],
+              operatorName: operatorName,
+              onAction: onRefresh,
+              role: 'outgoing',
+              showError: showError,
+              showSuccess: showSuccess,
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// بطاقة السند الموحدة (مثل staging)
+// ──────────────────────────────────────────────────────────────────────────────
+
+class _VoucherCard extends ConsumerWidget {
+  final TransferVoucherModel voucher;
+  final String operatorName;
+  final VoidCallback onAction;
+  final String role;
+  final void Function(BuildContext, String) showError;
+  final void Function(BuildContext, String) showSuccess;
+
+  const _VoucherCard({
+    super.key,
+    required this.voucher,
+    required this.operatorName,
+    required this.onAction,
+    required this.role,
+    required this.showError,
+    required this.showSuccess,
+  });
+
+  Color get _statusColor {
+    switch (voucher.status) {
+      case 'confirmed':
+        return Colors.green;
+      case 'pending':
+        return Colors.orange;
+      case 'cancelled':
+        return Colors.red;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  String get _statusLabel {
+    switch (voucher.status) {
+      case 'confirmed':
+        return 'مُنفَّذ';
+      case 'pending':
+        return 'قيد الانتظار';
+      case 'cancelled':
+        return 'ملغي';
+      default:
+        return 'مسودة';
+    }
+  }
+
+  String get _transferLabel {
+    return role == 'incoming' 
+        ? 'مخزن الخلاط ← شاشة الاستلام'
+        : 'شاشة الاستلام ← جاهز للاستخدام';
+  }
+
+  Color get _transferColor {
+    return role == 'incoming' ? Colors.deepPurple : Colors.green;
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final ds = ref.read(dataSourceProvider);
+    
+    return Card(
+      margin: const EdgeInsets.only(bottom: 10),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'المادة: ${item.materialName}',
-              style: const TextStyle(fontWeight: FontWeight.bold),
+            // رأس البطاقة
+            Row(
+              children: [
+                Chip(
+                  label: Text(_statusLabel, style: const TextStyle(color: Colors.white, fontSize: 12)),
+                  backgroundColor: _statusColor,
+                  padding: EdgeInsets.zero,
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                const SizedBox(width: 8),
+                Icon(
+                  role == 'incoming' ? Icons.arrow_downward : Icons.arrow_upward,
+                  size: 16,
+                  color: _transferColor,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  voucher.voucherNumber ?? '',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                ),
+                const Spacer(),
+                if (voucher.createdAt != null)
+                  Text(
+                    _formatDate(voucher.createdAt!),
+                    style: const TextStyle(color: Colors.grey, fontSize: 12),
+                  ),
+              ],
             ),
-            const SizedBox(height: 8),
-            Text(
-              'الكمية المطلوبة: ${requestedQty.toStringAsFixed(2)} ${item.unit}',
-            ),
-            Text(
-              'الكمية المتاحة: ${item.currentBalance.toStringAsFixed(2)} ${item.unit}',
-              style: TextStyle(
-                color: item.currentBalance < requestedQty ? Colors.red : Colors.green,
+            
+            // نوع التحويل
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                _transferLabel,
+                style: TextStyle(
+                  fontSize: 11,
+                  color: _transferColor,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
             ),
-            if (item.currentBalance < requestedQty) ...[
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.red.shade50,
-                  borderRadius: BorderRadius.circular(8),
+            
+            const SizedBox(height: 8),
+            
+            // المواد مع الكميات
+            if (voucher.items.isNotEmpty)
+              Wrap(
+                spacing: 4,
+                runSpacing: 4,
+                children: voucher.items.take(4).map((item) {
+                  return Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: Colors.deepPurple.shade50,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.deepPurple.shade100),
+                    ),
+                    child: Text(
+                      '${item.materialName} (${item.requestedQty.toStringAsFixed(2)} ${item.unit})', 
+                      style: TextStyle(fontSize: 11, color: Colors.deepPurple.shade800),
+                    ),
+                  );
+                }).toList(),
+              ),
+            
+            if (voucher.items.length > 4)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  '+${voucher.items.length - 4} مواد أخرى',
+                  style: const TextStyle(color: Colors.grey, fontSize: 11),
                 ),
-                child: const Row(
-                  children: [
-                    Icon(Icons.warning_amber_rounded, color: Colors.red),
-                    SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'تنبيه: الكمية المتاحة أقل من الكمية المطلوبة',
-                        style: TextStyle(color: Colors.red, fontSize: 12),
+              ),
+            
+            if (voucher.notes?.isNotEmpty == true)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(
+                  'ملاحظات: ${voucher.notes}',
+                  style: const TextStyle(color: Colors.grey, fontSize: 12),
+                ),
+              ),
+            
+            // ─── الأزرار (مثل staging) ──────────────────────────────────────
+            if (!voucher.isConfirmed && !voucher.isCancelled) ...[
+              const Divider(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  // إلغاء
+                  TextButton.icon(
+                    icon: const Icon(Icons.cancel_outlined, color: Colors.red, size: 16),
+                    label: const Text('إلغاء', style: TextStyle(color: Colors.red)),
+                    onPressed: () async {
+                      final ok = await _confirmDialog(
+                        context,
+                        'تأكيد الإلغاء',
+                        'هل تريد إلغاء سند ${voucher.voucherNumber}؟',
+                      );
+                      if (ok) {
+                        try {
+                          await ds.cancelTransferVoucher(voucher.id!);
+                          showSuccess(context, '✅ تم إلغاء السند بنجاح');
+                          onAction();
+                        } catch (e) {
+                          showError(context, '❌ فشل إلغاء السند: ${e.toString()}');
+                        }
+                      }
+                    },
+                  ),
+                  const SizedBox(width: 8),
+                  
+                  // إرسال للمراجعة (إذا كان مسودة)
+                  if (voucher.isDraft)
+                    ElevatedButton.icon(
+                      icon: const Icon(Icons.send, size: 16),
+                      label: const Text('إرسال للمراجعة'),
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+                      onPressed: () async {
+                        try {
+                          await ds.submitTransferVoucher(voucher.id!);
+                          showSuccess(context, '✅ تم إرسال السند للمراجعة');
+                          onAction();
+                        } catch (e) {
+                          showError(context, '❌ فشل إرسال السند: ${e.toString()}');
+                        }
+                      },
+                    ),
+                  
+                  // تأكيد الاستلام (إذا كان في انتظار)
+                  if (voucher.isPending)
+                    ElevatedButton.icon(
+                      icon: const Icon(Icons.check_circle, size: 16),
+                      label: Text(
+                        role == 'incoming' 
+                            ? 'تأكيد استلام للاستلام' 
+                            : 'تأكيد للجاهز للاستخدام',
                       ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: role == 'incoming' ? Colors.deepPurple : Colors.green,
+                      ),
+                      onPressed: () async {
+                        final confirmMsg = role == 'incoming'
+                            ? 'هل تأكد استلام المواد من مخزن الخلاط؟\nسيتم نقل المواد لشاشة الاستلام.'
+                            : 'هل تأكد استلام المواد من شاشة الاستلام؟\nسيتم نقل المواد للجاهز للاستخدام.';
+                        
+                        final ok = await _confirmDialog(
+                          context,
+                          'تأكيد الاستلام',
+                          confirmMsg,
+                        );
+                        
+                        if (ok) {
+                          try {
+                            await ds.confirmTransferVoucher(voucher.id!, {
+                              'confirmed_by': operatorName,
+                            });
+                            
+                            final successMsg = role == 'incoming'
+                                ? '✅ تم تأكيد الاستلام ونقل المواد لشاشة الاستلام'
+                                : '✅ تم تأكيد الاستلام ونقل المواد للجاهز للاستخدام';
+                            
+                            showSuccess(context, successMsg);
+                            onAction();
+                          } catch (e) {
+                            showError(context, '❌ فشل تأكيد الاستلام: ${e.toString()}');
+                          }
+                        }
+                      },
+                    ),
+                ],
+              ),
+            ],
+            
+            // معلومات التأكيد
+            if (voucher.isConfirmed && voucher.confirmedBy != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Row(
+                  children: [
+                    const Icon(Icons.check_circle, color: Colors.green, size: 14),
+                    const SizedBox(width: 4),
+                    Text(
+                      'تم التنفيذ بواسطة: ${voucher.confirmedBy}',
+                      style: const TextStyle(color: Colors.green, fontSize: 12),
                     ),
                   ],
                 ),
               ),
-            ],
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.orange.shade50,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.orange.shade200),
-              ),
-              child: const Row(
-                children: [
-                  Icon(Icons.warning_amber_rounded, color: Colors.orange),
-                  SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'تأكيد الاستلام يعني خصم الكمية المطلوبة من المخزن ونقلها للمواد الجاهزة للاستخدام.',
-                      style: TextStyle(fontSize: 12),
-                    ),
-                  ),
-                ],
-              ),
-            ),
           ],
         ),
+      ),
+    );
+  }
+
+  Future<bool> _confirmDialog(BuildContext context, String title, String msg) async {
+    final res = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(title),
+        content: Text(msg),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('إلغاء'),
+            child: const Text('لا'),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.deepPurple,
+            ),
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('تأكيد الاستلام', style: TextStyle(color: Colors.white)),
+            child: const Text('نعم، تأكيد'),
           ),
         ],
       ),
     );
+    return res ?? false;
+  }
 
-    if (confirmed != true) return;
-
+  String _formatDate(String dateStr) {
     try {
-      final ds = ref.read(dataSourceProvider);
-      
-      // 1. تسجيل حركة الخصم من المخزن
-      await ds.addInventoryTransaction(InventoryTransactionModel(
-        id: '',
-        materialId: item.materialId,
-        warehouseType: 'receiving',
-        transactionType: 'out',
-        quantity: requestedQty,
-        createdBy: operatorName,
-        notes: 'خصم الكمية المطلوبة للاستلام - جاهزة للاستخدام',
-        createdAt: DateTime.now(),
-      ));
-
-      // 2. تحديث المخزون (خصم الكمية)
-      await ds.transferInventory(
-        materialId: item.materialId,
-        quantity: requestedQty,
-        fromWarehouse: 'receiving',
-        toWarehouse: 'ready_for_use',
-        notes: 'نقل من قيد الاستلام إلى جاهز للاستخدام',
-        createdBy: operatorName,
-      );
-
-      ref.invalidate(_receivingInventoryProvider);
-      ref.invalidate(inventorySummaryProvider);
-      
-      if (context.mounted) {
-        showSuccess(context, '✅ تم تأكيد استلام ${item.materialName} (${requestedQty.toStringAsFixed(2)} ${item.unit}) وأصبحت جاهزة للاستخدام');
-        onMaterialConfirmed(item.materialId);
-      }
-    } catch (e) {
-      if (context.mounted) {
-        showError(context, '❌ فشل تأكيد الاستلام: ${e.toString()}');
-      }
+      final date = DateTime.parse(dateStr);
+      return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+    } catch (_) {
+      return dateStr.split('T').first;
     }
   }
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
-// تبويب جاهز للاستخدام
+// حوار إنشاء السند (مثل staging)
 // ──────────────────────────────────────────────────────────────────────────────
 
-class _ReadyForUseTab extends ConsumerWidget {
-  final VoidCallback onRefresh;
-  final List<String> confirmedIds;
-  final Map<String, double> receivedQuantities;
+class _ReceivingVoucherDialog extends ConsumerStatefulWidget {
+  final String transferType;
+  final String? createdBy;
+  final VoidCallback onSaved;
+  final void Function(BuildContext, String) showError;
+  final void Function(BuildContext, String) showSuccess;
+  final List<InventorySummaryModel>? preSelectedMaterials;
+  final Map<String, double>? selectedQuantities;
 
-  const _ReadyForUseTab({
-    required this.onRefresh,
-    this.confirmedIds = const [],
-    required this.receivedQuantities,
+  const _ReceivingVoucherDialog({
+    required this.transferType,
+    required this.onSaved,
+    this.createdBy,
+    required this.showError,
+    required this.showSuccess,
+    this.preSelectedMaterials,
+    this.selectedQuantities,
   });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final async = ref.watch(_receivingInventoryProvider);
-    
-    return async.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.error_outline, size: 48, color: Colors.red),
-            const SizedBox(height: 12),
-            const Text('حدث خطأ أثناء تحميل المواد الجاهزة', style: TextStyle(color: Colors.red)),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: onRefresh,
-              child: const Text('إعادة المحاولة'),
-            ),
-          ],
-        ),
-      ),
-      data: (items) {
-        final confirmedItems = items.where((m) => confirmedIds.contains(m.materialId)).toList();
-        
-        if (confirmedItems.isEmpty) {
-          return const Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.check_circle_outline, size: 64, color: Colors.grey),
-                SizedBox(height: 12),
-                Text('لا توجد مواد جاهزة للاستخدام', style: TextStyle(color: Colors.grey)),
-                SizedBox(height: 6),
-                Text('المواد تظهر هنا بعد تأكيد استلامها',
-                    style: TextStyle(color: Colors.grey, fontSize: 12)),
-              ],
-            ),
-          );
-        }
-        
-        final total = confirmedItems.fold(0.0, (s, m) => s + m.currentBalance);
-        return Column(
-          children: [
-            _buildSummaryCard(
-              title: 'إجمالي المواد الجاهزة للاستخدام',
-              total: total,
-              color: Colors.green,
-              badge: '(${confirmedItems.length} مادة)',
-            ),
-            Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                itemCount: confirmedItems.length,
-                itemBuilder: (ctx, i) {
-                  final material = confirmedItems[i];
-                  final qty = receivedQuantities[material.materialId] ?? material.currentBalance;
-                  return _buildMaterialCard(
-                    material, 
-                    Colors.green,
-                    showReadyBadge: true,
-                    requestedQty: qty,
-                  );
-                },
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
+  ConsumerState<_ReceivingVoucherDialog> createState() => _ReceivingVoucherDialogState();
 }
 
-// ──────────────────────────────────────────────────────────────────────────────
-// تبويب سجل الاستلام
-// ──────────────────────────────────────────────────────────────────────────────
-
-class _ReceivingHistoryTab extends ConsumerWidget {
-  final VoidCallback onRefresh;
-  final List<String> confirmedIds;
-  final Map<String, double> receivedQuantities;
-
-  const _ReceivingHistoryTab({
-    required this.onRefresh,
-    this.confirmedIds = const [],
-    required this.receivedQuantities,
-  });
+class _ReceivingVoucherDialogState extends ConsumerState<_ReceivingVoucherDialog> {
+  final _notesCtrl = TextEditingController();
+  final List<_VItemEntry> _items = [];
+  bool _loading = false;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final async = ref.watch(_receivingInventoryProvider);
-    
-    return async.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.error_outline, size: 48, color: Colors.red),
-            const SizedBox(height: 12),
-            const Text('حدث خطأ أثناء تحميل سجل الاستلام', style: TextStyle(color: Colors.red)),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: onRefresh,
-              child: const Text('إعادة المحاولة'),
-            ),
-          ],
-        ),
-      ),
-      data: (items) {
-        final historyItems = items.where((m) => confirmedIds.contains(m.materialId)).toList();
-        
-        if (historyItems.isEmpty) {
-          return const Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.history, size: 64, color: Colors.grey),
-                SizedBox(height: 12),
-                Text('لا يوجد سجل استلام', style: TextStyle(color: Colors.grey)),
-                SizedBox(height: 6),
-                Text('سجل الاستلام يظهر هنا بعد تأكيد الاستلام',
-                    style: TextStyle(color: Colors.grey, fontSize: 12)),
-              ],
-            ),
-          );
-        }
-        
-        final totalDeducted = historyItems.fold(0.0, (sum, m) => sum + (receivedQuantities[m.materialId] ?? m.currentBalance));
-        
-        return Column(
-          children: [
-            Container(
-              margin: const EdgeInsets.all(12),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.blue.shade50,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.blue.shade200),
+  void initState() {
+    super.initState();
+    // إذا كانت هناك مواد محددة مسبقاً، أضفها تلقائياً
+    if (widget.preSelectedMaterials != null && widget.preSelectedMaterials!.isNotEmpty) {
+      for (final material in widget.preSelectedMaterials!) {
+        final qty = widget.selectedQuantities?[material.materialId] ?? material.currentBalance;
+        _items.add(_VItemEntry(
+          name: material.materialName,
+          materialId: material.materialId,
+          unit: material.unit,
+          qty: qty,
+        ));
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _notesCtrl.dispose();
+    super.dispose();
+  }
+
+  String get _fromWarehouse =>
+      widget.transferType == 'mixer_to_receiving' ? 'mixer' : 'receiving';
+
+  String get _title =>
+      widget.transferType == 'mixer_to_receiving'
+          ? 'طلب استلام من مخزن الخلاط'
+          : 'سند صادر للجاهز للاستخدام';
+
+  String get _flowLabel =>
+      widget.transferType == 'mixer_to_receiving'
+          ? 'مخزن الخلاط ← شاشة الاستلام'
+          : 'شاشة الاستلام ← جاهز للاستخدام';
+
+  void _addItem() => setState(() => _items.add(_VItemEntry()));
+  void _removeItem(int i) => setState(() => _items.removeAt(i));
+
+  Future<void> _save() async {
+    if (_items.isEmpty) {
+      widget.showError(context, '⚠️ أضف بنداً واحداً على الأقل');
+      return;
+    }
+
+    final incomplete = <int>[
+      for (var i = 0; i < _items.length; i++)
+        if (_items[i].name.isEmpty || _items[i].qty <= 0) i + 1,
+    ];
+
+    if (incomplete.isNotEmpty) {
+      widget.showError(context, '⚠️ أكمل بيانات البند رقم ${incomplete.join("، ")} قبل الحفظ');
+      return;
+    }
+
+    setState(() => _loading = true);
+
+    try {
+      final ds = ref.read(dataSourceProvider);
+      
+      await ds.createTransferVoucher({
+        'notes': _notesCtrl.text.trim(),
+        'created_by': widget.createdBy ?? 'مدير الاستلام',
+        'transfer_type': widget.transferType,
+        'items': _items
+            .map((e) => {
+                  'material_name': e.name,
+                  'unit': e.unit,
+                  'requested_qty': e.qty,
+                  if (e.materialId != null) 'material_id': e.materialId,
+                })
+            .toList(),
+      });
+
+      if (mounted) {
+        Navigator.pop(context);
+        widget.showSuccess(context, '✅ تم إنشاء السند بنجاح');
+        widget.onSaved();
+      }
+    } catch (e) {
+      if (mounted) {
+        widget.showError(context, '❌ فشل إنشاء السند: ${e.toString()}');
+      }
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final summaryAsync = ref.watch(inventorySummaryProvider);
+    final materials = summaryAsync.valueOrNull
+            ?.where((m) => m.warehouseType == _fromWarehouse)
+            .toList() ??
+        [];
+
+    return AlertDialog(
+      title: Text(_title),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // مؤشر التدفق
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.deepPurple.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.swap_horiz, color: Colors.deepPurple, size: 16),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _flowLabel,
+                        style: const TextStyle(color: Colors.deepPurple, fontSize: 13),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              child: Row(
+              const SizedBox(height: 12),
+              
+              // ملاحظات
+              TextField(
+                controller: _notesCtrl,
+                maxLines: 2,
+                decoration: const InputDecoration(
+                  labelText: 'ملاحظات (اختياري)',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 16),
+              
+              // قائمة المواد
+              Row(
                 children: [
-                  Icon(Icons.history, color: Colors.blue.shade700),
-                  const SizedBox(width: 8),
-                  Text(
-                    'سجل الاستلام - ${historyItems.length} عملية',
-                    style: TextStyle(
-                      color: Colors.blue.shade700,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+                  const Text('المواد', style: TextStyle(fontWeight: FontWeight.bold)),
                   const Spacer(),
-                  Text(
-                    'إجمالي الكمية المخصومة: ${totalDeducted.toStringAsFixed(1)} كجم',
-                    style: TextStyle(
-                      color: Colors.blue.shade700,
-                      fontWeight: FontWeight.bold,
-                    ),
+                  TextButton.icon(
+                    icon: const Icon(Icons.add, size: 16),
+                    label: const Text('إضافة بند'),
+                    onPressed: _addItem,
                   ),
                 ],
               ),
-            ),
-            Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                itemCount: historyItems.length,
-                itemBuilder: (ctx, i) {
-                  final material = historyItems[i];
-                  final qty = receivedQuantities[material.materialId] ?? material.currentBalance;
-                  return Card(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    child: ListTile(
-                      leading: CircleAvatar(
-                        backgroundColor: Colors.green.shade100,
-                        child: Icon(Icons.check_circle, color: Colors.green.shade700),
-                      ),
-                      title: Text(
-                        material.materialName,
-                        style: const TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                      subtitle: Text('✅ تم الاستلام'),
-                      trailing: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Text(
-                            '-${qty.toStringAsFixed(2)} ${material.unit}',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: Colors.red.shade700,
-                            ),
-                          ),
-                          Text(
-                            'الرصيد المتبقي: ${material.currentBalance.toStringAsFixed(2)} ${material.unit}',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: Colors.grey.shade600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-          ],
-        );
-      },
+              const Divider(),
+              
+              ..._items.asMap().entries.map((e) => _VItemRow(
+                    index: e.key,
+                    entry: e.value,
+                    materials: materials,
+                    onRemove: () => _removeItem(e.key),
+                    onChanged: () => setState(() {}),
+                  )),
+              
+              if (_items.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 8),
+                  child: Center(
+                    child: Text('اضغط "إضافة بند" لإضافة مادة',
+                        style: TextStyle(color: Colors.grey)),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('إلغاء'),
+        ),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.deepPurple,
+          ),
+          onPressed: _loading ? null : _save,
+          child: _loading
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
+              : const Text(
+                  'حفظ',
+                  style: TextStyle(color: Colors.white),
+                ),
+        ),
+      ],
     );
   }
 }
@@ -789,7 +989,6 @@ Widget _buildSummaryCard({
   required String title,
   required double total,
   required MaterialColor color,
-  String? badge,
 }) {
   return Container(
     margin: const EdgeInsets.all(12),
@@ -801,23 +1000,9 @@ Widget _buildSummaryCard({
     ),
     child: Row(
       children: [
-        Icon(Icons.assignment_outlined, color: color),
+        Icon(Icons.inventory_2_outlined, color: color),
         const SizedBox(width: 8),
         Text(title, style: TextStyle(color: color.shade800, fontWeight: FontWeight.bold)),
-        if (badge != null) ...[
-          const SizedBox(width: 6),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-            decoration: BoxDecoration(
-              color: Colors.green.shade100,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Text(
-              badge,
-              style: TextStyle(color: Colors.green.shade700, fontSize: 10, fontWeight: FontWeight.bold),
-            ),
-          ),
-        ],
         const Spacer(),
         Text(
           '${total.toStringAsFixed(1)} كجم',
@@ -828,143 +1013,179 @@ Widget _buildSummaryCard({
   );
 }
 
-Widget _buildMaterialCard(
-  InventorySummaryModel item,
-  MaterialColor color, {
-  bool isFromMixer = false,
-  bool isConfirmed = false,
-  double? requestedQty,
-  bool showConfirmButton = false,
-  VoidCallback? onConfirm,
-  bool showReadyBadge = false,
-}) {
-  final qty = requestedQty ?? item.currentBalance;
-  
+Widget _buildMaterialCard(InventorySummaryModel item, MaterialColor color) {
   return Card(
     margin: const EdgeInsets.only(bottom: 8),
-    child: Container(
-      decoration: BoxDecoration(
-        border: isFromMixer && !isConfirmed
-            ? Border.all(color: Colors.orange.shade300, width: 2)
-            : showReadyBadge || isConfirmed
-                ? Border.all(color: Colors.green.shade700, width: 2)
-                : null,
-        borderRadius: BorderRadius.circular(8),
+    child: ListTile(
+      leading: CircleAvatar(
+        backgroundColor: color.shade50,
+        child: Icon(Icons.science_outlined, color: color.shade700),
       ),
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: isFromMixer && !isConfirmed
-              ? Colors.orange.shade100 
-              : showReadyBadge || isConfirmed
-                  ? Colors.green.shade100
-                  : color.shade50,
-          child: Icon(
-            isFromMixer && !isConfirmed ? Icons.send : 
-            showReadyBadge || isConfirmed ? Icons.check_circle : Icons.science_outlined,
-            color: isFromMixer && !isConfirmed
-                ? Colors.orange.shade700 
-                : showReadyBadge || isConfirmed
-                    ? Colors.green.shade700
-                    : color.shade700,
-          ),
-        ),
-        title: Row(
-          children: [
-            Expanded(
-              child: Text(
-                item.materialName,
-                style: const TextStyle(fontWeight: FontWeight.w600),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            if (isFromMixer && !isConfirmed) ...[
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: Colors.orange.shade100,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  'من الخلاط',
-                  style: TextStyle(
-                    color: Colors.orange.shade700,
-                    fontSize: 9,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ],
-            if (showReadyBadge || isConfirmed) ...[
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: Colors.green.shade100,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  'جاهز',
-                  style: TextStyle(
-                    color: Colors.green.shade700,
-                    fontSize: 9,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ],
-          ],
-        ),
-        subtitle: isFromMixer && !isConfirmed
-            ? Text('الكمية المطلوبة: ${qty.toStringAsFixed(2)} ${item.unit}')
-            : null,
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  isConfirmed || showReadyBadge
-                      ? '-${qty.toStringAsFixed(2)} ${item.unit}'
-                      : '${item.currentBalance.toStringAsFixed(2)} ${item.unit}',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 15,
-                    color: isConfirmed || showReadyBadge
-                        ? Colors.red.shade700
-                        : item.currentBalance <= 0 ? Colors.red : color.shade700,
-                  ),
-                ),
-                if (isConfirmed || showReadyBadge)
-                  Text(
-                    'مخصوم',
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: Colors.grey.shade600,
-                    ),
-                  ),
-              ],
-            ),
-            if (showConfirmButton && !isConfirmed) ...[
-              const SizedBox(width: 8),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green,
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  minimumSize: const Size(60, 30),
-                ),
-                onPressed: onConfirm,
-                child: const Text(
-                  'تأكيد',
-                  style: TextStyle(color: Colors.white, fontSize: 11),
-                ),
-              ),
-            ],
-          ],
+      title: Text(item.materialName, style: const TextStyle(fontWeight: FontWeight.w600)),
+      trailing: Text(
+        '${item.currentBalance.toStringAsFixed(2)} ${item.unit}',
+        style: TextStyle(
+          fontWeight: FontWeight.bold,
+          fontSize: 15,
+          color: item.currentBalance <= 0 ? Colors.red : color.shade700,
         ),
       ),
     ),
   );
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// مكونات إدخال البنود
+// ──────────────────────────────────────────────────────────────────────────────
+
+class _VItemEntry {
+  String name = '';
+  String unit = 'كجم';
+  double qty = 0;
+  String? materialId;
+
+  _VItemEntry({
+    this.name = '',
+    this.unit = 'كجم',
+    this.qty = 0,
+    this.materialId,
+  });
+}
+
+class _VItemRow extends StatelessWidget {
+  final int index;
+  final _VItemEntry entry;
+  final List<InventorySummaryModel> materials;
+  final VoidCallback onRemove;
+  final VoidCallback onChanged;
+
+  const _VItemRow({
+    required this.index,
+    required this.entry,
+    required this.materials,
+    required this.onRemove,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final itemNo = index + 1;
+    final selected = entry.name.isNotEmpty
+        ? materials
+            .where((m) => (entry.materialId != null && entry.materialId!.isNotEmpty)
+                ? m.materialId == entry.materialId
+                : m.materialName == entry.name)
+            .firstOrNull
+        : null;
+    final available = selected?.currentBalance ?? 0.0;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.grey.shade300),
+        borderRadius: BorderRadius.circular(8),
+        color: Colors.grey.shade50,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text('البند $itemNo',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.deepPurple)),
+              const Spacer(),
+              InkWell(
+                onTap: onRemove,
+                child: const Icon(Icons.remove_circle_outline, color: Colors.red, size: 20),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          
+          // اختيار المادة
+          materials.isEmpty
+              ? TextField(
+                  decoration: const InputDecoration(
+                    labelText: 'اسم المادة',
+                    border: OutlineInputBorder(),
+                  ),
+                  onChanged: (v) {
+                    entry.name = v;
+                    onChanged();
+                  },
+                )
+              : DropdownButtonFormField<String>(
+                  value: entry.name.isNotEmpty ? entry.name : null,
+                  decoration: const InputDecoration(
+                    labelText: 'المادة',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: materials
+                      .map((m) => DropdownMenuItem(
+                            value: m.materialName,
+                            child: Text(
+                              '${m.materialName} (${m.currentBalance.toStringAsFixed(1)} ${m.unit})',
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ))
+                      .toList(),
+                  onChanged: (v) {
+                    entry.name = v ?? '';
+                    final mat = materials.firstWhere(
+                      (m) => m.materialName == v,
+                      orElse: () => materials.first,
+                    );
+                    entry.materialId = mat.materialId;
+                    entry.unit = mat.unit;
+                    onChanged();
+                  },
+                ),
+          const SizedBox(height: 8),
+          
+          // الكمية والوحدة
+          Row(
+            children: [
+              Expanded(
+                child: TextFormField(
+                  initialValue: entry.qty > 0 ? entry.qty.toString() : '',
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: InputDecoration(
+                    labelText: 'الكمية',
+                    border: const OutlineInputBorder(),
+                    helperText: available > 0 ? 'متاح: ${available.toStringAsFixed(2)}' : null,
+                    helperStyle: const TextStyle(color: Colors.grey),
+                  ),
+                  onChanged: (v) {
+                    entry.qty = double.tryParse(v) ?? 0;
+                    onChanged();
+                  },
+                ),
+              ),
+              const SizedBox(width: 8),
+              SizedBox(
+                width: 80,
+                child: DropdownButtonFormField<String>(
+                  value: entry.unit,
+                  decoration: const InputDecoration(
+                    labelText: 'الوحدة',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'كجم', child: Text('كجم')),
+                    DropdownMenuItem(value: 'جرام', child: Text('جرام')),
+                    DropdownMenuItem(value: 'لتر', child: Text('لتر')),
+                  ],
+                  onChanged: (v) {
+                    entry.unit = v ?? 'كجم';
+                    onChanged();
+                  },
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 }
