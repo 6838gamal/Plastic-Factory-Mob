@@ -35,6 +35,13 @@ final _stagingOutgoingVouchersProvider = FutureProvider.autoDispose<List<Transfe
   return raw.map(TransferVoucherModel.fromJson).toList();
 });
 
+// ── إضافة Provider لسندات الاستلام من الخلاط ──
+final _mixerToReceivingVouchersProvider = FutureProvider.autoDispose<List<TransferVoucherModel>>((ref) async {
+  final ds = ref.read(dataSourceProvider);
+  final raw = await ds.getTransferVouchers(transferType: 'mixer_to_receiving');
+  return raw.map(TransferVoucherModel.fromJson).toList();
+});
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 class InventoryPage extends ConsumerStatefulWidget {
@@ -369,15 +376,16 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
               ] 
               
               else if (isMixer) ...[
+                // ── استلام وارد - إنشاء سند Voucher ──
                 ListTile(
                   leading: CircleAvatar(
                       backgroundColor: Colors.green,
                       child: const Icon(Icons.send, color: Colors.white)),
                   title: const Text('استلام وارد'),
-                  subtitle: const Text('اختيار مواد من مخزن الخلاط وإرسالها للاستلام'),
+                  subtitle: const Text('إنشاء سند استلام من مخزن الخلاط'),
                   onTap: () {
                     Navigator.pop(context);
-                    _showSelectMaterialsForReceivingDialog(context);
+                    _showCreateReceivingVoucherDialog(context);
                   },
                 ),
                 ListTile(
@@ -441,8 +449,8 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
     );
   }
 
-  // ── حوار اختيار المواد للإرسال (مثل بقية النوافذ) ──
-  void _showSelectMaterialsForReceivingDialog(BuildContext context) {
+  // ── حوار إنشاء سند استلام من مخزن الخلاط ──
+  void _showCreateReceivingVoucherDialog(BuildContext context) {
     final summaryAsync = ref.read(inventorySummaryProvider);
     final allItems = summaryAsync.value ?? [];
     
@@ -462,25 +470,44 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
 
     showDialog(
       context: context,
-      builder: (ctx) => _SendMaterialsDialog(
+      builder: (ctx) => _CreateReceivingVoucherDialog(
         materials: mixerMaterials,
         onConfirm: (selectedMaterials, quantities) async {
+          // إنشاء سند Voucher بدلاً من الانتقال المباشر
           try {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => RawMaterialReceivingPage(
-                  preSelectedMaterials: selectedMaterials,
-                  sourceWarehouse: AppConstants.warehouseMixer,
-                  title: 'استلام وارد - مخزن الخلاط',
-                  selectedQuantities: quantities,
-                ),
+            final ds = ref.read(dataSourceProvider);
+            final authState = ref.read(authProvider);
+            final operatorName = authState.user?.name ?? authState.user?.email ?? 'مدير';
+
+            // إنشاء السند
+            await ds.createTransferVoucher({
+              'notes': 'طلب استلام من مخزن الخلاط',
+              'created_by': operatorName,
+              'transfer_type': 'mixer_to_receiving',
+              'items': selectedMaterials
+                  .map((m) => {
+                        'material_name': m.materialName,
+                        'unit': m.unit,
+                        'requested_qty': quantities[m.materialId] ?? m.currentBalance,
+                        'material_id': m.materialId,
+                      })
+                  .toList(),
+            });
+
+            // تحديث البيانات
+            ref.invalidate(_mixerToReceivingVouchersProvider);
+            ref.invalidate(inventorySummaryProvider);
+
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('✅ تم إنشاء سند الاستلام بنجاح'),
+                backgroundColor: Colors.green,
               ),
             );
           } catch (e) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('❌ فشل إرسال البيانات: ${e.toString()}'),
+                content: Text('❌ فشل إنشاء السند: ${e.toString()}'),
                 backgroundColor: Colors.red,
               ),
             );
@@ -1063,23 +1090,23 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// كلاس حوار إرسال المواد (مثل بقية النوافذ)
+// كلاس حوار إنشاء سند استلام من الخلاط
 // ══════════════════════════════════════════════════════════════════════════════
 
-class _SendMaterialsDialog extends StatefulWidget {
+class _CreateReceivingVoucherDialog extends StatefulWidget {
   final List<InventorySummaryModel> materials;
   final Function(List<InventorySummaryModel>, Map<String, double>) onConfirm;
 
-  const _SendMaterialsDialog({
+  const _CreateReceivingVoucherDialog({
     required this.materials,
     required this.onConfirm,
   });
 
   @override
-  State<_SendMaterialsDialog> createState() => _SendMaterialsDialogState();
+  State<_CreateReceivingVoucherDialog> createState() => _CreateReceivingVoucherDialogState();
 }
 
-class _SendMaterialsDialogState extends State<_SendMaterialsDialog> {
+class _CreateReceivingVoucherDialogState extends State<_CreateReceivingVoucherDialog> {
   final Map<String, bool> _selectedMap = {};
   final Map<String, TextEditingController> _quantityControllers = {};
   bool _selectAll = true;
@@ -1113,7 +1140,7 @@ class _SendMaterialsDialogState extends State<_SendMaterialsDialog> {
         children: [
           Icon(Icons.send, color: Colors.teal),
           const SizedBox(width: 8),
-          const Text('إرسال مواد للاستلام'),
+          const Text('إنشاء سند استلام من الخلاط'),
         ],
       ),
       content: SizedBox(
@@ -1307,7 +1334,7 @@ class _SendMaterialsDialogState extends State<_SendMaterialsDialog> {
                   widget.onConfirm(selectedMaterials, quantities);
                 },
           child: Text(
-            'إرسال ($selectedCount)',
+            'إنشاء سند ($selectedCount)',
             style: const TextStyle(color: Colors.white),
           ),
         ),
@@ -1317,10 +1344,8 @@ class _SendMaterialsDialogState extends State<_SendMaterialsDialog> {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// باقي الكود (Warehouse Tab, Summary Panel, Material Card, Staging Tab, Transactions Tab)
+// Warehouse Tab
 // ══════════════════════════════════════════════════════════════════════════════
-
-// ── Warehouse Tab ─────────────────────────────────────────────────────────────
 
 class _WarehouseTab extends ConsumerWidget {
   final String warehouse;
@@ -1865,7 +1890,7 @@ class _BalanceChip extends StatelessWidget {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// Staging Warehouse Tab (مختصر)
+// Staging Warehouse Tab
 // ══════════════════════════════════════════════════════════════════════════════
 
 enum _StagingSection { inventory, incoming, outgoing }
