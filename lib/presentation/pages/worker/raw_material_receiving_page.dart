@@ -19,10 +19,12 @@ final _receivingInventoryProvider = FutureProvider.autoDispose<List<InventorySum
   return summary.where((m) => m.warehouseType == 'receiving').toList();
 });
 
+// ── تعديل: استخدام الحقول الموجودة بدلاً من isConfirmed ──
 final _readyForUseProvider = FutureProvider.autoDispose<List<InventorySummaryModel>>((ref) async {
   final summary = await ref.watch(inventorySummaryProvider.future);
-  // المواد التي في مخزن الاستلام وتم قبولها
-  return summary.where((m) => m.warehouseType == 'receiving' && m.isConfirmed == true).toList();
+  // المواد التي في مخزن الاستلام (سيتم اعتبارها جاهزة للاستخدام)
+  // يمكنك استخدام معيار آخر مثل الحالة أو كمية المخزون
+  return summary.where((m) => m.warehouseType == 'receiving' && m.currentBalance > 0).toList();
 });
 
 final _receivingOutgoingProvider = FutureProvider.autoDispose<List<TransferVoucherModel>>((ref) async {
@@ -55,6 +57,7 @@ class _RawMaterialReceivingPageState extends ConsumerState<RawMaterialReceivingP
     with SingleTickerProviderStateMixin {
   late TabController _tabs;
   List<InventorySummaryModel> _incomingMaterials = [];
+  List<String> _confirmedMaterialIds = [];
 
   @override
   void initState() {
@@ -64,7 +67,6 @@ class _RawMaterialReceivingPageState extends ConsumerState<RawMaterialReceivingP
     
     if (widget.preSelectedMaterials != null && widget.preSelectedMaterials!.isNotEmpty) {
       _incomingMaterials = widget.preSelectedMaterials!;
-      // عرض رسالة بعدد المواد المستلمة
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -169,12 +171,19 @@ class _RawMaterialReceivingPageState extends ConsumerState<RawMaterialReceivingP
                 _ReceivingInventoryTab(
                   onRefresh: _refresh,
                   preLoadedMaterials: _incomingMaterials,
-                  onMaterialConfirmed: () {
-                    // عند تأكيد استلام مادة، انتقل إلى تبويب "جاهز للاستخدام"
+                  confirmedIds: _confirmedMaterialIds,
+                  onMaterialConfirmed: (materialId) {
+                    setState(() {
+                      _confirmedMaterialIds.add(materialId);
+                    });
+                    // انتقل إلى تبويب "جاهز للاستخدام"
                     _tabs.animateTo(1);
                   },
                 ),
-                _ReadyForUseTab(onRefresh: _refresh),
+                _ReadyForUseTab(
+                  onRefresh: _refresh,
+                  confirmedIds: _confirmedMaterialIds,
+                ),
                 _ReceivingOutgoingTab(
                   operatorName: _operatorName,
                   onRefresh: _refresh,
@@ -292,11 +301,13 @@ class _RawMaterialReceivingPageState extends ConsumerState<RawMaterialReceivingP
 class _ReceivingInventoryTab extends ConsumerWidget {
   final VoidCallback onRefresh;
   final List<InventorySummaryModel> preLoadedMaterials;
-  final VoidCallback onMaterialConfirmed;
+  final List<String> confirmedIds;
+  final Function(String) onMaterialConfirmed;
 
   const _ReceivingInventoryTab({
     required this.onRefresh,
     this.preLoadedMaterials = const [],
+    this.confirmedIds = const [],
     required this.onMaterialConfirmed,
   });
 
@@ -351,6 +362,7 @@ class _ReceivingInventoryTab extends ConsumerWidget {
                   uniqueItems[i], 
                   Colors.deepPurple,
                   isFromMixer: preLoadedMaterials.any((m) => m.materialId == uniqueItems[i].materialId),
+                  isConfirmed: confirmedIds.contains(uniqueItems[i].materialId),
                   showConfirmButton: true,
                   onConfirm: () {
                     _confirmReceiving(context, ref, uniqueItems[i]);
@@ -421,15 +433,26 @@ class _ReceivingInventoryTab extends ConsumerWidget {
     if (confirmed != true) return;
 
     try {
+      // استخدام الدالة الموجودة لتأكيد استلام المواد
+      // يمكن استخدام transferInventory لنقل المواد من receiving إلى ready
       final ds = ref.read(dataSourceProvider);
       final authState = ref.read(authProvider);
       final operatorName = authState.user?.name ?? authState.user?.email ?? 'مدير الاستلام';
 
-      await ds.confirmMaterialReceiving(
+      // تحديث حالة المادة عن طريق نقلها إلى مخزن مؤقت أو تحديثها
+      // هنا نستخدم addInventoryTransaction لتسجيل حركة تأكيد الاستلام
+      await ds.addInventoryTransaction(InventoryTransactionModel(
+        id: '',
         materialId: item.materialId,
-        confirmedBy: operatorName,
-      );
+        warehouseType: 'receiving',
+        transactionType: 'confirm_receiving',
+        quantity: item.currentBalance,
+        createdBy: operatorName,
+        notes: 'تأكيد استلام المادة - جاهزة للاستخدام',
+        createdAt: DateTime.now(),
+      ));
 
+      // تحديث البيانات
       ref.invalidate(_receivingInventoryProvider);
       ref.invalidate(_readyForUseProvider);
       ref.invalidate(inventorySummaryProvider);
@@ -441,8 +464,8 @@ class _ReceivingInventoryTab extends ConsumerWidget {
             backgroundColor: Colors.green,
           ),
         );
-        // الانتقال إلى تبويب "جاهز للاستخدام"
-        onMaterialConfirmed();
+        // إضافة المادة إلى قائمة المواد المؤكدة والانتقال إلى تبويب جاهز للاستخدام
+        onMaterialConfirmed(item.materialId);
       }
     } catch (e) {
       if (context.mounted) {
@@ -460,7 +483,12 @@ class _ReceivingInventoryTab extends ConsumerWidget {
 
 class _ReadyForUseTab extends ConsumerWidget {
   final VoidCallback onRefresh;
-  const _ReadyForUseTab({required this.onRefresh});
+  final List<String> confirmedIds;
+
+  const _ReadyForUseTab({
+    required this.onRefresh,
+    this.confirmedIds = const [],
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -470,7 +498,10 @@ class _ReadyForUseTab extends ConsumerWidget {
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, _) => Center(child: Text('خطأ: $e')),
       data: (items) {
-        if (items.isEmpty) {
+        // تصفية المواد المؤكدة فقط
+        final confirmedItems = items.where((m) => confirmedIds.contains(m.materialId)).toList();
+        
+        if (confirmedItems.isEmpty) {
           return const Center(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -486,21 +517,21 @@ class _ReadyForUseTab extends ConsumerWidget {
           );
         }
         
-        final total = items.fold(0.0, (s, m) => s + m.currentBalance);
+        final total = confirmedItems.fold(0.0, (s, m) => s + m.currentBalance);
         return Column(
           children: [
             _buildSummaryCard(
               'إجمالي المواد الجاهزة للاستخدام', 
               total, 
               Colors.green,
-              '(${items.length} مادة)',
+              '(${confirmedItems.length} مادة)',
             ),
             Expanded(
               child: ListView.builder(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
-                itemCount: items.length,
+                itemCount: confirmedItems.length,
                 itemBuilder: (ctx, i) => _buildMaterialCard(
-                  items[i], 
+                  confirmedItems[i], 
                   Colors.green,
                   showReadyBadge: true,
                 ),
@@ -514,7 +545,7 @@ class _ReadyForUseTab extends ConsumerWidget {
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
-// تبويب صادر للخلاط
+// تبويب صادر للخلاط (نفس الكود السابق)
 // ──────────────────────────────────────────────────────────────────────────────
 
 class _ReceivingOutgoingTab extends ConsumerWidget {
@@ -563,7 +594,7 @@ class _ReceivingOutgoingTab extends ConsumerWidget {
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
-// بطاقة السند لشاشة استلام المواد الخام
+// بطاقة السند (نفس الكود السابق)
 // ──────────────────────────────────────────────────────────────────────────────
 
 class _ReceivingVoucherCard extends ConsumerWidget {
@@ -782,7 +813,7 @@ class _ReceivingVoucherCard extends ConsumerWidget {
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
-// حوار إنشاء سند لشاشة استلام المواد الخام
+// حوار إنشاء سند (نفس الكود السابق)
 // ──────────────────────────────────────────────────────────────────────────────
 
 class _ReceivingVoucherDialog extends ConsumerStatefulWidget {
@@ -1000,6 +1031,7 @@ Widget _buildMaterialCard(
   InventorySummaryModel item,
   MaterialColor color, {
   bool isFromMixer = false,
+  bool isConfirmed = false,
   bool showConfirmButton = false,
   VoidCallback? onConfirm,
   bool showReadyBadge = false,
@@ -1009,8 +1041,8 @@ Widget _buildMaterialCard(
     child: Container(
       decoration: BoxDecoration(
         border: isFromMixer 
-            ? Border.all(color: Colors.green.shade300, width: 2)
-            : showReadyBadge
+            ? Border.all(color: Colors.orange.shade300, width: 2)
+            : showReadyBadge || isConfirmed
                 ? Border.all(color: Colors.green.shade700, width: 2)
                 : null,
         borderRadius: BorderRadius.circular(8),
@@ -1018,16 +1050,16 @@ Widget _buildMaterialCard(
       child: ListTile(
         leading: CircleAvatar(
           backgroundColor: isFromMixer 
-              ? Colors.green.shade100 
-              : showReadyBadge
+              ? Colors.orange.shade100 
+              : showReadyBadge || isConfirmed
                   ? Colors.green.shade100
                   : color.shade50,
           child: Icon(
             isFromMixer ? Icons.send : 
-            showReadyBadge ? Icons.check_circle : Icons.science_outlined,
+            showReadyBadge || isConfirmed ? Icons.check_circle : Icons.science_outlined,
             color: isFromMixer 
-                ? Colors.green.shade700 
-                : showReadyBadge
+                ? Colors.orange.shade700 
+                : showReadyBadge || isConfirmed
                     ? Colors.green.shade700
                     : color.shade700,
           ),
@@ -1041,7 +1073,7 @@ Widget _buildMaterialCard(
                 overflow: TextOverflow.ellipsis,
               ),
             ),
-            if (isFromMixer) ...[
+            if (isFromMixer && !isConfirmed) ...[
               const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -1059,7 +1091,7 @@ Widget _buildMaterialCard(
                 ),
               ),
             ],
-            if (showReadyBadge) ...[
+            if (showReadyBadge || isConfirmed) ...[
               const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -1090,7 +1122,7 @@ Widget _buildMaterialCard(
                 color: item.currentBalance <= 0 ? Colors.red : color.shade700,
               ),
             ),
-            if (showConfirmButton && !showReadyBadge) ...[
+            if (showConfirmButton && !isConfirmed) ...[
               const SizedBox(width: 8),
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
@@ -1170,7 +1202,6 @@ class _VItemRow extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 8),
-          // Material dropdown
           materials.isEmpty
               ? TextField(
                   decoration: const InputDecoration(labelText: 'اسم المادة الخام', border: OutlineInputBorder()),
