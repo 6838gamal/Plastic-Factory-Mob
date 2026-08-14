@@ -10,6 +10,8 @@ import '../../../providers/reference_data_provider.dart'
 import '../../../../core/constants/app_constants.dart';
 import '../../../widgets/common/loading_widget.dart';
 import '../../../../core/utils/helpers.dart';
+// ── إضافة import لصفحة استلام المواد الخام ──────────────────────────────
+import '../worker/raw_material_receiving_page.dart';
 
 // ── Providers ────────────────────────────────────────────────────────────────
 //
@@ -294,17 +296,17 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
                 ],
               ),
               const Divider(),
-              ListTile(
-                leading: CircleAvatar(
-                    backgroundColor: Colors.green,
-                    child: const Icon(Icons.add_circle_outline, color: Colors.white)),
-                title: Text(isMain ? 'استلام وارد' : 'استلام من الرئيسي'),
-                subtitle: Text(isMain
-                    ? 'إضافة مواد خام جديدة للمخزون'
-                    : 'سحب من المخزن الرئيسي وإضافة لمخزن الخلاط'),
-                onTap: () {
-                  Navigator.pop(context);
-                  if (isMain) {
+              
+              // ── Main Warehouse Options ─────────────────────────────────
+              if (isMain) ...[
+                ListTile(
+                  leading: CircleAvatar(
+                      backgroundColor: Colors.green,
+                      child: const Icon(Icons.add_circle_outline, color: Colors.white)),
+                  title: const Text('استلام وارد'),
+                  subtitle: const Text('إضافة مواد خام جديدة للمخزون'),
+                  onTap: () {
+                    Navigator.pop(context);
                     _showInventoryDialog(context,
                         title: 'استلام وارد',
                         transactionType: 'in',
@@ -312,56 +314,38 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
                         icon: Icons.add_circle_outline,
                         iconColor: Colors.green,
                         defaultWarehouse: _activeWarehouse);
-                  } else {
-                    _showTransferDialog(context,
-                        fromWarehouse: AppConstants.warehouseMain,
-                        toWarehouse: AppConstants.warehouseMixer);
-                  }
-                },
-              ),
-              ListTile(
-                leading: CircleAvatar(
-                    backgroundColor: Colors.orange,
-                    child: const Icon(Icons.tune, color: Colors.white)),
-                title: const Text('تسوية يدوية'),
-                subtitle: const Text('تعديل الرصيد يدوياً (زيادة أو نقصان)'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _showInventoryDialog(context,
-                      title: 'تسوية يدوية',
-                      transactionType: 'adjustment',
-                      positiveOnly: false,
-                      icon: Icons.tune,
-                      iconColor: Colors.orange,
-                      defaultWarehouse: _activeWarehouse);
-                },
-              ),
-              ListTile(
-                leading: CircleAvatar(
-                    backgroundColor: Colors.blue,
-                    child: const Icon(Icons.playlist_add_check, color: Colors.white)),
-                title: const Text('رصيد افتتاحي'),
-                subtitle: const Text('تسجيل الرصيد الافتتاحي لمادة'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _showOpeningBalanceDialog(context,
-                      defaultWarehouse: _activeWarehouse);
-                },
-              ),
-              if (isMain) ...[
-                ListTile(
-                  leading: CircleAvatar(
-                      backgroundColor: Colors.purple,
-                      child: const Icon(Icons.compare_arrows, color: Colors.white)),
-                  title: const Text('تحويل للخلاط'),
-                  subtitle: const Text('نقل كمية مباشرة من الرئيسي إلى مخزن الخلاط'),
-                  onTap: () {
-                    Navigator.pop(context);
-                    _showTransferDialog(context,
-                        fromWarehouse: AppConstants.warehouseMain,
-                        toWarehouse: AppConstants.warehouseMixer);
                   },
                 ),
+                ListTile(
+                  leading: CircleAvatar(
+                      backgroundColor: Colors.orange,
+                      child: const Icon(Icons.tune, color: Colors.white)),
+                  title: const Text('تسوية يدوية'),
+                  subtitle: const Text('تعديل الرصيد يدوياً (زيادة أو نقصان)'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _showInventoryDialog(context,
+                        title: 'تسوية يدوية',
+                        transactionType: 'adjustment',
+                        positiveOnly: false,
+                        icon: Icons.tune,
+                        iconColor: Colors.orange,
+                        defaultWarehouse: _activeWarehouse);
+                  },
+                ),
+                ListTile(
+                  leading: CircleAvatar(
+                      backgroundColor: Colors.blue,
+                      child: const Icon(Icons.playlist_add_check, color: Colors.white)),
+                  title: const Text('رصيد افتتاحي'),
+                  subtitle: const Text('تسجيل الرصيد الافتتاحي لمادة'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _showOpeningBalanceDialog(context,
+                        defaultWarehouse: _activeWarehouse);
+                  },
+                ),
+                // ── Transfer to Staging ──────────────────────────────────
                 ListTile(
                   leading: CircleAvatar(
                       backgroundColor: Colors.deepOrange,
@@ -373,35 +357,142 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
                     _openStagingVoucherDialog(context, 'main_to_staging');
                   },
                 ),
-              ] else ...[
+                // ── Cancel Transfer from Staging ─────────────────────────
                 ListTile(
                   leading: CircleAvatar(
-                      backgroundColor: Colors.indigo,
-                      child: const Icon(Icons.compare_arrows, color: Colors.white)),
-                  title: const Text('إرجاع للرئيسي'),
-                  subtitle: const Text('إرجاع كمية من مخزن الخلاط إلى الرئيسي'),
+                      backgroundColor: Colors.deepPurple,
+                      child: const Icon(Icons.undo, color: Colors.white)),
+                  title: const Text('إلغاء تحويل من المرحلي'),
+                  subtitle: const Text('إرجاع مواد من المخزن المرحلي إلى الرئيسي'),
                   onTap: () {
                     Navigator.pop(context);
                     _showTransferDialog(context,
-                        fromWarehouse: AppConstants.warehouseMixer,
+                        fromWarehouse: 'staging',
                         toWarehouse: AppConstants.warehouseMain);
                   },
                 ),
+                // ── Reset Balance ────────────────────────────────────────
+                ListTile(
+                  leading: CircleAvatar(
+                      backgroundColor: Colors.red.shade700,
+                      child: const Icon(Icons.exposure_zero, color: Colors.white)),
+                  title: const Text('تصفير بيانات مادة'),
+                  subtitle: const Text('إعادة كل تفاصيل المادة إلى صفر'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _showResetBalanceDialog(context, defaultWarehouse: _activeWarehouse);
+                  },
+                ),
+              ] 
+              
+              // ── Mixer Warehouse Options ──────────────────────────────
+              else if (isMixer) ...[
+                // ── استلام وارد - نقل بيانات مخزن الخلاط ──────────────────
+                ListTile(
+                  leading: CircleAvatar(
+                      backgroundColor: Colors.green,
+                      child: const Icon(Icons.add_circle_outline, color: Colors.white)),
+                  title: const Text('استلام وارد'),
+                  subtitle: const Text('نقل مواد من مخزن الخلاط إلى شاشة الاستلام'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    // نقل بيانات مخزن الخلاط إلى شاشة الاستلام
+                    _navigateToRawMaterialReceivingWithMixerData(context);
+                  },
+                ),
+                ListTile(
+                  leading: CircleAvatar(
+                      backgroundColor: Colors.orange,
+                      child: const Icon(Icons.tune, color: Colors.white)),
+                  title: const Text('تسوية يدوية'),
+                  subtitle: const Text('تعديل الرصيد يدوياً (زيادة أو نقصان)'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _showInventoryDialog(context,
+                        title: 'تسوية يدوية',
+                        transactionType: 'adjustment',
+                        positiveOnly: false,
+                        icon: Icons.tune,
+                        iconColor: Colors.orange,
+                        defaultWarehouse: _activeWarehouse);
+                  },
+                ),
+                ListTile(
+                  leading: CircleAvatar(
+                      backgroundColor: Colors.blue,
+                      child: const Icon(Icons.playlist_add_check, color: Colors.white)),
+                  title: const Text('رصيد افتتاحي'),
+                  subtitle: const Text('تسجيل الرصيد الافتتاحي لمادة'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _showOpeningBalanceDialog(context,
+                        defaultWarehouse: _activeWarehouse);
+                  },
+                ),
+                // ── Transfer from Staging ────────────────────────────────
+                ListTile(
+                  leading: CircleAvatar(
+                      backgroundColor: Colors.teal,
+                      child: const Icon(Icons.arrow_upward, color: Colors.white)),
+                  title: const Text('سحب من المرحلي'),
+                  subtitle: const Text('نقل مواد من المخزن المرحلي إلى الخلاط'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _openStagingVoucherDialog(context, 'staging_to_mixer');
+                  },
+                ),
+                // ── Reset Balance ────────────────────────────────────────
+                ListTile(
+                  leading: CircleAvatar(
+                      backgroundColor: Colors.red.shade700,
+                      child: const Icon(Icons.exposure_zero, color: Colors.white)),
+                  title: const Text('تصفير بيانات مادة'),
+                  subtitle: const Text('إعادة كل تفاصيل المادة إلى صفر'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _showResetBalanceDialog(context, defaultWarehouse: _activeWarehouse);
+                  },
+                ),
               ],
-              ListTile(
-                leading: CircleAvatar(
-                    backgroundColor: Colors.red.shade700,
-                    child: const Icon(Icons.exposure_zero, color: Colors.white)),
-                title: const Text('تصفير بيانات مادة'),
-                subtitle: const Text('إعادة كل تفاصيل المادة (الرصيد، الوارد، المنصرف، التحويلات، الرصيد الافتتاحي) إلى صفر'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _showResetBalanceDialog(context, defaultWarehouse: _activeWarehouse);
-                },
-              ),
+              
               const SizedBox(height: 8),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  // ── Navigate to Raw Material Receiving Page with Mixer Data ─────────────
+
+  void _navigateToRawMaterialReceivingWithMixerData(BuildContext context) {
+    // جلب بيانات المخزون من الـ Provider
+    final summaryAsync = ref.read(inventorySummaryProvider);
+    final allItems = summaryAsync.value ?? [];
+    
+    // تصفية المواد الموجودة في مخزن الخلاط فقط
+    final mixerMaterials = allItems
+        .where((item) => item.warehouseType == AppConstants.warehouseMixer)
+        .toList();
+
+    if (mixerMaterials.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('لا توجد مواد في مخزن الخلاط لنقلها'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    // التوجيه إلى صفحة استلام المواد الخام مع تمرير بيانات مخزن الخلاط
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => RawMaterialReceivingPage(
+          preSelectedMaterials: mixerMaterials, // تمرير المواد الموجودة في الخلاط
+          sourceWarehouse: AppConstants.warehouseMixer,
+          title: 'استلام وارد - مخزن الخلاط',
         ),
       ),
     );
