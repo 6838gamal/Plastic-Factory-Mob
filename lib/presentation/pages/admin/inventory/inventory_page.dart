@@ -14,10 +14,6 @@ import '../../../../core/utils/helpers.dart';
 import '../../worker/raw_material_receiving_page.dart';
 
 // ── Providers ────────────────────────────────────────────────────────────────
-//
-// ملخص المخزون يأتي من inventorySummaryProvider المشترك (وليس نسخة محلية)
-// حتى تنعكس أي عملية تُغيّر المخزون من أي شاشة أخرى (ترحيل سند، تحويل، طبخة)
-// فوراً على كروت المواد هنا دون الحاجة لإعادة فتح الصفحة.
 
 final _txProvider = FutureProvider.autoDispose.family<List<InventoryTransactionModel>, String>(
   (ref, materialId) async {
@@ -53,7 +49,6 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
   late TabController _tabController;
   String _search = '';
 
-  // 0 = main, 1 = mixer, 2 = staging, 3 = transactions
   static const _tabMain = 0;
   static const _tabMixer = 1;
   static const _tabStaging = 2;
@@ -83,7 +78,6 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
     final isTransactionsTab = _tabController.index == _tabTx;
     final isStagingTab = _tabController.index == _tabStaging;
 
-    // Badge count for staging incoming pending
     final pendingIncoming = ref
             .watch(_stagingIncomingVouchersProvider)
             .valueOrNull
@@ -94,7 +88,6 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
     return Scaffold(
       body: Column(
         children: [
-          // ── Tab Bar ──────────────────────────────────────────────
           TabBar(
             controller: _tabController,
             isScrollable: true,
@@ -114,7 +107,6 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
             ],
           ),
 
-          // ── Search Bar (all tabs except transactions) ─────────────
           if (!isTransactionsTab)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -125,7 +117,6 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
               ),
             ),
 
-          // ── Tab Content ───────────────────────────────────────────
           Expanded(
             child: TabBarView(
               controller: _tabController,
@@ -159,7 +150,6 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
         ],
       ),
 
-      // ── FAB ──────────────────────────────────────────────────────
       floatingActionButton: isTransactionsTab
           ? null
           : FloatingActionButton.extended(
@@ -188,7 +178,6 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
     final isMixer   = _tabController.index == _tabMixer;
     final isStaging = _tabController.index == _tabStaging;
 
-    // ── Staging tab has its own dedicated sheet ───────────────────────────
     if (isStaging) {
       showModalBottomSheet(
         context: context,
@@ -213,7 +202,6 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
                 ],
               ),
               const Divider(),
-              // ── Banner explaining the 2-step flow ────────────────────
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                 child: Container(
@@ -268,7 +256,6 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
       return;
     }
 
-    // ── Main / Mixer sheet ────────────────────────────────────────────────
     final color = isMain ? Colors.blue : Colors.teal;
     final warehouseLabel = isMain ? 'المخزن الرئيسي' : 'مخزن الخلاط';
 
@@ -297,7 +284,6 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
               ),
               const Divider(),
               
-              // ── Main Warehouse Options ─────────────────────────────────
               if (isMain) ...[
                 ListTile(
                   leading: CircleAvatar(
@@ -345,7 +331,6 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
                         defaultWarehouse: _activeWarehouse);
                   },
                 ),
-                // ── Transfer to Staging ──────────────────────────────────
                 ListTile(
                   leading: CircleAvatar(
                       backgroundColor: Colors.deepOrange,
@@ -357,7 +342,6 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
                     _openStagingVoucherDialog(context, 'main_to_staging');
                   },
                 ),
-                // ── Cancel Transfer from Staging ─────────────────────────
                 ListTile(
                   leading: CircleAvatar(
                       backgroundColor: Colors.deepPurple,
@@ -371,7 +355,6 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
                         toWarehouse: AppConstants.warehouseMain);
                   },
                 ),
-                // ── Reset Balance ────────────────────────────────────────
                 ListTile(
                   leading: CircleAvatar(
                       backgroundColor: Colors.red.shade700,
@@ -385,9 +368,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
                 ),
               ] 
               
-              // ── Mixer Warehouse Options ──────────────────────────────
               else if (isMixer) ...[
-                // ── استلام وارد - اختيار المواد وإرسالها ──
                 ListTile(
                   leading: CircleAvatar(
                       backgroundColor: Colors.green,
@@ -428,7 +409,6 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
                         defaultWarehouse: _activeWarehouse);
                   },
                 ),
-                // ── Transfer from Staging ────────────────────────────────
                 ListTile(
                   leading: CircleAvatar(
                       backgroundColor: Colors.teal,
@@ -440,7 +420,6 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
                     _openStagingVoucherDialog(context, 'staging_to_mixer');
                   },
                 ),
-                // ── Reset Balance ────────────────────────────────────────
                 ListTile(
                   leading: CircleAvatar(
                       backgroundColor: Colors.red.shade700,
@@ -462,7 +441,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
     );
   }
 
-  // ── حوار اختيار المواد للإرسال ──
+  // ── حوار اختيار المواد للإرسال (مثل بقية النوافذ) ──
   void _showSelectMaterialsForReceivingDialog(BuildContext context) {
     final summaryAsync = ref.read(inventorySummaryProvider);
     final allItems = summaryAsync.value ?? [];
@@ -483,26 +462,35 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
 
     showDialog(
       context: context,
-      builder: (ctx) => _SelectMaterialsDialog(
+      builder: (ctx) => _SendMaterialsDialog(
         materials: mixerMaterials,
-        onConfirm: (selectedMaterials) {
-          // إرسال البيانات إلى شاشة الاستلام
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => RawMaterialReceivingPage(
-                preSelectedMaterials: selectedMaterials,
-                sourceWarehouse: AppConstants.warehouseMixer,
-                title: 'استلام وارد - مخزن الخلاط',
+        onConfirm: (selectedMaterials, quantities) async {
+          try {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => RawMaterialReceivingPage(
+                  preSelectedMaterials: selectedMaterials,
+                  sourceWarehouse: AppConstants.warehouseMixer,
+                  title: 'استلام وارد - مخزن الخلاط',
+                  selectedQuantities: quantities,
+                ),
               ),
-            ),
-          );
+            );
+          } catch (e) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('❌ فشل إرسال البيانات: ${e.toString()}'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
         },
       ),
     );
   }
 
-  // ── Open staging voucher dialog (callable from page level) ───────────────
+  // ── Open staging voucher dialog ───────────────────────────────
 
   Future<void> _openStagingVoucherDialog(
       BuildContext context, String transferType) async {
@@ -529,7 +517,6 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
       {required String defaultWarehouse}) async {
     final summaryAsync = ref.read(inventorySummaryProvider);
     final all = summaryAsync.value ?? [];
-    // Deduplicate by materialId — we reset both warehouses regardless of which tab is active
     final seen = <String>{};
     final materials = all
         .where((m) => seen.add(m.materialId))
@@ -607,7 +594,6 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
                   final ds = ref.read(dataSourceProvider);
                   final authState = ref.read(authProvider);
                   final email = authState.user?.email ?? 'admin';
-                  // Single atomic call — resets both warehouses in one DB transaction
                   await ds.resetMaterialBothWarehouses(
                     selected!.materialId,
                     createdBy: email,
@@ -646,8 +632,6 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
     required Color iconColor,
     required String defaultWarehouse,
   }) async {
-    // allRawMaterialsAsSummaryProvider: يشمل كل المواد الخام النشطة بصرف النظر عن وجودها في المخزن
-    // حتى تظهر المواد المضافة حديثاً في قائمة الاستلام فوراً.
     final summaryAsync = ref.read(allRawMaterialsAsSummaryProvider);
     final all = summaryAsync.value ?? [];
     final materials = all.where((m) => m.warehouseType == defaultWarehouse).toList();
@@ -835,7 +819,6 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // From → To header
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
@@ -965,10 +948,8 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
 
   Future<void> _showOpeningBalanceDialog(BuildContext context,
       {required String defaultWarehouse}) async {
-    // allRawMaterialsAsSummaryProvider: يشمل كل المواد الخام النشطة حتى المضافة حديثاً
     final summaryAsync = ref.read(allRawMaterialsAsSummaryProvider);
     final all = summaryAsync.value ?? [];
-    // إزالة التكرار: رصيد افتتاحي يُطبَّق على المادة بغض النظر عن المخزن
     final uniqueMaterials = <String, InventorySummaryModel>{};
     for (final m in all) {
       uniqueMaterials.putIfAbsent(m.materialId, () => m);
@@ -1082,31 +1063,44 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// كلاس حوار اختيار المواد
+// كلاس حوار إرسال المواد (مثل بقية النوافذ)
 // ══════════════════════════════════════════════════════════════════════════════
 
-class _SelectMaterialsDialog extends StatefulWidget {
+class _SendMaterialsDialog extends StatefulWidget {
   final List<InventorySummaryModel> materials;
-  final Function(List<InventorySummaryModel>) onConfirm;
+  final Function(List<InventorySummaryModel>, Map<String, double>) onConfirm;
 
-  const _SelectMaterialsDialog({
+  const _SendMaterialsDialog({
     required this.materials,
     required this.onConfirm,
   });
 
   @override
-  State<_SelectMaterialsDialog> createState() => _SelectMaterialsDialogState();
+  State<_SendMaterialsDialog> createState() => _SendMaterialsDialogState();
 }
 
-class _SelectMaterialsDialogState extends State<_SelectMaterialsDialog> {
+class _SendMaterialsDialogState extends State<_SendMaterialsDialog> {
   final Map<String, bool> _selectedMap = {};
+  final Map<String, TextEditingController> _quantityControllers = {};
+  bool _selectAll = true;
 
   @override
   void initState() {
     super.initState();
     for (final material in widget.materials) {
       _selectedMap[material.materialId] = true;
+      _quantityControllers[material.materialId] = TextEditingController(
+        text: material.currentBalance.toStringAsFixed(2),
+      );
     }
+  }
+
+  @override
+  void dispose() {
+    for (final controller in _quantityControllers.values) {
+      controller.dispose();
+    }
+    super.dispose();
   }
 
   @override
@@ -1117,21 +1111,20 @@ class _SelectMaterialsDialogState extends State<_SelectMaterialsDialog> {
     return AlertDialog(
       title: Row(
         children: [
-          Icon(Icons.checklist, color: Colors.deepPurple),
+          Icon(Icons.send, color: Colors.teal),
           const SizedBox(width: 8),
-          const Text('اختر المواد للإرسال'),
+          const Text('إرسال مواد للاستلام'),
         ],
       ),
       content: SizedBox(
         width: double.maxFinite,
-        height: 450,
+        height: 500,
         child: Column(
           children: [
-            // شريط معلومات
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: Colors.deepPurple.shade50,
+                color: Colors.teal.shade50,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
@@ -1141,7 +1134,7 @@ class _SelectMaterialsDialogState extends State<_SelectMaterialsDialog> {
                     'المحدد: $selectedCount من $totalCount',
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
-                      color: Colors.deepPurple.shade700,
+                      color: Colors.teal.shade700,
                     ),
                   ),
                   Row(
@@ -1149,6 +1142,7 @@ class _SelectMaterialsDialogState extends State<_SelectMaterialsDialog> {
                       TextButton(
                         onPressed: () {
                           setState(() {
+                            _selectAll = true;
                             for (final key in _selectedMap.keys) {
                               _selectedMap[key] = true;
                             }
@@ -1159,6 +1153,7 @@ class _SelectMaterialsDialogState extends State<_SelectMaterialsDialog> {
                       TextButton(
                         onPressed: () {
                           setState(() {
+                            _selectAll = false;
                             for (final key in _selectedMap.keys) {
                               _selectedMap[key] = false;
                             }
@@ -1172,43 +1167,102 @@ class _SelectMaterialsDialogState extends State<_SelectMaterialsDialog> {
               ),
             ),
             const SizedBox(height: 12),
-            // قائمة المواد
             Expanded(
               child: ListView.builder(
                 itemCount: widget.materials.length,
                 itemBuilder: (ctx, index) {
                   final material = widget.materials[index];
-                  return CheckboxListTile(
-                    value: _selectedMap[material.materialId] ?? false,
-                    onChanged: (value) {
-                      setState(() {
-                        _selectedMap[material.materialId] = value ?? false;
-                      });
-                    },
-                    title: Text(
-                      material.materialName,
-                      style: const TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                    subtitle: Text(
-                      'الرصيد: ${material.currentBalance.toStringAsFixed(2)} ${material.unit}',
-                    ),
-                    secondary: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.green.shade50,
-                        borderRadius: BorderRadius.circular(8),
+                  final isSelected = _selectedMap[material.materialId] ?? false;
+                  final controller = _quantityControllers[material.materialId]!;
+                  
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    decoration: BoxDecoration(
+                      border: Border.all(
+                        color: isSelected ? Colors.teal.shade300 : Colors.grey.shade300,
+                        width: isSelected ? 2 : 1,
                       ),
-                      child: Text(
-                        '${material.currentBalance.toStringAsFixed(2)} ${material.unit}',
-                        style: TextStyle(
-                          color: Colors.green.shade700,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12,
-                        ),
+                      borderRadius: BorderRadius.circular(8),
+                      color: isSelected ? Colors.teal.shade50 : Colors.white,
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(8),
+                      child: Row(
+                        children: [
+                          Checkbox(
+                            value: isSelected,
+                            onChanged: (value) {
+                              setState(() {
+                                _selectedMap[material.materialId] = value ?? false;
+                              });
+                            },
+                          ),
+                          Expanded(
+                            flex: 2,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  material.materialName,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                                Text(
+                                  'المتاح: ${material.currentBalance.toStringAsFixed(2)} ${material.unit}',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey.shade600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Expanded(
+                            flex: 1,
+                            child: TextFormField(
+                              controller: controller,
+                              enabled: isSelected,
+                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                              decoration: InputDecoration(
+                                labelText: 'الكمية',
+                                labelStyle: TextStyle(
+                                  fontSize: 12,
+                                  color: isSelected ? Colors.teal.shade700 : Colors.grey.shade400,
+                                ),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                suffixText: material.unit,
+                                suffixStyle: TextStyle(
+                                  fontSize: 11,
+                                  color: isSelected ? Colors.teal.shade700 : Colors.grey.shade400,
+                                ),
+                              ),
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: isSelected ? Colors.black : Colors.grey.shade400,
+                              ),
+                              onChanged: (value) {
+                                final qty = double.tryParse(value) ?? 0;
+                                if (qty > material.currentBalance) {
+                                  controller.text = material.currentBalance.toStringAsFixed(2);
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('⚠️ الكمية لا تتجاوز ${material.currentBalance.toStringAsFixed(2)} ${material.unit}'),
+                                      backgroundColor: Colors.orange,
+                                      duration: const Duration(seconds: 2),
+                                    ),
+                                  );
+                                }
+                              },
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    controlAffinity: ListTileControlAffinity.leading,
-                    contentPadding: EdgeInsets.zero,
                   );
                 },
               ),
@@ -1223,17 +1277,34 @@ class _SelectMaterialsDialogState extends State<_SelectMaterialsDialog> {
         ),
         ElevatedButton(
           style: ElevatedButton.styleFrom(
-            backgroundColor: selectedCount == 0 ? Colors.grey : Colors.deepPurple,
+            backgroundColor: selectedCount == 0 ? Colors.grey : Colors.teal,
           ),
           onPressed: selectedCount == 0
               ? null
               : () {
-                  final selectedMaterials = widget.materials
-                      .where((m) => _selectedMap[m.materialId] ?? false)
-                      .toList();
+                  final selectedMaterials = <InventorySummaryModel>[];
+                  final quantities = <String, double>{};
+                  
+                  for (final material in widget.materials) {
+                    if (_selectedMap[material.materialId] ?? false) {
+                      selectedMaterials.add(material);
+                      final qty = double.tryParse(_quantityControllers[material.materialId]?.text ?? '0') ?? 0;
+                      quantities[material.materialId] = qty.clamp(0, material.currentBalance);
+                    }
+                  }
+                  
+                  if (selectedMaterials.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('⚠️ اختر مادة واحدة على الأقل'),
+                        backgroundColor: Colors.orange,
+                      ),
+                    );
+                    return;
+                  }
                   
                   Navigator.pop(context);
-                  widget.onConfirm(selectedMaterials);
+                  widget.onConfirm(selectedMaterials, quantities);
                 },
           child: Text(
             'إرسال ($selectedCount)',
@@ -1246,8 +1317,10 @@ class _SelectMaterialsDialogState extends State<_SelectMaterialsDialog> {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// Warehouse Tab — Summary Header + Filtered Material List
+// باقي الكود (Warehouse Tab, Summary Panel, Material Card, Staging Tab, Transactions Tab)
 // ══════════════════════════════════════════════════════════════════════════════
+
+// ── Warehouse Tab ─────────────────────────────────────────────────────────────
 
 class _WarehouseTab extends ConsumerWidget {
   final String warehouse;
@@ -1284,13 +1357,10 @@ class _WarehouseTab extends ConsumerWidget {
           child: CustomScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
             slivers: [
-              // ── Summary Panel ──────────────────────────────────
               SliverToBoxAdapter(
                 child: _WarehouseSummaryPanel(
                     items: list, color: color, label: label),
               ),
-
-              // ── Empty state ────────────────────────────────────
               if (filtered.isEmpty)
                 SliverFillRemaining(
                   child: Center(
@@ -1343,9 +1413,7 @@ class _WarehouseTab extends ConsumerWidget {
   }
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
-// Warehouse Summary Panel
-// ══════════════════════════════════════════════════════════════════════════════
+// ── Warehouse Summary Panel ──────────────────────────────────────────────────
 
 class _WarehouseSummaryPanel extends StatelessWidget {
   final List<InventorySummaryModel> items;
@@ -1384,7 +1452,6 @@ class _WarehouseSummaryPanel extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header
           Row(
             children: [
               const Icon(Icons.inventory_2_outlined,
@@ -1414,7 +1481,6 @@ class _WarehouseSummaryPanel extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 14),
-          // Stats row
           Row(
             children: [
               _StatChip(
@@ -1497,9 +1563,7 @@ class _StatChip extends StatelessWidget {
   }
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
-// Material Summary Card
-// ══════════════════════════════════════════════════════════════════════════════
+// ── Material Summary Card ────────────────────────────────────────────────────
 
 class _SummaryCard extends ConsumerWidget {
   final InventorySummaryModel item;
@@ -1632,7 +1696,6 @@ class _SummaryCard extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── Title row ─────────────────────────────────────────
             Row(
               children: [
                 Container(
@@ -1669,7 +1732,6 @@ class _SummaryCard extends ConsumerWidget {
                           fontSize: 11,
                           fontWeight: FontWeight.bold)),
                 ),
-                // ── زر الحذف النهائي ────────────────────────────
                 PopupMenuButton<String>(
                   icon: const Icon(Icons.more_vert, size: 20),
                   tooltip: 'خيارات',
@@ -1694,8 +1756,6 @@ class _SummaryCard extends ConsumerWidget {
               ],
             ),
             const SizedBox(height: 12),
-
-            // ── Current balance highlight ──────────────────────────
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
@@ -1721,8 +1781,6 @@ class _SummaryCard extends ConsumerWidget {
             const SizedBox(height: 10),
             const Divider(height: 1),
             const SizedBox(height: 10),
-
-            // ── Balance breakdown chips ────────────────────────────
             Row(
               children: [
                 _BalanceChip(
@@ -1737,8 +1795,6 @@ class _SummaryCard extends ConsumerWidget {
                     'تسويات', item.netAdjustments, item.unit, Colors.purple),
               ],
             ),
-
-            // ── Min stock progress bar ────────────────────────────
             if (item.minStock > 0) ...[
               const SizedBox(height: 10),
               Row(
@@ -1772,8 +1828,6 @@ class _SummaryCard extends ConsumerWidget {
     );
   }
 }
-
-// ── Small chip for opening/in/out/adjustments ──────────────────────────────
 
 class _BalanceChip extends StatelessWidget {
   final String label;
@@ -1811,7 +1865,7 @@ class _BalanceChip extends StatelessWidget {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// Staging Warehouse Tab
+// Staging Warehouse Tab (مختصر)
 // ══════════════════════════════════════════════════════════════════════════════
 
 enum _StagingSection { inventory, incoming, outgoing }
@@ -1851,7 +1905,6 @@ class _StagingTabState extends ConsumerState<_StagingTab> {
 
     return Column(
       children: [
-        // ── Section switcher ─────────────────────────────────────
         Container(
           color: Colors.deepOrange.shade50,
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -1885,8 +1938,6 @@ class _StagingTabState extends ConsumerState<_StagingTab> {
           ),
         ),
         const Divider(height: 1),
-
-        // ── Section content ──────────────────────────────────────
         Expanded(
           child: IndexedStack(
             index: _section.index,
@@ -1914,10 +1965,7 @@ class _StagingTabState extends ConsumerState<_StagingTab> {
       ],
     );
   }
-
 }
-
-// ── Section chip ─────────────────────────────────────────────────────────────
 
 class _StagingChip extends StatelessWidget {
   final String label;
@@ -1979,8 +2027,6 @@ class _StagingChip extends StatelessWidget {
   }
 }
 
-// ── Staging inventory section ────────────────────────────────────────────────
-
 class _StagingInventorySection extends ConsumerWidget {
   final VoidCallback onRefresh;
   final String search;
@@ -2011,7 +2057,6 @@ class _StagingInventorySection extends ConsumerWidget {
           child: CustomScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
             slivers: [
-              // ── Summary Panel (same style as main/mixer) ──────────
               SliverToBoxAdapter(
                 child: _WarehouseSummaryPanel(
                   items: items,
@@ -2019,8 +2064,6 @@ class _StagingInventorySection extends ConsumerWidget {
                   label: 'المخزن المرحلي',
                 ),
               ),
-
-              // ── Empty state ────────────────────────────────────────
               if (filtered.isEmpty)
                 SliverFillRemaining(
                   child: Center(
@@ -2070,8 +2113,6 @@ class _StagingInventorySection extends ConsumerWidget {
   }
 }
 
-// ── Staging vouchers section ─────────────────────────────────────────────────
-
 class _StagingVouchersSection extends ConsumerWidget {
   final ProviderBase<AsyncValue<List<TransferVoucherModel>>> provider;
   final String emptyLabel;
@@ -2111,7 +2152,7 @@ class _StagingVouchersSection extends ConsumerWidget {
                 const SizedBox(height: 6),
                 Text(emptyHint,
                     style: const TextStyle(color: Colors.grey, fontSize: 12)),
-                const SizedBox(height: 80), // space for FAB
+                const SizedBox(height: 80),
               ],
             ),
           );
@@ -2133,8 +2174,6 @@ class _StagingVouchersSection extends ConsumerWidget {
     );
   }
 }
-
-// ── Staging voucher card ─────────────────────────────────────────────────────
 
 class _StagingVoucherCard extends ConsumerWidget {
   final TransferVoucherModel voucher;
@@ -2196,7 +2235,6 @@ class _StagingVoucherCard extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header
             Row(
               children: [
                 Chip(
@@ -2219,7 +2257,6 @@ class _StagingVoucherCard extends ConsumerWidget {
               ],
             ),
             const SizedBox(height: 8),
-            // Items
             if (voucher.itemNames.isNotEmpty)
               Wrap(
                 spacing: 4,
@@ -2254,14 +2291,11 @@ class _StagingVoucherCard extends ConsumerWidget {
                     style:
                         const TextStyle(color: Colors.grey, fontSize: 12)),
               ),
-
-            // Actions
             if (!voucher.isConfirmed && !voucher.isCancelled) ...[
               const Divider(height: 16),
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  // Cancel
                   TextButton.icon(
                     icon: const Icon(Icons.cancel_outlined,
                         color: Colors.red, size: 16),
@@ -2285,7 +2319,6 @@ class _StagingVoucherCard extends ConsumerWidget {
                     },
                   ),
                   const SizedBox(width: 8),
-                  // Submit (if draft)
                   if (voucher.isDraft)
                     ElevatedButton.icon(
                       icon: const Icon(Icons.send, size: 16),
@@ -2305,7 +2338,6 @@ class _StagingVoucherCard extends ConsumerWidget {
                         }
                       },
                     ),
-                  // Confirm receipt — incoming: main→staging
                   if (role == 'incoming' && voucher.isPending)
                     ElevatedButton.icon(
                       icon: const Icon(Icons.check_circle, size: 16),
@@ -2340,7 +2372,6 @@ class _StagingVoucherCard extends ConsumerWidget {
                         }
                       },
                     ),
-                  // Confirm receipt — outgoing: staging→mixer
                   if (role == 'outgoing' && voucher.isPending)
                     ElevatedButton.icon(
                       icon: const Icon(Icons.check_circle, size: 16),
@@ -2378,8 +2409,6 @@ class _StagingVoucherCard extends ConsumerWidget {
                 ],
               ),
             ],
-
-            // Confirmed info
             if (voucher.isConfirmed && voucher.confirmedBy != null)
               Padding(
                 padding: const EdgeInsets.only(top: 6),
@@ -2519,7 +2548,6 @@ class _StagingVoucherDialogState extends ConsumerState<_StagingVoucherDialog> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Flow indicator
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
@@ -2801,7 +2829,6 @@ class _TransactionsTabState extends ConsumerState<_TransactionsTab> {
 
     return Column(
       children: [
-        // ── Filter row ────────────────────────────────────────────
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
