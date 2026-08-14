@@ -35,14 +35,14 @@ class ApiDataSource {
 
   const injected = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: '',
+    defaultValue: 'https://plastic-factory-api-backend.onrender.com',
   );
 
   if (injected.isNotEmpty) {
     return injected;
   }
 
-  return 'http://localhost:5000';
+  return 'https://plastic-factory-api-backend.onrender.com';
   }
 
   static String get baseUrl => _baseUrl;
