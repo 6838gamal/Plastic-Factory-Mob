@@ -10,7 +10,7 @@ import '../../../providers/reference_data_provider.dart'
 import '../../../../core/constants/app_constants.dart';
 import '../../../widgets/common/loading_widget.dart';
 import '../../../../core/utils/helpers.dart';
-// ── إضافة import لصفحة استلام المواد الخام ──────────────────────────────
+// ── المسار الصحيح لشاشة استلام المواد الخام ──
 import '../../worker/raw_material_receiving_page.dart';
 
 // ── Providers ────────────────────────────────────────────────────────────────
@@ -387,17 +387,16 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
               
               // ── Mixer Warehouse Options ──────────────────────────────
               else if (isMixer) ...[
-                // ── استلام وارد - نقل بيانات مخزن الخلاط ──────────────────
+                // ── استلام وارد - اختيار المواد وإرسالها ──
                 ListTile(
                   leading: CircleAvatar(
                       backgroundColor: Colors.green,
-                      child: const Icon(Icons.add_circle_outline, color: Colors.white)),
+                      child: const Icon(Icons.send, color: Colors.white)),
                   title: const Text('استلام وارد'),
-                  subtitle: const Text('نقل مواد من مخزن الخلاط إلى شاشة الاستلام'),
+                  subtitle: const Text('اختيار مواد من مخزن الخلاط وإرسالها للاستلام'),
                   onTap: () {
                     Navigator.pop(context);
-                    // نقل بيانات مخزن الخلاط إلى شاشة الاستلام
-                    _navigateToRawMaterialReceivingWithMixerData(context);
+                    _showSelectMaterialsForReceivingDialog(context);
                   },
                 ),
                 ListTile(
@@ -463,14 +462,11 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
     );
   }
 
-  // ── Navigate to Raw Material Receiving Page with Mixer Data ─────────────
-
-  void _navigateToRawMaterialReceivingWithMixerData(BuildContext context) {
-    // جلب بيانات المخزون من الـ Provider
+  // ── حوار اختيار المواد للإرسال ──
+  void _showSelectMaterialsForReceivingDialog(BuildContext context) {
     final summaryAsync = ref.read(inventorySummaryProvider);
     final allItems = summaryAsync.value ?? [];
     
-    // تصفية المواد الموجودة في مخزن الخلاط فقط
     final mixerMaterials = allItems
         .where((item) => item.warehouseType == AppConstants.warehouseMixer)
         .toList();
@@ -478,22 +474,30 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
     if (mixerMaterials.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('لا توجد مواد في مخزن الخلاط لنقلها'),
+          content: Text('لا توجد مواد في مخزن الخلاط لإرسالها'),
           backgroundColor: Colors.orange,
         ),
       );
       return;
     }
 
-    // التوجيه إلى صفحة استلام المواد الخام مع تمرير بيانات مخزن الخلاط
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => RawMaterialReceivingPage(
-          preSelectedMaterials: mixerMaterials, // تمرير المواد الموجودة في الخلاط
-          sourceWarehouse: AppConstants.warehouseMixer,
-          title: 'استلام وارد - مخزن الخلاط',
-        ),
+    showDialog(
+      context: context,
+      builder: (ctx) => _SelectMaterialsDialog(
+        materials: mixerMaterials,
+        onConfirm: (selectedMaterials) {
+          // إرسال البيانات إلى شاشة الاستلام
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => RawMaterialReceivingPage(
+                preSelectedMaterials: selectedMaterials,
+                sourceWarehouse: AppConstants.warehouseMixer,
+                title: 'استلام وارد - مخزن الخلاط',
+              ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -1073,6 +1077,170 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
           ],
         ),
       ),
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// كلاس حوار اختيار المواد
+// ══════════════════════════════════════════════════════════════════════════════
+
+class _SelectMaterialsDialog extends StatefulWidget {
+  final List<InventorySummaryModel> materials;
+  final Function(List<InventorySummaryModel>) onConfirm;
+
+  const _SelectMaterialsDialog({
+    required this.materials,
+    required this.onConfirm,
+  });
+
+  @override
+  State<_SelectMaterialsDialog> createState() => _SelectMaterialsDialogState();
+}
+
+class _SelectMaterialsDialogState extends State<_SelectMaterialsDialog> {
+  final Map<String, bool> _selectedMap = {};
+
+  @override
+  void initState() {
+    super.initState();
+    for (final material in widget.materials) {
+      _selectedMap[material.materialId] = true;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final selectedCount = _selectedMap.values.where((v) => v).length;
+    final totalCount = widget.materials.length;
+
+    return AlertDialog(
+      title: Row(
+        children: [
+          Icon(Icons.checklist, color: Colors.deepPurple),
+          const SizedBox(width: 8),
+          const Text('اختر المواد للإرسال'),
+        ],
+      ),
+      content: SizedBox(
+        width: double.maxFinite,
+        height: 450,
+        child: Column(
+          children: [
+            // شريط معلومات
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.deepPurple.shade50,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'المحدد: $selectedCount من $totalCount',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.deepPurple.shade700,
+                    ),
+                  ),
+                  Row(
+                    children: [
+                      TextButton(
+                        onPressed: () {
+                          setState(() {
+                            for (final key in _selectedMap.keys) {
+                              _selectedMap[key] = true;
+                            }
+                          });
+                        },
+                        child: const Text('تحديد الكل'),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          setState(() {
+                            for (final key in _selectedMap.keys) {
+                              _selectedMap[key] = false;
+                            }
+                          });
+                        },
+                        child: const Text('إلغاء الكل'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            // قائمة المواد
+            Expanded(
+              child: ListView.builder(
+                itemCount: widget.materials.length,
+                itemBuilder: (ctx, index) {
+                  final material = widget.materials[index];
+                  return CheckboxListTile(
+                    value: _selectedMap[material.materialId] ?? false,
+                    onChanged: (value) {
+                      setState(() {
+                        _selectedMap[material.materialId] = value ?? false;
+                      });
+                    },
+                    title: Text(
+                      material.materialName,
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    subtitle: Text(
+                      'الرصيد: ${material.currentBalance.toStringAsFixed(2)} ${material.unit}',
+                    ),
+                    secondary: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.green.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        '${material.currentBalance.toStringAsFixed(2)} ${material.unit}',
+                        style: TextStyle(
+                          color: Colors.green.shade700,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                    controlAffinity: ListTileControlAffinity.leading,
+                    contentPadding: EdgeInsets.zero,
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('إلغاء'),
+        ),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: selectedCount == 0 ? Colors.grey : Colors.deepPurple,
+          ),
+          onPressed: selectedCount == 0
+              ? null
+              : () {
+                  final selectedMaterials = widget.materials
+                      .where((m) => _selectedMap[m.materialId] ?? false)
+                      .toList();
+                  
+                  Navigator.pop(context);
+                  widget.onConfirm(selectedMaterials);
+                },
+          child: Text(
+            'إرسال ($selectedCount)',
+            style: const TextStyle(color: Colors.white),
+          ),
+        ),
+      ],
     );
   }
 }
