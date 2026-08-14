@@ -11,7 +11,7 @@ import '../../../../core/constants/app_constants.dart';
 import '../../../widgets/common/loading_widget.dart';
 import '../../../../core/utils/helpers.dart';
 // ── إضافة import لصفحة استلام المواد الخام ──────────────────────────────
-import '../worker/raw_material_receiving_page.dart';
+import '../../worker/raw_material_receiving_page.dart';
 
 // ── Providers ────────────────────────────────────────────────────────────────
 //
