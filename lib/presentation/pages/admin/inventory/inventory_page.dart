@@ -10,7 +10,6 @@ import '../../../providers/reference_data_provider.dart'
 import '../../../../core/constants/app_constants.dart';
 import '../../../widgets/common/loading_widget.dart';
 import '../../../../core/utils/helpers.dart';
-// ── المسار الصحيح لشاشة استلام المواد الخام ──
 import '../../worker/raw_material_receiving_page.dart';
 
 // ── Providers ────────────────────────────────────────────────────────────────
@@ -32,13 +31,6 @@ final _stagingIncomingVouchersProvider = FutureProvider.autoDispose<List<Transfe
 final _stagingOutgoingVouchersProvider = FutureProvider.autoDispose<List<TransferVoucherModel>>((ref) async {
   final ds = ref.read(dataSourceProvider);
   final raw = await ds.getTransferVouchers(transferType: 'staging_to_mixer');
-  return raw.map(TransferVoucherModel.fromJson).toList();
-});
-
-// ── إضافة Provider لسندات الاستلام من الخلاط ──
-final _mixerToReceivingVouchersProvider = FutureProvider.autoDispose<List<TransferVoucherModel>>((ref) async {
-  final ds = ref.read(dataSourceProvider);
-  final raw = await ds.getTransferVouchers(transferType: 'mixer_to_receiving');
   return raw.map(TransferVoucherModel.fromJson).toList();
 });
 
@@ -376,7 +368,6 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
               ] 
               
               else if (isMixer) ...[
-                // ── استلام وارد - إنشاء سند Voucher ──
                 ListTile(
                   leading: CircleAvatar(
                       backgroundColor: Colors.green,
@@ -473,13 +464,11 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
       builder: (ctx) => _CreateReceivingVoucherDialog(
         materials: mixerMaterials,
         onConfirm: (selectedMaterials, quantities) async {
-          // إنشاء سند Voucher بدلاً من الانتقال المباشر
           try {
             final ds = ref.read(dataSourceProvider);
             final authState = ref.read(authProvider);
             final operatorName = authState.user?.name ?? authState.user?.email ?? 'مدير';
 
-            // إنشاء السند
             await ds.createTransferVoucher({
               'notes': 'طلب استلام من مخزن الخلاط',
               'created_by': operatorName,
@@ -494,13 +483,11 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
                   .toList(),
             });
 
-            // تحديث البيانات
-            ref.invalidate(_mixerToReceivingVouchersProvider);
             ref.invalidate(inventorySummaryProvider);
 
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text('✅ تم إنشاء سند الاستلام بنجاح'),
+                content: Text('✅ تم إنشاء سند الاستلام بنجاح (قيد الانتظار)'),
                 backgroundColor: Colors.green,
               ),
             );
