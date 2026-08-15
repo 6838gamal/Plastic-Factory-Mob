@@ -933,10 +933,15 @@ class _ReceivingVoucherDialogState extends ConsumerState<_ReceivingVoucherDialog
       _selectedUnit = materials.first.unit;
     }
 
-    final selectedMaterial = materials.firstWhere(
-      (m) => m.materialId == _selectedMaterialId,
-      orElse: () => materials.isNotEmpty ? materials.first : InventorySummaryModel(materialId: '', materialName: '', unit: 'كجم', currentBalance: 0),
-    );
+    // العثور على المادة المحددة
+    InventorySummaryModel? selectedMaterial;
+    if (_selectedMaterialId.isNotEmpty) {
+      try {
+        selectedMaterial = materials.firstWhere((m) => m.materialId == _selectedMaterialId);
+      } catch (_) {
+        selectedMaterial = materials.isNotEmpty ? materials.first : null;
+      }
+    }
 
     return AlertDialog(
       title: Text(_title),
@@ -1001,10 +1006,10 @@ class _ReceivingVoucherDialogState extends ConsumerState<_ReceivingVoucherDialog
                 controller: _qtyController,
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                 decoration: InputDecoration(
-                  labelText: 'الكمية (${selectedMaterial.unit})',
+                  labelText: 'الكمية (${selectedMaterial?.unit ?? 'كجم'})',
                   border: const OutlineInputBorder(),
                   prefixIcon: const Icon(Icons.scale_outlined),
-                  helperText: selectedMaterial.materialId.isNotEmpty
+                  helperText: selectedMaterial != null
                       ? 'المتاح: ${selectedMaterial.currentBalance.toStringAsFixed(2)} ${selectedMaterial.unit}'
                       : null,
                   helperStyle: const TextStyle(color: Colors.grey),
