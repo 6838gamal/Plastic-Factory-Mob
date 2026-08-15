@@ -20,12 +20,14 @@ final receivingInventoryProvider = FutureProvider.autoDispose<List<InventorySumm
   return summary.where((m) => m.warehouseType == 'receiving').toList();
 });
 
+/// سندات وارد من الخلاط (شاشة الاستلام كمستلم)
 final receivingIncomingProvider = FutureProvider.autoDispose<List<TransferVoucherModel>>((ref) async {
   final ds = ref.read(dataSourceProvider);
   final raw = await ds.getTransferVouchers(transferType: 'mixer_to_receiving');
   return raw.map(TransferVoucherModel.fromJson).toList();
 });
 
+/// سندات صادر للجاهز للاستخدام (شاشة الاستلام كمرسل)
 final receivingOutgoingProvider = FutureProvider.autoDispose<List<TransferVoucherModel>>((ref) async {
   final ds = ref.read(dataSourceProvider);
   final raw = await ds.getTransferVouchers(transferType: 'receiving_to_ready');
@@ -194,31 +196,32 @@ class _RawMaterialReceivingPageState extends ConsumerState<RawMaterialReceivingP
             showError: _showErrorSnackBar,
             showSuccess: _showSuccessSnackBar,
           ),
+          // ── وارد من الخلاط (شاشة الاستلام كمستلم) ──
           _IncomingTab(
             operatorName: _operatorName,
             onRefresh: _refresh,
             showError: _showErrorSnackBar,
             showSuccess: _showSuccessSnackBar,
           ),
+          // ── صادر للجاهز (شاشة الاستلام كمرسل) ──
           _OutgoingTab(
             operatorName: _operatorName,
             onRefresh: _refresh,
             showError: _showErrorSnackBar,
             showSuccess: _showSuccessSnackBar,
           ),
+          // ── جاهز للاستخدام ──
           _ReadyForUseTab(onRefresh: _refresh),
         ],
       ),
-      floatingActionButton: _tabs.index == 1
-          ? null
-          : _tabs.index == 2
-              ? FloatingActionButton.extended(
-                  backgroundColor: Colors.deepPurple,
-                  icon: const Icon(Icons.add, color: Colors.white),
-                  label: const Text('إرسال للجاهز', style: TextStyle(color: Colors.white)),
-                  onPressed: () => _openVoucherDialog(context, 'receiving_to_ready'),
-                )
-              : null,
+      floatingActionButton: _tabs.index == 2
+          ? FloatingActionButton.extended(
+              backgroundColor: Colors.deepPurple,
+              icon: const Icon(Icons.add, color: Colors.white),
+              label: const Text('إرسال للجاهز', style: TextStyle(color: Colors.white)),
+              onPressed: () => _openVoucherDialog(context, 'receiving_to_ready'),
+            )
+          : null,
     );
   }
 }
@@ -271,7 +274,7 @@ class _InventoryTab extends ConsumerWidget {
                 SizedBox(height: 12),
                 Text('لا توجد مواد في شاشة الاستلام', style: TextStyle(color: Colors.grey)),
                 SizedBox(height: 6),
-                Text('انتظر وصول مواد من مخزن الخلاط',
+                Text('انتظر تأكيد استلام مواد من مخزن الخلاط',
                     style: TextStyle(color: Colors.grey, fontSize: 12)),
               ],
             ),
@@ -305,7 +308,7 @@ class _InventoryTab extends ConsumerWidget {
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
-// تبويب وارد من الخلاط
+// تبويب وارد من الخلاط (شاشة الاستلام كمستلم)
 // ──────────────────────────────────────────────────────────────────────────────
 
 class _IncomingTab extends ConsumerWidget {
@@ -354,7 +357,7 @@ class _IncomingTab extends ConsumerWidget {
                 SizedBox(height: 12),
                 Text('لا توجد طلبات واردة من مخزن الخلاط', style: TextStyle(color: Colors.grey)),
                 SizedBox(height: 6),
-                Text('سيتم عرض الطلبات هنا بعد إنشائها من مخزن الخلاط',
+                Text('انتظر إنشاء طلب من مخزن الخلاط',
                     style: TextStyle(color: Colors.grey, fontSize: 12)),
               ],
             ),
@@ -366,12 +369,11 @@ class _IncomingTab extends ConsumerWidget {
           child: ListView.builder(
             padding: const EdgeInsets.all(12),
             itemCount: vouchers.length,
-            itemBuilder: (ctx, i) => _VoucherCard(
+            itemBuilder: (ctx, i) => _IncomingVoucherCard(
               key: ValueKey(vouchers[i].id),
               voucher: vouchers[i],
               operatorName: operatorName,
               onAction: onRefresh,
-              role: 'incoming',
               showError: showError,
               showSuccess: showSuccess,
             ),
@@ -383,7 +385,7 @@ class _IncomingTab extends ConsumerWidget {
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
-// تبويب صادر للجاهز
+// تبويب صادر للجاهز (شاشة الاستلام كمرسل)
 // ──────────────────────────────────────────────────────────────────────────────
 
 class _OutgoingTab extends ConsumerWidget {
@@ -444,12 +446,11 @@ class _OutgoingTab extends ConsumerWidget {
           child: ListView.builder(
             padding: const EdgeInsets.all(12),
             itemCount: vouchers.length,
-            itemBuilder: (ctx, i) => _VoucherCard(
+            itemBuilder: (ctx, i) => _OutgoingVoucherCard(
               key: ValueKey(vouchers[i].id),
               voucher: vouchers[i],
               operatorName: operatorName,
               onAction: onRefresh,
-              role: 'outgoing',
               showError: showError,
               showSuccess: showSuccess,
             ),
@@ -532,23 +533,21 @@ class _ReadyForUseTab extends ConsumerWidget {
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
-// بطاقة السند الموحدة
+// بطاقة السند الوارد (شاشة الاستلام كمستلم - يظهر زر تأكيد الاستلام)
 // ──────────────────────────────────────────────────────────────────────────────
 
-class _VoucherCard extends ConsumerWidget {
+class _IncomingVoucherCard extends ConsumerWidget {
   final TransferVoucherModel voucher;
   final String operatorName;
   final VoidCallback onAction;
-  final String role;
   final void Function(BuildContext, String) showError;
   final void Function(BuildContext, String) showSuccess;
 
-  const _VoucherCard({
+  const _IncomingVoucherCard({
     super.key,
     required this.voucher,
     required this.operatorName,
     required this.onAction,
-    required this.role,
     required this.showError,
     required this.showSuccess,
   });
@@ -571,22 +570,12 @@ class _VoucherCard extends ConsumerWidget {
       case 'confirmed':
         return 'مُنفَّذ';
       case 'pending':
-        return 'قيد الانتظار';
+        return 'بانتظار الاستلام';
       case 'cancelled':
         return 'ملغي';
       default:
         return 'مسودة';
     }
-  }
-
-  String get _transferLabel {
-    return role == 'incoming' 
-        ? 'مخزن الخلاط ← شاشة الاستلام'
-        : 'شاشة الاستلام ← جاهز للاستخدام';
-  }
-
-  Color get _transferColor {
-    return role == 'incoming' ? Colors.deepPurple : Colors.green;
   }
 
   @override
@@ -610,11 +599,7 @@ class _VoucherCard extends ConsumerWidget {
                   materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
                 const SizedBox(width: 8),
-                Icon(
-                  role == 'incoming' ? Icons.arrow_downward : Icons.arrow_upward,
-                  size: 16,
-                  color: _transferColor,
-                ),
+                const Icon(Icons.arrow_downward, size: 16, color: Colors.deepPurple),
                 const SizedBox(width: 4),
                 Text(
                   voucher.voucherNumber ?? '',
@@ -632,10 +617,10 @@ class _VoucherCard extends ConsumerWidget {
             Padding(
               padding: const EdgeInsets.only(top: 4),
               child: Text(
-                _transferLabel,
+                'من: مخزن الخلاط → شاشة الاستلام',
                 style: TextStyle(
                   fontSize: 11,
-                  color: _transferColor,
+                  color: Colors.deepPurple,
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -643,7 +628,6 @@ class _VoucherCard extends ConsumerWidget {
             
             const SizedBox(height: 8),
             
-            // عرض المادة مع الكمية
             if (voucher.items.isNotEmpty)
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -691,89 +675,61 @@ class _VoucherCard extends ConsumerWidget {
                 ),
               ),
             
-            if (!voucher.isConfirmed && !voucher.isCancelled) ...[
+            // ─── زر التأكيد فقط للمستلم ──────────────────────────────────────
+            if (voucher.isPending) ...[
               const Divider(height: 16),
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
+                  // رفض الطلب (يمكن للمستلم رفض الطلب)
                   TextButton.icon(
                     icon: const Icon(Icons.cancel_outlined, color: Colors.red, size: 16),
-                    label: const Text('إلغاء', style: TextStyle(color: Colors.red)),
+                    label: const Text('رفض الطلب', style: TextStyle(color: Colors.red)),
                     onPressed: () async {
                       final ok = await _confirmDialog(
                         context,
-                        'تأكيد الإلغاء',
-                        'هل تريد إلغاء سند ${voucher.voucherNumber}؟',
+                        'تأكيد رفض الطلب',
+                        'هل تريد رفض سند ${voucher.voucherNumber}؟',
                       );
                       if (ok) {
                         try {
                           await ds.cancelTransferVoucher(voucher.id!);
-                          showSuccess(context, '✅ تم إلغاء السند بنجاح');
+                          showSuccess(context, '✅ تم رفض الطلب بنجاح');
                           onAction();
                         } catch (e) {
-                          showError(context, '❌ فشل إلغاء السند: ${e.toString()}');
+                          showError(context, '❌ فشل رفض الطلب: ${e.toString()}');
                         }
                       }
                     },
                   ),
                   const SizedBox(width: 8),
                   
-                  if (voucher.isDraft)
-                    ElevatedButton.icon(
-                      icon: const Icon(Icons.send, size: 16),
-                      label: const Text('إرسال للمراجعة'),
-                      style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
-                      onPressed: () async {
+                  // تأكيد الاستلام (زر المستلم)
+                  ElevatedButton.icon(
+                    icon: const Icon(Icons.check_circle, size: 16),
+                    label: const Text('تأكيد الاستلام'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                    ),
+                    onPressed: () async {
+                      final ok = await _confirmDialog(
+                        context,
+                        'تأكيد الاستلام',
+                        'هل تأكد استلام المواد من مخزن الخلاط؟\nسيتم نقل المواد لشاشة الاستلام.',
+                      );
+                      if (ok) {
                         try {
-                          await ds.submitTransferVoucher(voucher.id!);
-                          showSuccess(context, '✅ تم إرسال السند للمراجعة');
+                          await ds.confirmTransferVoucher(voucher.id!, {
+                            'confirmed_by': operatorName,
+                          });
+                          showSuccess(context, '✅ تم تأكيد الاستلام ونقل المواد لشاشة الاستلام');
                           onAction();
                         } catch (e) {
-                          showError(context, '❌ فشل إرسال السند: ${e.toString()}');
+                          showError(context, '❌ فشل تأكيد الاستلام: ${e.toString()}');
                         }
-                      },
-                    ),
-                  
-                  if (voucher.isPending)
-                    ElevatedButton.icon(
-                      icon: const Icon(Icons.check_circle, size: 16),
-                      label: Text(
-                        role == 'incoming' 
-                            ? 'تأكيد استلام للاستلام' 
-                            : 'تأكيد للجاهز للاستخدام',
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: role == 'incoming' ? Colors.deepPurple : Colors.green,
-                      ),
-                      onPressed: () async {
-                        final confirmMsg = role == 'incoming'
-                            ? 'هل تأكد استلام المواد من مخزن الخلاط؟\nسيتم نقل المواد لشاشة الاستلام.'
-                            : 'هل تأكد استلام المواد من شاشة الاستلام؟\nسيتم نقل المواد للجاهز للاستخدام.';
-                        
-                        final ok = await _confirmDialog(
-                          context,
-                          'تأكيد الاستلام',
-                          confirmMsg,
-                        );
-                        
-                        if (ok) {
-                          try {
-                            await ds.confirmTransferVoucher(voucher.id!, {
-                              'confirmed_by': operatorName,
-                            });
-                            
-                            final successMsg = role == 'incoming'
-                                ? '✅ تم تأكيد الاستلام ونقل المواد لشاشة الاستلام'
-                                : '✅ تم تأكيد الاستلام ونقل المواد للجاهز للاستخدام';
-                            
-                            showSuccess(context, successMsg);
-                            onAction();
-                          } catch (e) {
-                            showError(context, '❌ فشل تأكيد الاستلام: ${e.toString()}');
-                          }
-                        }
-                      },
-                    ),
+                      }
+                    },
+                  ),
                 ],
               ),
             ],
@@ -786,7 +742,7 @@ class _VoucherCard extends ConsumerWidget {
                     const Icon(Icons.check_circle, color: Colors.green, size: 14),
                     const SizedBox(width: 4),
                     Text(
-                      'تم التنفيذ بواسطة: ${voucher.confirmedBy}',
+                      'تم الاستلام بواسطة: ${voucher.confirmedBy}',
                       style: const TextStyle(color: Colors.green, fontSize: 12),
                     ),
                   ],
@@ -833,7 +789,235 @@ class _VoucherCard extends ConsumerWidget {
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
-// حوار إنشاء السند (مادة واحدة فقط)
+// بطاقة السند الصادر (شاشة الاستلام كمرسل - لا يظهر زر التأكيد)
+// ──────────────────────────────────────────────────────────────────────────────
+
+class _OutgoingVoucherCard extends ConsumerWidget {
+  final TransferVoucherModel voucher;
+  final String operatorName;
+  final VoidCallback onAction;
+  final void Function(BuildContext, String) showError;
+  final void Function(BuildContext, String) showSuccess;
+
+  const _OutgoingVoucherCard({
+    super.key,
+    required this.voucher,
+    required this.operatorName,
+    required this.onAction,
+    required this.showError,
+    required this.showSuccess,
+  });
+
+  Color get _statusColor {
+    switch (voucher.status) {
+      case 'confirmed':
+        return Colors.green;
+      case 'pending':
+        return Colors.orange;
+      case 'cancelled':
+        return Colors.red;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  String get _statusLabel {
+    switch (voucher.status) {
+      case 'confirmed':
+        return 'مُنفَّذ';
+      case 'pending':
+        return 'بانتظار استلام الجاهز';
+      case 'cancelled':
+        return 'ملغي';
+      default:
+        return 'مسودة';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final ds = ref.read(dataSourceProvider);
+    
+    return Card(
+      margin: const EdgeInsets.only(bottom: 10),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Chip(
+                  label: Text(_statusLabel, style: const TextStyle(color: Colors.white, fontSize: 12)),
+                  backgroundColor: _statusColor,
+                  padding: EdgeInsets.zero,
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                const SizedBox(width: 8),
+                const Icon(Icons.arrow_upward, size: 16, color: Colors.green),
+                const SizedBox(width: 4),
+                Text(
+                  voucher.voucherNumber ?? '',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                ),
+                const Spacer(),
+                if (voucher.createdAt != null)
+                  Text(
+                    _formatDate(voucher.createdAt!),
+                    style: const TextStyle(color: Colors.grey, fontSize: 12),
+                  ),
+              ],
+            ),
+            
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                'من: شاشة الاستلام → جاهز للاستخدام',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Colors.green,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+            
+            const SizedBox(height: 8),
+            
+            if (voucher.items.isNotEmpty)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.green.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.green.shade100),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      voucher.items.first.materialName,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.green.shade800,
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.green.shade200,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        '${voucher.items.first.requestedQty.toStringAsFixed(2)} ${voucher.items.first.unit}',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.green.shade900,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            
+            if (voucher.notes?.isNotEmpty == true)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(
+                  'ملاحظات: ${voucher.notes}',
+                  style: const TextStyle(color: Colors.grey, fontSize: 12),
+                ),
+              ),
+            
+            // ─── لا يوجد زر تأكيد للمرسل ──────────────────────────────────────
+            // فقط إمكانية إلغاء السند إذا كان pending
+            if (voucher.isPending) ...[
+              const Divider(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton.icon(
+                    icon: const Icon(Icons.cancel_outlined, color: Colors.red, size: 16),
+                    label: const Text('إلغاء الإرسال', style: TextStyle(color: Colors.red)),
+                    onPressed: () async {
+                      final ok = await _confirmDialog(
+                        context,
+                        'تأكيد الإلغاء',
+                        'هل تريد إلغاء سند ${voucher.voucherNumber}؟',
+                      );
+                      if (ok) {
+                        try {
+                          await ds.cancelTransferVoucher(voucher.id!);
+                          showSuccess(context, '✅ تم إلغاء السند بنجاح');
+                          onAction();
+                        } catch (e) {
+                          showError(context, '❌ فشل إلغاء السند: ${e.toString()}');
+                        }
+                      }
+                    },
+                  ),
+                ],
+              ),
+            ],
+            
+            if (voucher.isConfirmed && voucher.confirmedBy != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Row(
+                  children: [
+                    const Icon(Icons.check_circle, color: Colors.green, size: 14),
+                    const SizedBox(width: 4),
+                    Text(
+                      'تم الاستلام بواسطة: ${voucher.confirmedBy}',
+                      style: const TextStyle(color: Colors.green, fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<bool> _confirmDialog(BuildContext context, String title, String msg) async {
+    final res = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(title),
+        content: Text(msg),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('لا'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.deepPurple,
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('نعم، تأكيد'),
+          ),
+        ],
+      ),
+    );
+    return res ?? false;
+  }
+
+  String _formatDate(String dateStr) {
+    try {
+      final date = DateTime.parse(dateStr);
+      return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+    } catch (_) {
+      return dateStr.split('T').first;
+    }
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// حوار إنشاء السند (للمرسل فقط - مادة واحدة)
 // ──────────────────────────────────────────────────────────────────────────────
 
 class _ReceivingVoucherDialog extends ConsumerStatefulWidget {
@@ -907,7 +1091,7 @@ class _ReceivingVoucherDialogState extends ConsumerState<_ReceivingVoucherDialog
 
       if (mounted) {
         Navigator.pop(context);
-        widget.showSuccess(context, '✅ تم إنشاء السند بنجاح (قيد الانتظار)');
+        widget.showSuccess(context, '✅ تم إنشاء السند بنجاح (بانتظار استلام الجاهز)');
         widget.onSaved();
       }
     } catch (e) {
@@ -933,7 +1117,6 @@ class _ReceivingVoucherDialogState extends ConsumerState<_ReceivingVoucherDialog
       _selectedUnit = materials.first.unit;
     }
 
-    // العثور على المادة المحددة
     InventorySummaryModel? selectedMaterial;
     if (_selectedMaterialId.isNotEmpty) {
       try {
