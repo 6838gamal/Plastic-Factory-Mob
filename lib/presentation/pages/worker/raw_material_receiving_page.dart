@@ -709,9 +709,8 @@ class _IncomingVoucherCard extends ConsumerWidget {
             if (isDraft) ...[
               const Divider(height: 16),
               Row(
-                mainAxisAlignment: MathWidgets,
+                mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  // إرسال للمراجعة (إذا كان مسودة)
                   ElevatedButton.icon(
                     icon: const Icon(Icons.send, size: 16),
                     label: const Text('إرسال للمراجعة'),
