@@ -1120,7 +1120,7 @@ class _CreateReceivingVoucherDialogState extends State<_CreateReceivingVoucherDi
 
     final selectedMaterial = materials.firstWhere(
       (m) => m.materialId == _selectedMaterialId,
-      orElse: () => materials.isNotEmpty ? materials.first : InventorySummaryModel.empty(),
+      orElse: () => materials.isNotEmpty ? materials.first : InventorySummaryModel(materialId: '', materialName: '', unit: 'كجم', currentBalance: 0),
     );
 
     return AlertDialog(
@@ -1159,7 +1159,6 @@ class _CreateReceivingVoucherDialogState extends State<_CreateReceivingVoucherDi
               ),
               const SizedBox(height: 16),
               
-              // اختيار المادة
               DropdownButtonFormField<String>(
                 value: _selectedMaterialId.isNotEmpty ? _selectedMaterialId : null,
                 decoration: const InputDecoration(
@@ -1189,7 +1188,6 @@ class _CreateReceivingVoucherDialogState extends State<_CreateReceivingVoucherDi
               ),
               const SizedBox(height: 16),
               
-              // الكمية
               TextFormField(
                 controller: _qtyController,
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -1197,7 +1195,7 @@ class _CreateReceivingVoucherDialogState extends State<_CreateReceivingVoucherDi
                   labelText: 'الكمية (${selectedMaterial.unit})',
                   border: const OutlineInputBorder(),
                   prefixIcon: const Icon(Icons.scale_outlined),
-                  helperText: selectedMaterial.id.isNotEmpty
+                  helperText: selectedMaterial.materialId.isNotEmpty
                       ? 'المتاح: ${selectedMaterial.currentBalance.toStringAsFixed(2)} ${selectedMaterial.unit}'
                       : null,
                   helperStyle: const TextStyle(color: Colors.grey),
@@ -1208,7 +1206,6 @@ class _CreateReceivingVoucherDialogState extends State<_CreateReceivingVoucherDi
               ),
               const SizedBox(height: 16),
               
-              // ملاحظات
               TextField(
                 controller: _notesController,
                 maxLines: 2,
