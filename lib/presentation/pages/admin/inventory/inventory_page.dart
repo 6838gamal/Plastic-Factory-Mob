@@ -1120,7 +1120,13 @@ class _CreateReceivingVoucherDialogState extends State<_CreateReceivingVoucherDi
 
     final selectedMaterial = materials.firstWhere(
       (m) => m.materialId == _selectedMaterialId,
-      orElse: () => materials.isNotEmpty ? materials.first : InventorySummaryModel(materialId: '', materialName: '', unit: 'كجم', currentBalance: 0),
+      orElse: () => materials.isNotEmpty ? materials.first : InventorySummaryModel(
+        materialId: '',
+        materialName: '',
+        unit: 'كجم',
+        currentBalance: 0,
+        minStock: 0,
+      ),
     );
 
     return AlertDialog(
