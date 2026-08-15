@@ -530,7 +530,8 @@ class _IncomingVoucherCard extends ConsumerWidget {
             
             // ─── عرض المادة مع الكمية المحددة في السند ────────────────
             if (voucher.items.isNotEmpty)
-              Container(
+              ...voucher.items.map((item) => Container(
+                margin: const EdgeInsets.only(bottom: 4),
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                 decoration: BoxDecoration(
                   color: Colors.blue.shade50,
@@ -541,7 +542,7 @@ class _IncomingVoucherCard extends ConsumerWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      voucher.items.first.materialName,
+                      item.materialName,
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w500,
@@ -555,13 +556,34 @@ class _IncomingVoucherCard extends ConsumerWidget {
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
-                        'الكمية: ${voucher.items.first.requestedQty.toStringAsFixed(2)} ${voucher.items.first.unit}',
+                        '${item.requestedQty.toStringAsFixed(2)} ${item.unit}',
                         style: TextStyle(
-                          fontSize: 12,
+                          fontSize: 13,
                           fontWeight: FontWeight.bold,
                           color: Colors.blue.shade900,
                         ),
                       ),
+                    ),
+                  ],
+                ),
+              )).toList()
+            else
+              // إذا لم توجد مواد، عرض رسالة
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey.shade300),
+                ),
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.info_outline, size: 16, color: Colors.grey),
+                    SizedBox(width: 8),
+                    Text(
+                      'لا توجد مواد في هذا السند',
+                      style: TextStyle(color: Colors.grey, fontSize: 12),
                     ),
                   ],
                 ),
@@ -789,7 +811,8 @@ class _OutgoingVoucherCard extends ConsumerWidget {
             
             // ─── عرض المادة مع الكمية المحددة في السند ────────────────
             if (voucher.items.isNotEmpty)
-              Container(
+              ...voucher.items.map((item) => Container(
+                margin: const EdgeInsets.only(bottom: 4),
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                 decoration: BoxDecoration(
                   color: Colors.deepOrange.shade50,
@@ -800,7 +823,7 @@ class _OutgoingVoucherCard extends ConsumerWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      voucher.items.first.materialName,
+                      item.materialName,
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w500,
@@ -814,13 +837,34 @@ class _OutgoingVoucherCard extends ConsumerWidget {
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
-                        'الكمية: ${voucher.items.first.requestedQty.toStringAsFixed(2)} ${voucher.items.first.unit}',
+                        '${item.requestedQty.toStringAsFixed(2)} ${item.unit}',
                         style: TextStyle(
-                          fontSize: 12,
+                          fontSize: 13,
                           fontWeight: FontWeight.bold,
                           color: Colors.deepOrange.shade900,
                         ),
                       ),
+                    ),
+                  ],
+                ),
+              )).toList()
+            else
+              // إذا لم توجد مواد، عرض رسالة
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey.shade300),
+                ),
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.info_outline, size: 16, color: Colors.grey),
+                    SizedBox(width: 8),
+                    Text(
+                      'لا توجد مواد في هذا السند',
+                      style: TextStyle(color: Colors.grey, fontSize: 12),
                     ),
                   ],
                 ),
