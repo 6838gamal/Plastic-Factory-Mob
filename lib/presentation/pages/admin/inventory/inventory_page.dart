@@ -1118,16 +1118,15 @@ class _CreateReceivingVoucherDialogState extends State<_CreateReceivingVoucherDi
       _selectedUnit = materials.first.unit;
     }
 
-    final selectedMaterial = materials.firstWhere(
-      (m) => m.materialId == _selectedMaterialId,
-      orElse: () => materials.isNotEmpty ? materials.first : InventorySummaryModel(
-        materialId: '',
-        materialName: '',
-        unit: 'كجم',
-        currentBalance: 0,
-        minStock: 0,
-      ),
-    );
+    // العثور على المادة المحددة
+    InventorySummaryModel? selectedMaterial;
+    if (_selectedMaterialId.isNotEmpty) {
+      try {
+        selectedMaterial = materials.firstWhere((m) => m.materialId == _selectedMaterialId);
+      } catch (_) {
+        selectedMaterial = materials.isNotEmpty ? materials.first : null;
+      }
+    }
 
     return AlertDialog(
       title: Row(
@@ -1198,10 +1197,10 @@ class _CreateReceivingVoucherDialogState extends State<_CreateReceivingVoucherDi
                 controller: _qtyController,
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                 decoration: InputDecoration(
-                  labelText: 'الكمية (${selectedMaterial.unit})',
+                  labelText: 'الكمية (${selectedMaterial?.unit ?? 'كجم'})',
                   border: const OutlineInputBorder(),
                   prefixIcon: const Icon(Icons.scale_outlined),
-                  helperText: selectedMaterial.materialId.isNotEmpty
+                  helperText: selectedMaterial != null
                       ? 'المتاح: ${selectedMaterial.currentBalance.toStringAsFixed(2)} ${selectedMaterial.unit}'
                       : null,
                   helperStyle: const TextStyle(color: Colors.grey),
@@ -1238,7 +1237,7 @@ class _CreateReceivingVoucherDialogState extends State<_CreateReceivingVoucherDi
               ? null
               : () {
                   Navigator.pop(context);
-                  widget.onConfirm(selectedMaterial, _quantity);
+                  widget.onConfirm(selectedMaterial!, _quantity);
                 },
           child: const Text(
             'إنشاء سند',
