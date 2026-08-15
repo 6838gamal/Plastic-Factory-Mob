@@ -8,7 +8,6 @@ import '../../../data/models/inventory_summary_model.dart';
 import '../../../data/models/voucher_models.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/reference_data_provider.dart';
-import '../worker/raw_material_receiving_page.dart';
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Providers
@@ -62,7 +61,6 @@ class _StagingWarehousePageState extends ConsumerState<StagingWarehousePage>
     super.dispose();
   }
 
-  /// تحديث جميع البيانات
   void _refresh() {
     ref.invalidate(stagingInventoryProvider);
     ref.invalidate(stagingIncomingProvider);
@@ -73,15 +71,6 @@ class _StagingWarehousePageState extends ConsumerState<StagingWarehousePage>
   String get _operatorName {
     final auth = ref.read(authProvider);
     return auth.user?.name ?? auth.user?.email ?? 'مدير الإنتاج';
-  }
-
-  void _navigateToReceivingWarehouse(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const RawMaterialReceivingPage(),
-      ),
-    );
   }
 
   void _showErrorSnackBar(BuildContext context, String message) {
@@ -120,8 +109,15 @@ class _StagingWarehousePageState extends ConsumerState<StagingWarehousePage>
 
   @override
   Widget build(BuildContext context) {
-    final pendingCount = ref
+    final pendingIncoming = ref
             .watch(stagingIncomingProvider)
+            .valueOrNull
+            ?.where((v) => v.isPending)
+            .length ??
+        0;
+
+    final pendingOutgoing = ref
+            .watch(stagingOutgoingProvider)
             .valueOrNull
             ?.where((v) => v.isPending)
             .length ??
@@ -133,11 +129,6 @@ class _StagingWarehousePageState extends ConsumerState<StagingWarehousePage>
         foregroundColor: Colors.white,
         title: const Text('المخزن المرحلي'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.assignment_outlined),
-            onPressed: () => _navigateToReceivingWarehouse(context),
-            tooltip: 'استلام المواد الخام',
-          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _refresh,
@@ -152,14 +143,18 @@ class _StagingWarehousePageState extends ConsumerState<StagingWarehousePage>
             const Tab(icon: Icon(Icons.inventory_2_outlined), text: 'المخزون'),
             Tab(
               icon: Badge(
-                isLabelVisible: pendingCount > 0,
-                label: Text('$pendingCount'),
+                isLabelVisible: pendingIncoming > 0,
+                label: Text('$pendingIncoming'),
                 child: const Icon(Icons.arrow_downward),
               ),
               text: 'وارد من الرئيسي',
             ),
-            const Tab(
-              icon: Icon(Icons.arrow_upward),
+            Tab(
+              icon: Badge(
+                isLabelVisible: pendingOutgoing > 0,
+                label: Text('$pendingOutgoing'),
+                child: const Icon(Icons.arrow_upward),
+              ),
               text: 'صادر للخلاط',
             ),
           ],
@@ -453,7 +448,7 @@ class _VoucherCard extends ConsumerWidget {
   final TransferVoucherModel voucher;
   final String operatorName;
   final VoidCallback onAction;
-  final String role; // 'incoming' or 'outgoing'
+  final String role;
   final void Function(BuildContext, String) showError;
   final void Function(BuildContext, String) showSuccess;
 
@@ -500,7 +495,7 @@ class _VoucherCard extends ConsumerWidget {
   }
 
   Color get _transferColor {
-    return role == 'incoming' ? Colors.blue : Colors.orange;
+    return role == 'incoming' ? Colors.blue : Colors.deepOrange;
   }
 
   @override
@@ -559,33 +554,42 @@ class _VoucherCard extends ConsumerWidget {
             
             const SizedBox(height: 8),
             
-            // المواد
-            if (voucher.itemNames.isNotEmpty)
-              Wrap(
-                spacing: 4,
-                runSpacing: 4,
-                children: voucher.itemNames.take(4).map((name) {
-                  return Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: Colors.deepOrange.shade50,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.deepOrange.shade100),
+            // ── عرض المادة مع الكمية المحددة ──
+            if (voucher.items.isNotEmpty)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.deepOrange.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.deepOrange.shade100),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      voucher.items.first.materialName,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.deepOrange.shade800,
+                      ),
                     ),
-                    child: Text(
-                      name, 
-                      style: TextStyle(fontSize: 11, color: Colors.deepOrange.shade800),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.deepOrange.shade200,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        '${voucher.items.first.requestedQty.toStringAsFixed(2)} ${voucher.items.first.unit}',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.deepOrange.shade900,
+                        ),
+                      ),
                     ),
-                  );
-                }).toList(),
-              ),
-            
-            if (voucher.itemNames.length > 4)
-              Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Text(
-                  '+${voucher.itemNames.length - 4} مواد أخرى',
-                  style: const TextStyle(color: Colors.grey, fontSize: 11),
+                  ],
                 ),
               ),
             
@@ -617,10 +621,10 @@ class _VoucherCard extends ConsumerWidget {
                       if (ok) {
                         try {
                           await ds.cancelTransferVoucher(voucher.id!);
-                          showSuccess(context, 'تم إلغاء السند بنجاح');
+                          showSuccess(context, '✅ تم إلغاء السند بنجاح');
                           onAction();
                         } catch (e) {
-                          showError(context, 'فشل إلغاء السند: ${e.toString()}');
+                          showError(context, '❌ فشل إلغاء السند: ${e.toString()}');
                         }
                       }
                     },
@@ -745,7 +749,7 @@ class _VoucherCard extends ConsumerWidget {
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
-// حوار إنشاء السند
+// حوار إنشاء السند (مادة واحدة فقط)
 // ──────────────────────────────────────────────────────────────────────────────
 
 class _StagingVoucherDialog extends ConsumerStatefulWidget {
@@ -769,12 +773,17 @@ class _StagingVoucherDialog extends ConsumerStatefulWidget {
 
 class _StagingVoucherDialogState extends ConsumerState<_StagingVoucherDialog> {
   final _notesCtrl = TextEditingController();
-  final List<_VItemEntry> _items = [];
+  String _selectedMaterialId = '';
+  String _selectedMaterialName = '';
+  String _selectedUnit = 'كجم';
+  double _quantity = 0;
+  final TextEditingController _qtyController = TextEditingController();
   bool _loading = false;
 
   @override
   void dispose() {
     _notesCtrl.dispose();
+    _qtyController.dispose();
     super.dispose();
   }
 
@@ -791,22 +800,14 @@ class _StagingVoucherDialogState extends ConsumerState<_StagingVoucherDialog> {
           ? 'المخزن الرئيسي ← المخزن المرحلي'
           : 'المخزن المرحلي ← مخزن الخلطات';
 
-  void _addItem() => setState(() => _items.add(_VItemEntry()));
-  void _removeItem(int i) => setState(() => _items.removeAt(i));
-
   Future<void> _save() async {
-    if (_items.isEmpty) {
-      widget.showError(context, '⚠️ أضف بنداً واحداً على الأقل');
+    if (_selectedMaterialId.isEmpty) {
+      widget.showError(context, '⚠️ اختر مادة أولاً');
       return;
     }
 
-    final incomplete = <int>[
-      for (var i = 0; i < _items.length; i++)
-        if (_items[i].name.isEmpty || _items[i].qty <= 0) i + 1,
-    ];
-
-    if (incomplete.isNotEmpty) {
-      widget.showError(context, '⚠️ أكمل بيانات البند رقم ${incomplete.join("، ")} قبل الحفظ');
+    if (_quantity <= 0) {
+      widget.showError(context, '⚠️ أدخل كمية صحيحة');
       return;
     }
 
@@ -819,19 +820,19 @@ class _StagingVoucherDialogState extends ConsumerState<_StagingVoucherDialog> {
         'notes': _notesCtrl.text.trim(),
         'created_by': widget.createdBy ?? 'مدير الإنتاج',
         'transfer_type': widget.transferType,
-        'items': _items
-            .map((e) => {
-                  'material_name': e.name,
-                  'unit': e.unit,
-                  'requested_qty': e.qty,
-                  if (e.materialId != null) 'material_id': e.materialId,
-                })
-            .toList(),
+        'items': [
+          {
+            'material_name': _selectedMaterialName,
+            'unit': _selectedUnit,
+            'requested_qty': _quantity,
+            'material_id': _selectedMaterialId,
+          }
+        ],
       });
 
       if (mounted) {
         Navigator.pop(context);
-        widget.showSuccess(context, '✅ تم إنشاء السند بنجاح');
+        widget.showSuccess(context, '✅ تم إنشاء السند بنجاح (قيد الانتظار)');
         widget.onSaved();
       }
     } catch (e) {
@@ -850,6 +851,18 @@ class _StagingVoucherDialogState extends ConsumerState<_StagingVoucherDialog> {
             ?.where((m) => m.warehouseType == _fromWarehouse)
             .toList() ??
         [];
+
+    // تعيين المادة الافتراضية
+    if (_selectedMaterialId.isEmpty && materials.isNotEmpty) {
+      _selectedMaterialId = materials.first.materialId;
+      _selectedMaterialName = materials.first.materialName;
+      _selectedUnit = materials.first.unit;
+    }
+
+    final selectedMaterial = materials.firstWhere(
+      (m) => m.materialId == _selectedMaterialId,
+      orElse: () => materials.isNotEmpty ? materials.first : InventorySummaryModel.empty(),
+    );
 
     return AlertDialog(
       title: Text(_title),
@@ -880,7 +893,56 @@ class _StagingVoucherDialogState extends ConsumerState<_StagingVoucherDialog> {
                   ],
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
+              
+              // اختيار المادة (Dropdown)
+              DropdownButtonFormField<String>(
+                value: _selectedMaterialId.isNotEmpty ? _selectedMaterialId : null,
+                decoration: const InputDecoration(
+                  labelText: 'المادة',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.science_outlined),
+                ),
+                items: materials
+                    .map((m) => DropdownMenuItem(
+                          value: m.materialId,
+                          child: Text(
+                            '${m.materialName} (${m.currentBalance.toStringAsFixed(1)} ${m.unit})',
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ))
+                    .toList(),
+                onChanged: (v) {
+                  if (v != null) {
+                    final mat = materials.firstWhere((m) => m.materialId == v);
+                    setState(() {
+                      _selectedMaterialId = v;
+                      _selectedMaterialName = mat.materialName;
+                      _selectedUnit = mat.unit;
+                    });
+                  }
+                },
+              ),
+              const SizedBox(height: 16),
+              
+              // الكمية
+              TextFormField(
+                controller: _qtyController,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: InputDecoration(
+                  labelText: 'الكمية (${selectedMaterial.unit})',
+                  border: const OutlineInputBorder(),
+                  prefixIcon: const Icon(Icons.scale_outlined),
+                  helperText: selectedMaterial.id.isNotEmpty
+                      ? 'المتاح: ${selectedMaterial.currentBalance.toStringAsFixed(2)} ${selectedMaterial.unit}'
+                      : null,
+                  helperStyle: const TextStyle(color: Colors.grey),
+                ),
+                onChanged: (v) {
+                  _quantity = double.tryParse(v) ?? 0;
+                },
+              ),
+              const SizedBox(height: 16),
               
               // ملاحظات
               TextField(
@@ -889,40 +951,9 @@ class _StagingVoucherDialogState extends ConsumerState<_StagingVoucherDialog> {
                 decoration: const InputDecoration(
                   labelText: 'ملاحظات (اختياري)',
                   border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.note_add_outlined),
                 ),
               ),
-              const SizedBox(height: 16),
-              
-              // قائمة المواد
-              Row(
-                children: [
-                  const Text('المواد', style: TextStyle(fontWeight: FontWeight.bold)),
-                  const Spacer(),
-                  TextButton.icon(
-                    icon: const Icon(Icons.add, size: 16),
-                    label: const Text('إضافة بند'),
-                    onPressed: _addItem,
-                  ),
-                ],
-              ),
-              const Divider(),
-              
-              ..._items.asMap().entries.map((e) => _VItemRow(
-                    index: e.key,
-                    entry: e.value,
-                    materials: materials,
-                    onRemove: () => _removeItem(e.key),
-                    onChanged: () => setState(() {}),
-                  )),
-              
-              if (_items.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 8),
-                  child: Center(
-                    child: Text('اضغط "إضافة بند" لإضافة مادة',
-                        style: TextStyle(color: Colors.grey)),
-                  ),
-                ),
             ],
           ),
         ),
@@ -1013,153 +1044,4 @@ Widget _buildMaterialCard(InventorySummaryModel item, MaterialColor color) {
       ),
     ),
   );
-}
-
-// ──────────────────────────────────────────────────────────────────────────────
-// مكونات إدخال البنود
-// ──────────────────────────────────────────────────────────────────────────────
-
-class _VItemEntry {
-  String name = '';
-  String unit = 'كجم';
-  double qty = 0;
-  String? materialId;
-}
-
-class _VItemRow extends StatelessWidget {
-  final int index;
-  final _VItemEntry entry;
-  final List<InventorySummaryModel> materials;
-  final VoidCallback onRemove;
-  final VoidCallback onChanged;
-
-  const _VItemRow({
-    required this.index,
-    required this.entry,
-    required this.materials,
-    required this.onRemove,
-    required this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final itemNo = index + 1;
-    final selected = entry.name.isNotEmpty
-        ? materials
-            .where((m) => (entry.materialId != null && entry.materialId!.isNotEmpty)
-                ? m.materialId == entry.materialId
-                : m.materialName == entry.name)
-            .firstOrNull
-        : null;
-    final available = selected?.currentBalance ?? 0.0;
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey.shade300),
-        borderRadius: BorderRadius.circular(8),
-        color: Colors.grey.shade50,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Text('البند $itemNo',
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.deepOrange)),
-              const Spacer(),
-              InkWell(
-                onTap: onRemove,
-                child: const Icon(Icons.remove_circle_outline, color: Colors.red, size: 20),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          
-          // اختيار المادة
-          materials.isEmpty
-              ? TextField(
-                  decoration: const InputDecoration(
-                    labelText: 'اسم المادة',
-                    border: OutlineInputBorder(),
-                  ),
-                  onChanged: (v) {
-                    entry.name = v;
-                    onChanged();
-                  },
-                )
-              : DropdownButtonFormField<String>(
-                  value: entry.name.isNotEmpty ? entry.name : null,
-                  decoration: const InputDecoration(
-                    labelText: 'المادة',
-                    border: OutlineInputBorder(),
-                  ),
-                  items: materials
-                      .map((m) => DropdownMenuItem(
-                            value: m.materialName,
-                            child: Text(
-                              '${m.materialName} (${m.currentBalance.toStringAsFixed(1)} ${m.unit})',
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ))
-                      .toList(),
-                  onChanged: (v) {
-                    entry.name = v ?? '';
-                    final mat = materials.firstWhere(
-                      (m) => m.materialName == v,
-                      orElse: () => materials.first,
-                    );
-                    entry.materialId = mat.materialId;
-                    entry.unit = mat.unit;
-                    onChanged();
-                  },
-                ),
-          const SizedBox(height: 8),
-          
-          // الكمية والوحدة
-          Row(
-            children: [
-              Expanded(
-                child: TextFormField(
-                  initialValue: entry.qty > 0 ? entry.qty.toString() : '',
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: InputDecoration(
-                    labelText: 'الكمية',
-                    border: const OutlineInputBorder(),
-                    helperText: available > 0 ? 'متاح: ${available.toStringAsFixed(2)}' : null,
-                    helperStyle: const TextStyle(color: Colors.grey),
-                  ),
-                  onChanged: (v) {
-                    entry.qty = double.tryParse(v) ?? 0;
-                    onChanged();
-                  },
-                ),
-              ),
-              const SizedBox(width: 8),
-              SizedBox(
-                width: 80,
-                child: DropdownButtonFormField<String>(
-                  value: entry.unit,
-                  decoration: const InputDecoration(
-                    labelText: 'الوحدة',
-                    border: OutlineInputBorder(),
-                  ),
-                  items: const [
-                    DropdownMenuItem(value: 'كجم', child: Text('كجم')),
-                    DropdownMenuItem(value: 'جرام', child: Text('جرام')),
-                    DropdownMenuItem(value: 'لتر', child: Text('لتر')),
-                  ],
-                  onChanged: (v) {
-                    entry.unit = v ?? 'كجم';
-                    onChanged();
-                  },
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
 }
