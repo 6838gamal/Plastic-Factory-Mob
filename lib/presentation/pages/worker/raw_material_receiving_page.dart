@@ -582,6 +582,12 @@ class _IncomingVoucherCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final ds = ref.read(dataSourceProvider);
     
+    // التأكد من أن السند في حالة pending لعرض أزرار التأكيد
+    final isPending = voucher.isPending;
+    final isDraft = voucher.isDraft;
+    final isConfirmed = voucher.isConfirmed;
+    final isCancelled = voucher.isCancelled;
+
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -590,6 +596,7 @@ class _IncomingVoucherCard extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // رأس البطاقة
             Row(
               children: [
                 Chip(
@@ -614,6 +621,7 @@ class _IncomingVoucherCard extends ConsumerWidget {
               ],
             ),
             
+            // نوع التحويل
             Padding(
               padding: const EdgeInsets.only(top: 4),
               child: Text(
@@ -628,8 +636,10 @@ class _IncomingVoucherCard extends ConsumerWidget {
             
             const SizedBox(height: 8),
             
+            // ─── عرض المادة مع الكمية ────────────────
             if (voucher.items.isNotEmpty)
-              Container(
+              ...voucher.items.map((item) => Container(
+                margin: const EdgeInsets.only(bottom: 4),
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                 decoration: BoxDecoration(
                   color: Colors.deepPurple.shade50,
@@ -640,7 +650,7 @@ class _IncomingVoucherCard extends ConsumerWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      voucher.items.first.materialName,
+                      item.materialName,
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w500,
@@ -654,13 +664,33 @@ class _IncomingVoucherCard extends ConsumerWidget {
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
-                        '${voucher.items.first.requestedQty.toStringAsFixed(2)} ${voucher.items.first.unit}',
+                        '${item.requestedQty.toStringAsFixed(2)} ${item.unit}',
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.bold,
                           color: Colors.deepPurple.shade900,
                         ),
                       ),
+                    ),
+                  ],
+                ),
+              )).toList()
+            else
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey.shade300),
+                ),
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.info_outline, size: 16, color: Colors.grey),
+                    SizedBox(width: 8),
+                    Text(
+                      'لا توجد مواد في هذا السند',
+                      style: TextStyle(color: Colors.grey, fontSize: 12),
                     ),
                   ],
                 ),
@@ -675,8 +705,35 @@ class _IncomingVoucherCard extends ConsumerWidget {
                 ),
               ),
             
-            // ─── زر التأكيد فقط للمستلم (يظهر بوضوح) ──────────────────────────
-            if (voucher.isPending) ...[
+            // ─── الأزرار حسب حالة السند ──────────────────────────────────────
+            if (isDraft) ...[
+              const Divider(height: 16),
+              Row(
+                mainAxisAlignment: MathWidgets,
+                children: [
+                  // إرسال للمراجعة (إذا كان مسودة)
+                  ElevatedButton.icon(
+                    icon: const Icon(Icons.send, size: 16),
+                    label: const Text('إرسال للمراجعة'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.orange,
+                    ),
+                    onPressed: () async {
+                      try {
+                        await ds.submitTransferVoucher(voucher.id!);
+                        showSuccess(context, '✅ تم إرسال السند للمراجعة');
+                        onAction();
+                      } catch (e) {
+                        showError(context, '❌ فشل إرسال السند: ${e.toString()}');
+                      }
+                    },
+                  ),
+                ],
+              ),
+            ],
+            
+            // ─── زر التأكيد فقط للمستلم (في حالة pending) ──────────────────────
+            if (isPending) ...[
               const Divider(height: 16),
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
@@ -735,7 +792,7 @@ class _IncomingVoucherCard extends ConsumerWidget {
               ),
             ],
             
-            if (voucher.isConfirmed && voucher.confirmedBy != null)
+            if (isConfirmed && voucher.confirmedBy != null)
               Padding(
                 padding: const EdgeInsets.only(top: 6),
                 child: Row(
@@ -847,6 +904,7 @@ class _OutgoingVoucherCard extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // رأس البطاقة
             Row(
               children: [
                 Chip(
@@ -871,6 +929,7 @@ class _OutgoingVoucherCard extends ConsumerWidget {
               ],
             ),
             
+            // نوع التحويل
             Padding(
               padding: const EdgeInsets.only(top: 4),
               child: Text(
@@ -885,8 +944,10 @@ class _OutgoingVoucherCard extends ConsumerWidget {
             
             const SizedBox(height: 8),
             
+            // ─── عرض المادة مع الكمية ────────────────
             if (voucher.items.isNotEmpty)
-              Container(
+              ...voucher.items.map((item) => Container(
+                margin: const EdgeInsets.only(bottom: 4),
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                 decoration: BoxDecoration(
                   color: Colors.green.shade50,
@@ -897,7 +958,7 @@ class _OutgoingVoucherCard extends ConsumerWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      voucher.items.first.materialName,
+                      item.materialName,
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w500,
@@ -911,13 +972,33 @@ class _OutgoingVoucherCard extends ConsumerWidget {
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
-                        '${voucher.items.first.requestedQty.toStringAsFixed(2)} ${voucher.items.first.unit}',
+                        '${item.requestedQty.toStringAsFixed(2)} ${item.unit}',
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.bold,
                           color: Colors.green.shade900,
                         ),
                       ),
+                    ),
+                  ],
+                ),
+              )).toList()
+            else
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey.shade300),
+                ),
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.info_outline, size: 16, color: Colors.grey),
+                    SizedBox(width: 8),
+                    Text(
+                      'لا توجد مواد في هذا السند',
+                      style: TextStyle(color: Colors.grey, fontSize: 12),
                     ),
                   ],
                 ),
