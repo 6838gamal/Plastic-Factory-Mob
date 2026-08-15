@@ -196,14 +196,14 @@ class _RawMaterialReceivingPageState extends ConsumerState<RawMaterialReceivingP
             showError: _showErrorSnackBar,
             showSuccess: _showSuccessSnackBar,
           ),
-          // ── وارد من الخلاط (شاشة الاستلام كمستلم) ──
+          // ── وارد من الخلاط (شاشة الاستلام كمستلم - يظهر زر التأكيد) ──
           _IncomingTab(
             operatorName: _operatorName,
             onRefresh: _refresh,
             showError: _showErrorSnackBar,
             showSuccess: _showSuccessSnackBar,
           ),
-          // ── صادر للجاهز (شاشة الاستلام كمرسل) ──
+          // ── صادر للجاهز (شاشة الاستلام كمرسل - لا يظهر زر التأكيد) ──
           _OutgoingTab(
             operatorName: _operatorName,
             onRefresh: _refresh,
@@ -308,7 +308,7 @@ class _InventoryTab extends ConsumerWidget {
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
-// تبويب وارد من الخلاط (شاشة الاستلام كمستلم)
+// تبويب وارد من الخلاط (شاشة الاستلام كمستلم - يظهر زر تأكيد الاستلام)
 // ──────────────────────────────────────────────────────────────────────────────
 
 class _IncomingTab extends ConsumerWidget {
@@ -385,7 +385,7 @@ class _IncomingTab extends ConsumerWidget {
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
-// تبويب صادر للجاهز (شاشة الاستلام كمرسل)
+// تبويب صادر للجاهز (شاشة الاستلام كمرسل - لا يظهر زر التأكيد)
 // ──────────────────────────────────────────────────────────────────────────────
 
 class _OutgoingTab extends ConsumerWidget {
@@ -675,13 +675,13 @@ class _IncomingVoucherCard extends ConsumerWidget {
                 ),
               ),
             
-            // ─── زر التأكيد فقط للمستلم ──────────────────────────────────────
+            // ─── زر التأكيد فقط للمستلم (يظهر بوضوح) ──────────────────────────
             if (voucher.isPending) ...[
               const Divider(height: 16),
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  // رفض الطلب (يمكن للمستلم رفض الطلب)
+                  // رفض الطلب
                   TextButton.icon(
                     icon: const Icon(Icons.cancel_outlined, color: Colors.red, size: 16),
                     label: const Text('رفض الطلب', style: TextStyle(color: Colors.red)),
@@ -704,12 +704,13 @@ class _IncomingVoucherCard extends ConsumerWidget {
                   ),
                   const SizedBox(width: 8),
                   
-                  // تأكيد الاستلام (زر المستلم)
+                  // ─── زر تأكيد الاستلام (الزر الرئيسي) ──────────────────────
                   ElevatedButton.icon(
-                    icon: const Icon(Icons.check_circle, size: 16),
+                    icon: const Icon(Icons.check_circle, size: 18),
                     label: const Text('تأكيد الاستلام'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.green,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                     ),
                     onPressed: () async {
                       final ok = await _confirmDialog(
@@ -932,7 +933,6 @@ class _OutgoingVoucherCard extends ConsumerWidget {
               ),
             
             // ─── لا يوجد زر تأكيد للمرسل ──────────────────────────────────────
-            // فقط إمكانية إلغاء السند إذا كان pending
             if (voucher.isPending) ...[
               const Divider(height: 16),
               Row(
