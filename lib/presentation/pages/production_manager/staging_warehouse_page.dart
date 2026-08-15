@@ -163,14 +163,12 @@ class _StagingWarehousePageState extends ConsumerState<StagingWarehousePage>
         controller: _tabs,
         children: [
           _InventoryTab(onRefresh: _refresh),
-          // ── وارد من الرئيسي (المخزن المرحلي كمستلم) ──
           _IncomingTab(
             operatorName: _operatorName,
             onRefresh: _refresh,
             showError: _showErrorSnackBar,
             showSuccess: _showSuccessSnackBar,
           ),
-          // ── صادر للخلاط (المخزن المرحلي كمرسل) ──
           _OutgoingTab(
             operatorName: _operatorName,
             onRefresh: _refresh,
@@ -490,6 +488,7 @@ class _IncomingVoucherCard extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // رأس البطاقة
             Row(
               children: [
                 Chip(
@@ -514,6 +513,7 @@ class _IncomingVoucherCard extends ConsumerWidget {
               ],
             ),
             
+            // نوع التحويل
             Padding(
               padding: const EdgeInsets.only(top: 4),
               child: Text(
@@ -528,6 +528,7 @@ class _IncomingVoucherCard extends ConsumerWidget {
             
             const SizedBox(height: 8),
             
+            // ─── عرض المادة مع الكمية المحددة في السند ────────────────
             if (voucher.items.isNotEmpty)
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -554,9 +555,9 @@ class _IncomingVoucherCard extends ConsumerWidget {
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
-                        '${voucher.items.first.requestedQty.toStringAsFixed(2)} ${voucher.items.first.unit}',
+                        'الكمية: ${voucher.items.first.requestedQty.toStringAsFixed(2)} ${voucher.items.first.unit}',
                         style: TextStyle(
-                          fontSize: 13,
+                          fontSize: 12,
                           fontWeight: FontWeight.bold,
                           color: Colors.blue.shade900,
                         ),
@@ -581,30 +582,30 @@ class _IncomingVoucherCard extends ConsumerWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  // إلغاء (يمكن للمستلم رفض الطلب)
+                  // رفض الطلب
                   TextButton.icon(
                     icon: const Icon(Icons.cancel_outlined, color: Colors.red, size: 16),
-                    label: const Text('رفض', style: TextStyle(color: Colors.red)),
+                    label: const Text('رفض الطلب', style: TextStyle(color: Colors.red)),
                     onPressed: () async {
                       final ok = await _confirmDialog(
                         context,
-                        'تأكيد الرفض',
+                        'تأكيد رفض الطلب',
                         'هل تريد رفض سند ${voucher.voucherNumber}؟',
                       );
                       if (ok) {
                         try {
                           await ds.cancelTransferVoucher(voucher.id!);
-                          showSuccess(context, '✅ تم رفض السند بنجاح');
+                          showSuccess(context, '✅ تم رفض الطلب بنجاح');
                           onAction();
                         } catch (e) {
-                          showError(context, '❌ فشل رفض السند: ${e.toString()}');
+                          showError(context, '❌ فشل رفض الطلب: ${e.toString()}');
                         }
                       }
                     },
                   ),
                   const SizedBox(width: 8),
                   
-                  // تأكيد الاستلام (زر المستلم)
+                  // تأكيد الاستلام
                   ElevatedButton.icon(
                     icon: const Icon(Icons.check_circle, size: 16),
                     label: const Text('تأكيد الاستلام'),
@@ -746,6 +747,7 @@ class _OutgoingVoucherCard extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // رأس البطاقة
             Row(
               children: [
                 Chip(
@@ -770,6 +772,7 @@ class _OutgoingVoucherCard extends ConsumerWidget {
               ],
             ),
             
+            // نوع التحويل
             Padding(
               padding: const EdgeInsets.only(top: 4),
               child: Text(
@@ -784,6 +787,7 @@ class _OutgoingVoucherCard extends ConsumerWidget {
             
             const SizedBox(height: 8),
             
+            // ─── عرض المادة مع الكمية المحددة في السند ────────────────
             if (voucher.items.isNotEmpty)
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -810,9 +814,9 @@ class _OutgoingVoucherCard extends ConsumerWidget {
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
-                        '${voucher.items.first.requestedQty.toStringAsFixed(2)} ${voucher.items.first.unit}',
+                        'الكمية: ${voucher.items.first.requestedQty.toStringAsFixed(2)} ${voucher.items.first.unit}',
                         style: TextStyle(
-                          fontSize: 13,
+                          fontSize: 12,
                           fontWeight: FontWeight.bold,
                           color: Colors.deepOrange.shade900,
                         ),
@@ -832,7 +836,6 @@ class _OutgoingVoucherCard extends ConsumerWidget {
               ),
             
             // ─── لا يوجد زر تأكيد للمرسل ──────────────────────────────────────
-            // فقط إمكانية إلغاء السند إذا كان pending
             if (voucher.isPending) ...[
               const Divider(height: 16),
               Row(
