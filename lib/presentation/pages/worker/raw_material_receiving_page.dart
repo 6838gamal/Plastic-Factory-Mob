@@ -196,14 +196,14 @@ class _RawMaterialReceivingPageState extends ConsumerState<RawMaterialReceivingP
             showError: _showErrorSnackBar,
             showSuccess: _showSuccessSnackBar,
           ),
-          // ── وارد من الخلاط (شاشة الاستلام كمستلم - يظهر زر التأكيد) ──
+          // ── وارد من الخلاط (المستلم - يظهر زر تأكيد الاستلام) ──
           _IncomingTab(
             operatorName: _operatorName,
             onRefresh: _refresh,
             showError: _showErrorSnackBar,
             showSuccess: _showSuccessSnackBar,
           ),
-          // ── صادر للجاهز (شاشة الاستلام كمرسل - لا يظهر زر التأكيد) ──
+          // ── صادر للجاهز (المرسل - لا يظهر زر تأكيد) ──
           _OutgoingTab(
             operatorName: _operatorName,
             onRefresh: _refresh,
@@ -308,7 +308,7 @@ class _InventoryTab extends ConsumerWidget {
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
-// تبويب وارد من الخلاط (شاشة الاستلام كمستلم - يظهر زر تأكيد الاستلام)
+// تبويب وارد من الخلاط (المستلم - يظهر زر تأكيد الاستلام)
 // ──────────────────────────────────────────────────────────────────────────────
 
 class _IncomingTab extends ConsumerWidget {
@@ -385,7 +385,7 @@ class _IncomingTab extends ConsumerWidget {
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
-// تبويب صادر للجاهز (شاشة الاستلام كمرسل - لا يظهر زر التأكيد)
+// تبويب صادر للجاهز (المرسل - لا يظهر زر تأكيد)
 // ──────────────────────────────────────────────────────────────────────────────
 
 class _OutgoingTab extends ConsumerWidget {
@@ -533,7 +533,7 @@ class _ReadyForUseTab extends ConsumerWidget {
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
-// بطاقة السند الوارد (شاشة الاستلام كمستلم - يظهر زر تأكيد الاستلام)
+// بطاقة السند الوارد (المستلم - يظهر زر تأكيد الاستلام)
 // ──────────────────────────────────────────────────────────────────────────────
 
 class _IncomingVoucherCard extends ConsumerWidget {
@@ -568,13 +568,13 @@ class _IncomingVoucherCard extends ConsumerWidget {
   String get _statusLabel {
     switch (voucher.status) {
       case 'confirmed':
-        return 'مُنفَّذ';
+        return '✅ مُنفَّذ';
       case 'pending':
-        return 'بانتظار الاستلام';
+        return '🟠 بانتظار الاستلام';
       case 'cancelled':
-        return 'ملغي';
+        return '❌ ملغي';
       default:
-        return 'مسودة';
+        return '📄 مسودة';
     }
   }
 
@@ -582,27 +582,34 @@ class _IncomingVoucherCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final ds = ref.read(dataSourceProvider);
     
-    // التأكد من أن السند في حالة pending لعرض أزرار التأكيد
     final isPending = voucher.isPending;
     final isDraft = voucher.isDraft;
     final isConfirmed = voucher.isConfirmed;
     final isCancelled = voucher.isCancelled;
 
+    // حساب قيمة المادة (الكمية)
+    final totalQty = voucher.items.fold(0.0, (sum, item) => sum + item.requestedQty);
+    final materialName = voucher.items.isNotEmpty ? voucher.items.first.materialName : 'غير محدد';
+    final unit = voucher.items.isNotEmpty ? voucher.items.first.unit : 'كجم';
+
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+        side: isPending ? BorderSide(color: Colors.orange.shade300, width: 2) : BorderSide.none,
+      ),
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // رأس البطاقة
+            // ── رأس البطاقة ──────────────────────────────────────
             Row(
               children: [
                 Chip(
-                  label: Text(_statusLabel, style: const TextStyle(color: Colors.white, fontSize: 12)),
+                  label: Text(_statusLabel, style: const TextStyle(color: Colors.white, fontSize: 11)),
                   backgroundColor: _statusColor,
-                  padding: EdgeInsets.zero,
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 0),
                   materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
                 const SizedBox(width: 8),
@@ -616,19 +623,19 @@ class _IncomingVoucherCard extends ConsumerWidget {
                 if (voucher.createdAt != null)
                   Text(
                     _formatDate(voucher.createdAt!),
-                    style: const TextStyle(color: Colors.grey, fontSize: 12),
+                    style: const TextStyle(color: Colors.grey, fontSize: 11),
                   ),
               ],
             ),
             
-            // نوع التحويل
+            // ── نوع التحويل ──────────────────────────────────────
             Padding(
-              padding: const EdgeInsets.only(top: 4),
+              padding: const EdgeInsets.only(top: 2),
               child: Text(
                 'من: مخزن الخلاط → شاشة الاستلام',
                 style: TextStyle(
                   fontSize: 11,
-                  color: Colors.deepPurple,
+                  color: Colors.deepPurple.shade600,
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -636,63 +643,53 @@ class _IncomingVoucherCard extends ConsumerWidget {
             
             const SizedBox(height: 8),
             
-            // ─── عرض المادة مع الكمية ────────────────
-            if (voucher.items.isNotEmpty)
-              ...voucher.items.map((item) => Container(
-                margin: const EdgeInsets.only(bottom: 4),
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                decoration: BoxDecoration(
-                  color: Colors.deepPurple.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.deepPurple.shade100),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      item.materialName,
+            // ─── عرض المادة مع الكمية والقيمة ────────────────
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: Colors.deepPurple.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.deepPurple.shade100),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      materialName,
                       style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
                         color: Colors.deepPurple.shade800,
                       ),
                     ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.deepPurple.shade200,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        '${item.requestedQty.toStringAsFixed(2)} ${item.unit}',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.deepPurple.shade900,
-                        ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.deepPurple.shade200,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      '${totalQty.toStringAsFixed(2)} $unit',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.deepPurple.shade900,
                       ),
                     ),
-                  ],
-                ),
-              )).toList()
-            else
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.grey.shade300),
-                ),
-                child: const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.info_outline, size: 16, color: Colors.grey),
-                    SizedBox(width: 8),
-                    Text(
-                      'لا توجد مواد في هذا السند',
-                      style: TextStyle(color: Colors.grey, fontSize: 12),
-                    ),
-                  ],
+                  ),
+                ],
+              ),
+            ),
+            
+            // عرض تفاصيل المواد الإضافية إن وجدت
+            if (voucher.items.length > 1)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  '+${voucher.items.length - 1} مواد أخرى',
+                  style: const TextStyle(color: Colors.grey, fontSize: 11),
                 ),
               ),
             
@@ -700,19 +697,21 @@ class _IncomingVoucherCard extends ConsumerWidget {
               Padding(
                 padding: const EdgeInsets.only(top: 6),
                 child: Text(
-                  'ملاحظات: ${voucher.notes}',
+                  '📝 ${voucher.notes}',
                   style: const TextStyle(color: Colors.grey, fontSize: 12),
                 ),
               ),
             
-            // ─── الأزرار حسب حالة السند ──────────────────────────────────────
+            // ─── الأزرار حسب حالة السند ──────────────────────────
+            
+            // حالة المسودة: زر إرسال للمراجعة
             if (isDraft) ...[
               const Divider(height: 16),
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   ElevatedButton.icon(
-                    icon: const Icon(Icons.send, size: 16),
+                    icon: const Icon(Icons.send, size: 16, color: Colors.white),
                     label: const Text('إرسال للمراجعة'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.orange,
@@ -731,16 +730,15 @@ class _IncomingVoucherCard extends ConsumerWidget {
               ),
             ],
             
-            // ─── زر التأكيد فقط للمستلم (في حالة pending) ──────────────────────
+            // حالة قيد الانتظار: أزرار رفض وتأكيد للمستلم
             if (isPending) ...[
               const Divider(height: 16),
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  // رفض الطلب
                   TextButton.icon(
                     icon: const Icon(Icons.cancel_outlined, color: Colors.red, size: 16),
-                    label: const Text('رفض الطلب', style: TextStyle(color: Colors.red)),
+                    label: const Text('رفض', style: TextStyle(color: Colors.red)),
                     onPressed: () async {
                       final ok = await _confirmDialog(
                         context,
@@ -760,10 +758,13 @@ class _IncomingVoucherCard extends ConsumerWidget {
                   ),
                   const SizedBox(width: 8),
                   
-                  // ─── زر تأكيد الاستلام (الزر الرئيسي) ──────────────────────
+                  // ─── زر تأكيد الاستلام ──────────────────────────
                   ElevatedButton.icon(
-                    icon: const Icon(Icons.check_circle, size: 18),
-                    label: const Text('تأكيد الاستلام'),
+                    icon: const Icon(Icons.check_circle, size: 18, color: Colors.white),
+                    label: Text(
+                      'تأكيد استلام ${totalQty.toStringAsFixed(1)} $unit',
+                      style: const TextStyle(fontSize: 13),
+                    ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.green,
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -772,7 +773,10 @@ class _IncomingVoucherCard extends ConsumerWidget {
                       final ok = await _confirmDialog(
                         context,
                         'تأكيد الاستلام',
-                        'هل تأكد استلام المواد من مخزن الخلاط؟\nسيتم نقل المواد لشاشة الاستلام.',
+                        'هل تأكد استلام المواد من مخزن الخلاط؟\n'
+                        'المادة: $materialName\n'
+                        'الكمية: ${totalQty.toStringAsFixed(2)} $unit\n\n'
+                        'سيتم خصم الكمية من مخزن الخلاط وإضافتها لشاشة الاستلام.',
                       );
                       if (ok) {
                         try {
@@ -791,6 +795,7 @@ class _IncomingVoucherCard extends ConsumerWidget {
               ),
             ],
             
+            // حالة مؤكد: عرض معلومات التأكيد
             if (isConfirmed && voucher.confirmedBy != null)
               Padding(
                 padding: const EdgeInsets.only(top: 6),
@@ -846,7 +851,7 @@ class _IncomingVoucherCard extends ConsumerWidget {
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
-// بطاقة السند الصادر (شاشة الاستلام كمرسل - لا يظهر زر التأكيد)
+// بطاقة السند الصادر (المرسل - لا يظهر زر تأكيد)
 // ──────────────────────────────────────────────────────────────────────────────
 
 class _OutgoingVoucherCard extends ConsumerWidget {
@@ -881,13 +886,13 @@ class _OutgoingVoucherCard extends ConsumerWidget {
   String get _statusLabel {
     switch (voucher.status) {
       case 'confirmed':
-        return 'مُنفَّذ';
+        return '✅ مُنفَّذ';
       case 'pending':
-        return 'بانتظار استلام الجاهز';
+        return '🟠 بانتظار استلام الجاهز';
       case 'cancelled':
-        return 'ملغي';
+        return '❌ ملغي';
       default:
-        return 'مسودة';
+        return '📄 مسودة';
     }
   }
 
@@ -895,21 +900,34 @@ class _OutgoingVoucherCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final ds = ref.read(dataSourceProvider);
     
+    final isPending = voucher.isPending;
+    final isDraft = voucher.isDraft;
+    final isConfirmed = voucher.isConfirmed;
+    final isCancelled = voucher.isCancelled;
+
+    // حساب قيمة المادة (الكمية)
+    final totalQty = voucher.items.fold(0.0, (sum, item) => sum + item.requestedQty);
+    final materialName = voucher.items.isNotEmpty ? voucher.items.first.materialName : 'غير محدد';
+    final unit = voucher.items.isNotEmpty ? voucher.items.first.unit : 'كجم';
+
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+        side: isPending ? BorderSide(color: Colors.orange.shade300, width: 2) : BorderSide.none,
+      ),
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // رأس البطاقة
+            // ── رأس البطاقة ──────────────────────────────────────
             Row(
               children: [
                 Chip(
-                  label: Text(_statusLabel, style: const TextStyle(color: Colors.white, fontSize: 12)),
+                  label: Text(_statusLabel, style: const TextStyle(color: Colors.white, fontSize: 11)),
                   backgroundColor: _statusColor,
-                  padding: EdgeInsets.zero,
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 0),
                   materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
                 const SizedBox(width: 8),
@@ -923,19 +941,19 @@ class _OutgoingVoucherCard extends ConsumerWidget {
                 if (voucher.createdAt != null)
                   Text(
                     _formatDate(voucher.createdAt!),
-                    style: const TextStyle(color: Colors.grey, fontSize: 12),
+                    style: const TextStyle(color: Colors.grey, fontSize: 11),
                   ),
               ],
             ),
             
-            // نوع التحويل
+            // ── نوع التحويل ──────────────────────────────────────
             Padding(
-              padding: const EdgeInsets.only(top: 4),
+              padding: const EdgeInsets.only(top: 2),
               child: Text(
                 'من: شاشة الاستلام → جاهز للاستخدام',
                 style: TextStyle(
                   fontSize: 11,
-                  color: Colors.green,
+                  color: Colors.green.shade600,
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -943,63 +961,52 @@ class _OutgoingVoucherCard extends ConsumerWidget {
             
             const SizedBox(height: 8),
             
-            // ─── عرض المادة مع الكمية ────────────────
-            if (voucher.items.isNotEmpty)
-              ...voucher.items.map((item) => Container(
-                margin: const EdgeInsets.only(bottom: 4),
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                decoration: BoxDecoration(
-                  color: Colors.green.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.green.shade100),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      item.materialName,
+            // ─── عرض المادة مع الكمية والقيمة ────────────────
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: Colors.green.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.green.shade100),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      materialName,
                       style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
                         color: Colors.green.shade800,
                       ),
                     ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.green.shade200,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        '${item.requestedQty.toStringAsFixed(2)} ${item.unit}',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.green.shade900,
-                        ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.green.shade200,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      '${totalQty.toStringAsFixed(2)} $unit',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.green.shade900,
                       ),
                     ),
-                  ],
-                ),
-              )).toList()
-            else
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.grey.shade300),
-                ),
-                child: const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.info_outline, size: 16, color: Colors.grey),
-                    SizedBox(width: 8),
-                    Text(
-                      'لا توجد مواد في هذا السند',
-                      style: TextStyle(color: Colors.grey, fontSize: 12),
-                    ),
-                  ],
+                  ),
+                ],
+              ),
+            ),
+            
+            if (voucher.items.length > 1)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  '+${voucher.items.length - 1} مواد أخرى',
+                  style: const TextStyle(color: Colors.grey, fontSize: 11),
                 ),
               ),
             
@@ -1007,13 +1014,41 @@ class _OutgoingVoucherCard extends ConsumerWidget {
               Padding(
                 padding: const EdgeInsets.only(top: 6),
                 child: Text(
-                  'ملاحظات: ${voucher.notes}',
+                  '📝 ${voucher.notes}',
                   style: const TextStyle(color: Colors.grey, fontSize: 12),
                 ),
               ),
             
-            // ─── لا يوجد زر تأكيد للمرسل ──────────────────────────────────────
-            if (voucher.isPending) ...[
+            // ─── الأزرار حسب حالة السند ──────────────────────────
+            
+            // حالة المسودة: زر إرسال للمراجعة
+            if (isDraft) ...[
+              const Divider(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  ElevatedButton.icon(
+                    icon: const Icon(Icons.send, size: 16, color: Colors.white),
+                    label: const Text('إرسال للمراجعة'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.orange,
+                    ),
+                    onPressed: () async {
+                      try {
+                        await ds.submitTransferVoucher(voucher.id!);
+                        showSuccess(context, '✅ تم إرسال السند للمراجعة');
+                        onAction();
+                      } catch (e) {
+                        showError(context, '❌ فشل إرسال السند: ${e.toString()}');
+                      }
+                    },
+                  ),
+                ],
+              ),
+            ],
+            
+            // حالة قيد الانتظار: فقط إلغاء الإرسال (للمرسل)
+            if (isPending) ...[
               const Divider(height: 16),
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
@@ -1042,7 +1077,8 @@ class _OutgoingVoucherCard extends ConsumerWidget {
               ),
             ],
             
-            if (voucher.isConfirmed && voucher.confirmedBy != null)
+            // حالة مؤكد: عرض معلومات التأكيد
+            if (isConfirmed && voucher.confirmedBy != null)
               Padding(
                 padding: const EdgeInsets.only(top: 6),
                 child: Row(
