@@ -440,7 +440,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
     );
   }
 
-  // ── حوار إنشاء سند استلام من مخزن الخلاط (مادة واحدة) ──
+  // ── حوار إنشاء سند استلام من مخزن الخلاط (مثل بقية النوافذ - مادة واحدة) ──
   void _showCreateReceivingVoucherDialog(BuildContext context) {
     final summaryAsync = ref.read(inventorySummaryProvider);
     final allItems = summaryAsync.value ?? [];
@@ -487,7 +487,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
 
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text('✅ تم إنشاء سند الاستلام بنجاح (قيد الانتظار)'),
+                content: Text('✅ تم إنشاء سند الاستلام بنجاح (بانتظار الاستلام)'),
                 backgroundColor: Colors.green,
               ),
             );
@@ -1077,7 +1077,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage>
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// كلاس حوار إنشاء سند استلام من الخلاط (مادة واحدة)
+// كلاس حوار إنشاء سند استلام من الخلاط (مثل بقية النوافذ - مادة واحدة)
 // ══════════════════════════════════════════════════════════════════════════════
 
 class _CreateReceivingVoucherDialog extends StatefulWidget {
@@ -1118,7 +1118,6 @@ class _CreateReceivingVoucherDialogState extends State<_CreateReceivingVoucherDi
       _selectedUnit = materials.first.unit;
     }
 
-    // العثور على المادة المحددة
     InventorySummaryModel? selectedMaterial;
     if (_selectedMaterialId.isNotEmpty) {
       try {
@@ -1143,6 +1142,7 @@ class _CreateReceivingVoucherDialogState extends State<_CreateReceivingVoucherDi
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // مؤشر التدفق
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
@@ -1164,6 +1164,7 @@ class _CreateReceivingVoucherDialogState extends State<_CreateReceivingVoucherDi
               ),
               const SizedBox(height: 16),
               
+              // اختيار المادة (Dropdown)
               DropdownButtonFormField<String>(
                 value: _selectedMaterialId.isNotEmpty ? _selectedMaterialId : null,
                 decoration: const InputDecoration(
@@ -1193,6 +1194,7 @@ class _CreateReceivingVoucherDialogState extends State<_CreateReceivingVoucherDi
               ),
               const SizedBox(height: 16),
               
+              // الكمية
               TextFormField(
                 controller: _qtyController,
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -1211,6 +1213,7 @@ class _CreateReceivingVoucherDialogState extends State<_CreateReceivingVoucherDi
               ),
               const SizedBox(height: 16),
               
+              // ملاحظات
               TextField(
                 controller: _notesController,
                 maxLines: 2,
