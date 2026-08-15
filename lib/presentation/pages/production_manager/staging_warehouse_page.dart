@@ -13,20 +13,17 @@ import '../../providers/reference_data_provider.dart';
 // Providers
 // ──────────────────────────────────────────────────────────────────────────────
 
-/// مخزون المخزن المرحلي
 final stagingInventoryProvider = FutureProvider.autoDispose<List<InventorySummaryModel>>((ref) async {
   final summary = await ref.watch(inventorySummaryProvider.future);
   return summary.where((m) => m.warehouseType == 'staging').toList();
 });
 
-/// سندات وارد من الرئيسي (main → staging)
 final stagingIncomingProvider = FutureProvider.autoDispose<List<TransferVoucherModel>>((ref) async {
   final ds = ref.read(dataSourceProvider);
   final raw = await ds.getTransferVouchers(transferType: 'main_to_staging');
   return raw.map(TransferVoucherModel.fromJson).toList();
 });
 
-/// سندات صادر للخلاط (staging → mixer)
 final stagingOutgoingProvider = FutureProvider.autoDispose<List<TransferVoucherModel>>((ref) async {
   final ds = ref.read(dataSourceProvider);
   final raw = await ds.getTransferVouchers(transferType: 'staging_to_mixer');
@@ -510,7 +507,6 @@ class _VoucherCard extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // رأس البطاقة
             Row(
               children: [
                 Chip(
@@ -539,7 +535,6 @@ class _VoucherCard extends ConsumerWidget {
               ],
             ),
             
-            // نوع التحويل
             Padding(
               padding: const EdgeInsets.only(top: 4),
               child: Text(
@@ -554,7 +549,7 @@ class _VoucherCard extends ConsumerWidget {
             
             const SizedBox(height: 8),
             
-            // ── عرض المادة مع الكمية المحددة ──
+            // عرض المادة مع الكمية
             if (voucher.items.isNotEmpty)
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -602,13 +597,11 @@ class _VoucherCard extends ConsumerWidget {
                 ),
               ),
             
-            // ─── الأزرار ──────────────────────────────────────────────────────
             if (!voucher.isConfirmed && !voucher.isCancelled) ...[
               const Divider(height: 16),
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  // إلغاء
                   TextButton.icon(
                     icon: const Icon(Icons.cancel_outlined, color: Colors.red, size: 16),
                     label: const Text('إلغاء', style: TextStyle(color: Colors.red)),
@@ -631,7 +624,6 @@ class _VoucherCard extends ConsumerWidget {
                   ),
                   const SizedBox(width: 8),
                   
-                  // إرسال للمراجعة (إذا كان مسودة)
                   if (voucher.isDraft)
                     ElevatedButton.icon(
                       icon: const Icon(Icons.send, size: 16),
@@ -648,7 +640,6 @@ class _VoucherCard extends ConsumerWidget {
                       },
                     ),
                   
-                  // تأكيد الاستلام (إذا كان في انتظار)
                   if (voucher.isPending)
                     ElevatedButton.icon(
                       icon: const Icon(Icons.check_circle, size: 16),
@@ -693,7 +684,6 @@ class _VoucherCard extends ConsumerWidget {
               ),
             ],
             
-            // معلومات التأكيد
             if (voucher.isConfirmed && voucher.confirmedBy != null)
               Padding(
                 padding: const EdgeInsets.only(top: 6),
@@ -861,7 +851,7 @@ class _StagingVoucherDialogState extends ConsumerState<_StagingVoucherDialog> {
 
     final selectedMaterial = materials.firstWhere(
       (m) => m.materialId == _selectedMaterialId,
-      orElse: () => materials.isNotEmpty ? materials.first : InventorySummaryModel.empty(),
+      orElse: () => materials.isNotEmpty ? materials.first : InventorySummaryModel(materialId: '', materialName: '', unit: 'كجم', currentBalance: 0),
     );
 
     return AlertDialog(
@@ -873,7 +863,6 @@ class _StagingVoucherDialogState extends ConsumerState<_StagingVoucherDialog> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // مؤشر التدفق
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
@@ -895,7 +884,6 @@ class _StagingVoucherDialogState extends ConsumerState<_StagingVoucherDialog> {
               ),
               const SizedBox(height: 16),
               
-              // اختيار المادة (Dropdown)
               DropdownButtonFormField<String>(
                 value: _selectedMaterialId.isNotEmpty ? _selectedMaterialId : null,
                 decoration: const InputDecoration(
@@ -925,7 +913,6 @@ class _StagingVoucherDialogState extends ConsumerState<_StagingVoucherDialog> {
               ),
               const SizedBox(height: 16),
               
-              // الكمية
               TextFormField(
                 controller: _qtyController,
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -933,7 +920,7 @@ class _StagingVoucherDialogState extends ConsumerState<_StagingVoucherDialog> {
                   labelText: 'الكمية (${selectedMaterial.unit})',
                   border: const OutlineInputBorder(),
                   prefixIcon: const Icon(Icons.scale_outlined),
-                  helperText: selectedMaterial.id.isNotEmpty
+                  helperText: selectedMaterial.materialId.isNotEmpty
                       ? 'المتاح: ${selectedMaterial.currentBalance.toStringAsFixed(2)} ${selectedMaterial.unit}'
                       : null,
                   helperStyle: const TextStyle(color: Colors.grey),
@@ -944,7 +931,6 @@ class _StagingVoucherDialogState extends ConsumerState<_StagingVoucherDialog> {
               ),
               const SizedBox(height: 16),
               
-              // ملاحظات
               TextField(
                 controller: _notesCtrl,
                 maxLines: 2,
