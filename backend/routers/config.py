@@ -3,7 +3,7 @@ from fastapi import APIRouter, Request
 
 router = APIRouter(prefix="/api", tags=["config"])
 
-_DEFAULT_API_BASE_URL = "https://plastic-factory-api-backend.onrender.com"
+_DEFAULT_API_BASE_URL = "https://plastic-factory-api-backend-demo.onrender.com"
 
 @router.get("/config")
 async def get_config(request: Request):
